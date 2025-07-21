@@ -1,9 +1,9 @@
-import { createClient } from '@supabase/supabase-js'
-import bcrypt from 'bcryptjs'
+const { createClient } = require('@supabase/supabase-js')
+const bcrypt = require('bcryptjs')
 
 const supabase = createClient(
   "https://yjlzizakdjghpfduxcki.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqbHppemFrZGpnaHBmZHV4Y2tpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MzYyNzgsImV4cCI6MjA2NzUxMjI3OH0.zvvQ1ydbil2rjxlknyYZ7NF9qsgSkO-UbkofJbxe3AU" // 임시로 anon key 사용
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqbHppemFrZGpnaHBmZHV4Y2tpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MzYyNzgsImV4cCI6MjA2NzUxMjI3OH0.zvvQ1ydbil2rjxlknyYZ7NF9qsgSkO-UbkofJbxe3AU"
 )
 
 // JWT 토큰 검증 함수
@@ -16,7 +16,7 @@ function validateToken(token) {
   }
 }
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   try {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
@@ -78,7 +78,7 @@ export default async function handler(req, res) {
         .from('admin_users')
         .insert([{
           username,
-          password: passwordHash, // password_hash 대신 password 사용
+          password: passwordHash,
           name,
           is_active: true
         }])
@@ -86,7 +86,7 @@ export default async function handler(req, res) {
         .single();
 
       if (error) {
-        if (error.code === '23505') { // 중복 사용자명
+        if (error.code === '23505') {
           return res.status(400).json({
             success: false,
             error: '이미 존재하는 사용자명입니다'
@@ -118,7 +118,7 @@ export default async function handler(req, res) {
       if (name) updateData.name = name;
       if (typeof is_active === 'boolean') updateData.is_active = is_active;
       if (newPassword) {
-        updateData.password = await bcrypt.hash(newPassword, 10); // password_hash 대신 password 사용
+        updateData.password = await bcrypt.hash(newPassword, 10);
       }
       updateData.updated_at = new Date().toISOString();
 
@@ -149,7 +149,6 @@ export default async function handler(req, res) {
         });
       }
 
-      // 자기 자신은 삭제할 수 없도록 보호
       if (id === tokenData.userId) {
         return res.status(400).json({
           success: false,
@@ -179,7 +178,7 @@ export default async function handler(req, res) {
     console.error('Users API Error:', error);
     return res.status(500).json({
       success: false,
-      error: '서버 오류가 발생했습니다'
+      error: '서버 오류가 발생했습니다: ' + error.message
     });
   }
 } 
