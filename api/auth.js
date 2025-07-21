@@ -1,5 +1,5 @@
-import { createClient } from '@supabase/supabase-js'
-import bcrypt from 'bcryptjs'
+const { createClient } = require('@supabase/supabase-js')
+const bcrypt = require('bcryptjs')
 
 // 환경 변수에서 Supabase 설정 가져오기
 const supabase = createClient(
@@ -18,7 +18,7 @@ function generateSecureToken(user) {
   return Buffer.from(JSON.stringify(payload)).toString('base64')
 }
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   try {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
