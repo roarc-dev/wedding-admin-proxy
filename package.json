@@ -1,0 +1,17 @@
+{
+  "name": "wedding-admin-proxy",
+  "version": "1.0.0",
+  "description": "Proxy server for Framer wedding admin",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "bcryptjs": "^2.4.3"
+  },
+  "devDependencies": {
+    "vercel": "^33.0.0"
+  }
+} 
