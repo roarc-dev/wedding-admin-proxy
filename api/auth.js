@@ -14,7 +14,7 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
   if (req.method === "OPTIONS") {
-    // 인증 검사 없이 200 OK로 응답!
+    // 인증/권한 체크 없이 무조건 200 OK로 응답!
     res.status(200).end();
     return;
   }
