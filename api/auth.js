@@ -8,45 +8,20 @@ const supabase = createClient(
 )
 
 export default async function handler(req, res) {
-  try {
-    // CORS 헤더는 항상 추가
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
-    if (req.method === "OPTIONS") {
-      res.status(200).end();
-      return;
-    }
-
-    if (req.method === "POST") {
-      const { action, username, password } = req.body || {};
-      if (action === "login") {
-        // 실제 로그인 로직 (예시: admin/admin)
-        if (username === "admin" && password === "admin") {
-          return res.status(200).json({
-            success: true,
-            user: { id: 1, username: "admin" },
-            token: "dummy-token",
-          });
-        } else {
-          return res.status(401).json({
-            success: false,
-            error: "아이디 또는 비밀번호가 올바르지 않습니다.",
-          });
-        }
-      }
-      return res.status(400).json({ success: false, error: "Invalid action" });
-    }
-
-    res.status(405).json({ success: false, error: "Method Not Allowed" });
-  } catch (error) {
-    console.error('Auth API Error:', error)
-    return res.status(500).json({ 
-      success: false, 
-      error: 'Internal server error' 
-    })
+  if (req.method === "OPTIONS") {
+    res.status(200).end();
+    return;
   }
+
+  if (req.method === "POST") {
+    return res.status(200).json({ success: true });
+  }
+
+  res.status(405).json({ success: false, error: "Method Not Allowed" });
 }
 
 async function handleLogin(req, res, username, password) {
