@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs')
 
 const supabase = createClient(
   "https://yjlzizakdjghpfduxcki.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqbHppemFrZGpnaHBmZHV4Y2tpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MzYyNzgsImV4cCI6MjA2NzUxMjI3OH0.zvvQ1ydbil2rjxlknyYZ7NF9qsgSkO-UbkofJbxe3AU"
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqbHppemFrZGpnaHBmZHV4Y2tpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MTkzNjI3OCwiZXhwIjoyMDY3NTEyMjc4fQ.2dDp8I8CNRX3tYJK1hJrM8_1PZ2E3WKY5SyqQPAGCas" // service_role key 사용
 )
 
 // JWT 토큰 검증 함수

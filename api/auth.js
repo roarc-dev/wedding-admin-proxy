@@ -3,8 +3,8 @@ import bcrypt from 'bcryptjs'
 
 // 환경 변수에서 Supabase 설정 가져오기
 const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY // Service Key 사용 (anon key 아님!)
+  "https://yjlzizakdjghpfduxcki.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqbHppemFrZGpnaHBmZHV4Y2tpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MTkzNjI3OCwiZXhwIjoyMDY3NTEyMjc4fQ.2dDp8I8CNRX3tYJK1hJrM8_1PZ2E3WKY5SyqQPAGCas" // service_role key 사용
 )
 
 function generateSecureToken(user) {
@@ -64,7 +64,7 @@ export default async function handler(req, res) {
             // 이미 해시된 비밀번호
             isValidPassword = await bcrypt.compare(password, user.password);
           } else {
-            // 평문 비밀번호 (기존 데이터)
+            // 평문 비밀번호 (기존 데이터 - hobo1016! 등)
             isValidPassword = password === user.password;
             
             // 로그인 성공 시 해시로 업데이트
