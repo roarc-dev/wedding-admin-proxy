@@ -39,10 +39,35 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    console.log('Request method:', req.method);
+    console.log('Request body:', req.body);
+
     if (req.method === "POST") {
-      const { action, username, password, name, page_id } = req.body || {};
+      let body;
       
-      console.log('Received POST request:', { action, username, hasPassword: !!password, name });
+      // req.body가 없는 경우 요청을 파싱
+      if (!req.body) {
+        let rawBody = '';
+        req.on('data', chunk => {
+          rawBody += chunk.toString();
+        });
+        await new Promise(resolve => {
+          req.on('end', () => {
+            try {
+              body = JSON.parse(rawBody);
+            } catch (e) {
+              body = {};
+            }
+            resolve();
+          });
+        });
+      } else {
+        body = req.body;
+      }
+
+      const { action, username, password, name, page_id } = body || {};
+      
+      console.log('Parsed body:', { action, username, hasPassword: !!password, name });
       
       // 사용자 회원가입 (승인 대기 상태로 등록)
       if (action === "signup") {
