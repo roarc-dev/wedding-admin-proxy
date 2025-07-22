@@ -130,9 +130,8 @@ async function signupUserDirectly(userData) {
             username: userData.username,
             password: hashedPassword,
             name: userData.name,
-            is_active: false,
-            approval_status: "pending",
-            page_id: null
+            role: 'admin', // 기본 역할
+            is_active: false // 승인 대기 상태
         };
         
         console.log("Insert data:", insertData);

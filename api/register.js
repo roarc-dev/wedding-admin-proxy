@@ -34,11 +34,19 @@ module.exports = async function handler(req, res) {
 
       try {
         // 중복 사용자명 체크
-        const { data: existingUser } = await supabase
+        const { data: existingUser, error: checkError } = await supabase
           .from('admin_users')
           .select('username')
           .eq('username', username)
-          .single();
+          .maybeSingle(); // single() 대신 maybeSingle() 사용
+
+        if (checkError) {
+          console.error('User check error:', checkError);
+          return res.status(500).json({
+            success: false,
+            error: '사용자명 중복 확인 중 오류가 발생했습니다: ' + checkError.message
+          });
+        }
 
         if (existingUser) {
           return res.status(400).json({
@@ -50,17 +58,17 @@ module.exports = async function handler(req, res) {
         // 비밀번호 해싱
         const passwordHash = await bcrypt.hash(password, 10);
 
+        // 새 사용자 생성 (실제 테이블 구조에 맞춤)
         const { data: newUser, error } = await supabase
           .from('admin_users')
           .insert([{
             username,
             password: passwordHash,
             name,
-            is_active: false, // 승인 대기 상태
-            approval_status: 'pending', // 승인 상태 추가
-            page_id: null // 관리자가 승인 시 발급
+            role: 'admin', // 기본 역할
+            is_active: false // 승인 대기 상태 (기본값이 true이지만 명시적으로 false 설정)
           }])
-          .select('id, username, name, approval_status')
+          .select('id, username, name, role, is_active')
           .single();
 
         if (error) {
@@ -76,7 +84,12 @@ module.exports = async function handler(req, res) {
         return res.status(201).json({
           success: true,
           message: '회원가입이 완료되었습니다. 관리자 승인을 기다려주세요.',
-          data: newUser
+          data: {
+            id: newUser.id,
+            username: newUser.username,
+            name: newUser.name,
+            status: newUser.is_active ? 'active' : 'pending_approval'
+          }
         });
 
       } catch (supabaseError) {
