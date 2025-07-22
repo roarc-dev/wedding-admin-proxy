@@ -7,14 +7,14 @@ const PROXY_BASE_URL = "https://wedding-admin-proxy-1lp2vfy5v-roarcs-projects.ve
 
 // 직접 Supabase 연결 설정 (테스트용)
 const SUPABASE_URL_OPTIONS = [
-    "https://ydgqnpmybrlnkmklyokf.supabase.co",
-    "https://ydgqnpmybrlnkmklyokf.supabase.com", 
-    "https://api.ydgqnpmybrlnkmklyokf.supabase.co"
+    "https://yjlzizakdjghpfduxcki.supabase.co",
+    "https://yjlzizakdjghpfduxcki.supabase.com", 
+    "https://api.yjlzizakdjghpfduxcki.supabase.co"
 ];
 const SUPABASE_URL = SUPABASE_URL_OPTIONS[0]; // 기본값
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlkZ3FucG15YnJsbmtta2x5b2tmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzcyOTY0MDgsImV4cCI6MjA1Mjg3MjQwOH0.HQfEgPkqzFGRJMsyEGJjrFYnUuO1k6bJ9aKP8LrIX-w"
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqbHppemFrZGpnaHBmZHV4Y2tpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzcyOTY0MDgsImV4cCI6MjA1Mjg3MjQwOH0.9YQXZBanpE8OO1E2bgkRlbJYzKKWvfEuPInL1mgtFi8"
 // Service Role Key (RLS 우회용 - 프로덕션에서는 절대 노출하면 안됨!)
-const SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlkZ3FucG15YnJsbmtta2x5b2tmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczNzI5NjQwOCwiZXhwIjoyMDUyODcyNDA4fQ.Z0DxoXOJYy7aTSLZHKUJWoMRH0h8qGJz6V4JhZZldjQ"
+const SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqbHppemFrZGpnaHBmZHV4Y2tpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczNzI5NjQwOCwiZXhwIjoyMDUyODcyNDA4fQ.Cj8tD8KVzqbgBKwJZGcCpFQktPY3QVh6MJ8b5ZX0_38"
 
 // bcrypt 해싱을 위한 간단한 해시 함수 (실제로는 서버에서 해야 함)
 async function simpleHash(password) {
