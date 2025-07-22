@@ -18,7 +18,7 @@ function formatDateForCalendar(date: Date): string {
     return `${year}${month}${day}T${hours}${minutes}${seconds}`
 }
 
-interface AddToCalendarButtonProps {
+interface CalendarAddBtnProps {
     pageId: string
     buttonText?: string
     buttonBackgroundColor?: string
@@ -32,13 +32,13 @@ interface AddToCalendarButtonProps {
     }
 }
 
-export function AddToCalendarButton({
+export default function CalendarAddBtn({
     pageId = "demo",
     buttonText = "캘린더 추가",
     buttonBackgroundColor = "#007AFF",
     buttonTextColor = "#FFFFFF",
     buttonFont,
-}: AddToCalendarButtonProps) {
+}: CalendarAddBtnProps) {
     const [pageSettings, setPageSettings] = useState({
         groom_name_kr: '',
         bride_name_kr: '',
@@ -153,7 +153,7 @@ export function AddToCalendarButton({
     )
 }
 
-addPropertyControls(AddToCalendarButton, {
+addPropertyControls(CalendarAddBtn, {
     pageId: {
         type: ControlType.String,
         title: "페이지 ID",
