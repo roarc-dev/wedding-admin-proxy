@@ -15,23 +15,33 @@ export default async function handler(req, res) {
     return res.status(200).end()
   }
 
-  // 토큰 검증
-  const authHeader = req.headers.authorization
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ 
-      success: false, 
-      error: '인증 토큰이 필요합니다' 
-    })
-  }
+  // 공개 이미지 조회는 인증 건너뛰기 (갤러리용)
+  const isPublicImageRequest = req.method === 'GET' && (
+    req.query.action === 'getByPageId' || 
+    req.query.action === 'getAllPages'
+  )
 
-  const token = authHeader.substring(7)
-  const validatedUser = validateToken(token)
-  
-  if (!validatedUser) {
-    return res.status(401).json({ 
-      success: false, 
-      error: '유효하지 않은 토큰입니다' 
-    })
+  let validatedUser = null
+
+  if (!isPublicImageRequest) {
+    // 관리자 기능은 토큰 검증 필요
+    const authHeader = req.headers.authorization
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ 
+        success: false, 
+        error: '인증 토큰이 필요합니다' 
+      })
+    }
+
+    const token = authHeader.substring(7)
+    validatedUser = validateToken(token)
+    
+    if (!validatedUser) {
+      return res.status(401).json({ 
+        success: false, 
+        error: '유효하지 않은 토큰입니다' 
+      })
+    }
   }
 
   try {
@@ -127,11 +137,42 @@ async function handleGetImages(req, res) {
 }
 
 async function handleImageOperation(req, res) {
-  const { action, pageId, fileName, originalName, fileSize, publicUrl, displayOrder } = req.body
+  const { action, pageId, fileData, originalName, fileSize, displayOrder } = req.body
 
   try {
     if (action === 'upload') {
-      // 이미지 정보 데이터베이스에 저장
+      // Base64 데이터에서 실제 파일 데이터 추출
+      const matches = fileData.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/)
+      if (!matches || matches.length !== 3) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid file data format'
+        })
+      }
+
+      const mimeType = matches[1]
+      const base64Data = matches[2]
+      const buffer = Buffer.from(base64Data, 'base64')
+
+      // 파일명 생성
+      const fileName = `${pageId}/${Date.now()}_${Math.random().toString(36).substring(2)}.jpg`
+
+      // Supabase 스토리지에 업로드
+      const { error: uploadError } = await supabase.storage
+        .from('images')
+        .upload(fileName, buffer, {
+          contentType: mimeType,
+          cacheControl: '3600'
+        })
+
+      if (uploadError) throw uploadError
+
+      // 공개 URL 생성
+      const { data: { publicUrl } } = supabase.storage
+        .from('images')
+        .getPublicUrl(fileName)
+
+      // 데이터베이스에 메타데이터 저장
       const { data, error } = await supabase
         .from('images')
         .insert({
@@ -139,6 +180,7 @@ async function handleImageOperation(req, res) {
           filename: fileName,
           original_name: originalName,
           file_size: fileSize,
+          mime_type: mimeType,
           public_url: publicUrl,
           display_order: displayOrder
         })
