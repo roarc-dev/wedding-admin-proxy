@@ -8,12 +8,13 @@ const PROXY_BASE_URL = "https://wedding-admin-proxy-1lp2vfy5v-roarcs-projects.ve
 // 회원가입 함수
 async function signupUser(userData) {
     try {
-        const response = await fetch(`${PROXY_BASE_URL}/api/signup`, {
+        const response = await fetch(`${PROXY_BASE_URL}/api/auth`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
+                action: "register",
                 username: userData.username,
                 password: userData.password,
                 name: userData.name
