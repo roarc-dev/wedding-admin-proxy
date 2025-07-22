@@ -6,7 +6,12 @@ import { addPropertyControls, ControlType } from "framer"
 const PROXY_BASE_URL = "https://wedding-admin-proxy-1lp2vfy5v-roarcs-projects.vercel.app"
 
 // 직접 Supabase 연결 설정 (테스트용)
-const SUPABASE_URL = "https://ydgqnpmybrlnkmklyokf.supabase.co"
+const SUPABASE_URL_OPTIONS = [
+    "https://ydgqnpmybrlnkmklyokf.supabase.co",
+    "https://ydgqnpmybrlnkmklyokf.supabase.com", 
+    "https://api.ydgqnpmybrlnkmklyokf.supabase.co"
+];
+const SUPABASE_URL = SUPABASE_URL_OPTIONS[0]; // 기본값
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlkZ3FucG15YnJsbmtta2x5b2tmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzcyOTY0MDgsImV4cCI6MjA1Mjg3MjQwOH0.HQfEgPkqzFGRJMsyEGJjrFYnUuO1k6bJ9aKP8LrIX-w"
 // Service Role Key (RLS 우회용 - 프로덕션에서는 절대 노출하면 안됨!)
 const SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlkZ3FucG15YnJsbmtta2x5b2tmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczNzI5NjQwOCwiZXhwIjoyMDUyODcyNDA4fQ.Z0DxoXOJYy7aTSLZHKUJWoMRH0h8qGJz6V4JhZZldjQ"
@@ -52,26 +57,43 @@ async function signupUserDirectly(userData) {
         
         // Service Role Key 사용 (RLS 우회)
         const API_KEY = SUPABASE_SERVICE_KEY;
+        let workingUrl = null;
         
-        // 0. Supabase 연결 테스트
-        console.log("Testing Supabase connection...");
-        const testResponse = await fetch(`${SUPABASE_URL}/rest/v1/`, {
-            method: "GET",
-            headers: {
-                "apikey": API_KEY,
-                "Authorization": `Bearer ${API_KEY}`
+        // 0. 여러 URL 옵션 테스트
+        console.log("Testing multiple Supabase URLs...");
+        for (const urlOption of SUPABASE_URL_OPTIONS) {
+            try {
+                console.log(`Testing URL: ${urlOption}`);
+                const testResponse = await fetch(`${urlOption}/rest/v1/`, {
+                    method: "GET",
+                    headers: {
+                        "apikey": API_KEY,
+                        "Authorization": `Bearer ${API_KEY}`
+                    }
+                });
+                
+                console.log(`${urlOption} response status:`, testResponse.status);
+                
+                if (testResponse.ok || testResponse.status === 200) {
+                    workingUrl = urlOption;
+                    console.log(`✅ Working URL found: ${workingUrl}`);
+                    break;
+                }
+            } catch (urlError) {
+                console.log(`❌ URL ${urlOption} failed:`, urlError.message);
+                continue;
             }
-        });
-        
-        console.log("Connection test response status:", testResponse.status);
-        
-        if (!testResponse.ok) {
-            throw new Error(`Supabase 연결 실패: ${testResponse.status}`);
         }
         
-        // 1. 중복 사용자명 체크 (먼저 단순한 SELECT 시도)
+        if (!workingUrl) {
+            // 모든 URL이 실패한 경우, 프록시로 연결 시도
+            console.log("All direct URLs failed, trying via proxy...");
+            throw new Error("모든 Supabase URL 연결 실패. 프록시 연결을 시도하세요.");
+        }
+        
+        // 1. 중복 사용자명 체크
         console.log("Checking for existing users...");
-        const checkResponse = await fetch(`${SUPABASE_URL}/rest/v1/admin_users?username=eq.${userData.username}&select=username`, {
+        const checkResponse = await fetch(`${workingUrl}/rest/v1/admin_users?username=eq.${userData.username}&select=username`, {
             method: "GET",
             headers: {
                 "apikey": API_KEY,
@@ -115,7 +137,7 @@ async function signupUserDirectly(userData) {
         
         console.log("Insert data:", insertData);
         
-        const insertResponse = await fetch(`${SUPABASE_URL}/rest/v1/admin_users`, {
+        const insertResponse = await fetch(`${workingUrl}/rest/v1/admin_users`, {
             method: "POST",
             headers: {
                 "apikey": API_KEY,
@@ -189,17 +211,52 @@ export default function UserSignup(props) {
         }
 
         // 선택된 방식으로 회원가입 시도
-        const result = useDirectConnection 
-            ? await signupUserDirectly({
-                username: signupForm.username,
-                password: signupForm.password,
-                name: signupForm.name
-            })
-            : await signupUserViaProxy({
+        let result;
+        
+        if (useDirectConnection) {
+            console.log("🔧 직접 연결 모드로 회원가입 시도");
+            result = await signupUserDirectly({
                 username: signupForm.username,
                 password: signupForm.password,
                 name: signupForm.name
             });
+            
+            // 직접 연결이 실패하면 프록시로 자동 전환
+            if (!result.success && result.error.includes("URL 연결 실패")) {
+                console.log("🔄 직접 연결 실패, 프록시 모드로 자동 전환");
+                setError(`직접 연결 실패: ${result.error}. 프록시 모드로 재시도 중...`);
+                
+                // 2초 후 프록시로 재시도
+                setTimeout(async () => {
+                    const proxyResult = await signupUserViaProxy({
+                        username: signupForm.username,
+                        password: signupForm.password,
+                        name: signupForm.name
+                    });
+                    
+                    if (proxyResult.success) {
+                        setSuccess(`${proxyResult.message} (프록시를 통해 완료됨)`);
+                        setSignupForm({
+                            username: "",
+                            password: "",
+                            confirmPassword: "",
+                            name: ""
+                        });
+                    } else {
+                        setError(`프록시 연결도 실패: ${proxyResult.error}`);
+                    }
+                    setIsSigningUp(false);
+                }, 2000);
+                return;
+            }
+        } else {
+            console.log("🌐 프록시 모드로 회원가입 시도");
+            result = await signupUserViaProxy({
+                username: signupForm.username,
+                password: signupForm.password,
+                name: signupForm.name
+            });
+        }
 
         if (result.success) {
             setSuccess(result.message)
