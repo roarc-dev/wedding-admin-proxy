@@ -2,8 +2,8 @@ import React, { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { addPropertyControls, ControlType } from "framer"
 
-// 프록시 서버 URL (최신 배포)
-const PROXY_BASE_URL = "https://wedding-admin-proxy-2wca9wciw-roarcs-projects.vercel.app"
+// 프록시 서버 URL (고정된 Production URL)
+const PROXY_BASE_URL = "https://wedding-admin-proxy-git-main-roarcs-projects.vercel.app"
 
 // 회원가입 함수 - 프록시를 통한 안전한 연결
 async function signupUser(userData) {
