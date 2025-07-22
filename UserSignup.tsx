@@ -2,8 +2,8 @@ import React, { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { addPropertyControls, ControlType } from "framer"
 
-// 프록시 서버 URL
-const PROXY_BASE_URL = "https://wedding-admin-proxy-1lp2vfy5v-roarcs-projects.vercel.app"
+// 프록시 서버 URL (최신 배포)
+const PROXY_BASE_URL = "https://wedding-admin-proxy-11zu4u6vm-roarcs-projects.vercel.app"
 
 // 직접 Supabase 연결 설정 (테스트용)
 const SUPABASE_URL_OPTIONS = [
