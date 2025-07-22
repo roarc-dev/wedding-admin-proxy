@@ -90,16 +90,18 @@ async function handleGetSettings(req, res) {
     if (!data) {
       const defaultSettings = {
         page_id: pageId,
-        groom_name: '',
-        bride_name: '',
-        wedding_location: '',
-        photo_section_display_datetime: '',
-        photo_section_location: '',
+        groom_name_kr: '',
+        groom_name_en: '',
+        bride_name_kr: '',
+        bride_name_en: '',
+        wedding_date: null,
+        wedding_hour: '14',
+        wedding_minute: '00',
+        venue_name: '',
+        venue_address: '',
+        photo_section_image_url: '',
         photo_section_overlay_position: 'bottom',
-        photo_section_overlay_color: '#ffffff',
-        event_name: '',
-        event_details: '',
-        map_place_name: ''
+        photo_section_overlay_color: '#ffffff'
       }
 
       const { data: newData, error: insertError } = await supabase

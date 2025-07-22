@@ -40,13 +40,13 @@ export function AddToCalendarButton({
     buttonFont,
 }: AddToCalendarButtonProps) {
     const [pageSettings, setPageSettings] = useState({
-        groom_name: '',
-        bride_name: '',
+        groom_name_kr: '',
+        bride_name_kr: '',
         wedding_date: '',
-        wedding_time: '',
-        wedding_location: '',
-        event_name: '',
-        event_details: '',
+        wedding_hour: '14',
+        wedding_minute: '00',
+        venue_name: '',
+        venue_address: ''
     })
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
@@ -80,18 +80,17 @@ export function AddToCalendarButton({
     }
 
     const handleClick = () => {
-        if (!pageSettings.wedding_date || !pageSettings.wedding_time) {
+        if (!pageSettings.wedding_date || !pageSettings.wedding_hour || !pageSettings.wedding_minute) {
             alert('웨딩 날짜와 시간이 설정되지 않았습니다.')
             return
         }
 
         try {
-            // wedding_time ("HH:mm") 파싱
-            const [hoursStr, minutesStr] = pageSettings.wedding_time.split(":")
-            const startHour = parseInt(hoursStr, 10)
-            const startMinute = parseInt(minutesStr, 10)
+            // 시간 정보 파싱
+            const startHour = parseInt(pageSettings.wedding_hour, 10)
+            const startMinute = parseInt(pageSettings.wedding_minute, 10)
 
-            // wedding_date에 wedding_time 정보를 적용하여 시작 시간 생성
+            // wedding_date에 시간 정보를 적용하여 시작 시간 생성
             const startDateTime = new Date(pageSettings.wedding_date)
             startDateTime.setHours(startHour, startMinute, 0, 0)
 
@@ -99,10 +98,13 @@ export function AddToCalendarButton({
             const endDateTime = new Date(startDateTime.getTime() + 2 * 60 * 60 * 1000)
             const eventDates = `${formatDateForCalendar(startDateTime)}/${formatDateForCalendar(endDateTime)}`
 
-            // 이벤트명과 설명 기본값 설정
-            const eventName = pageSettings.event_name || `${pageSettings.groom_name} ♥ ${pageSettings.bride_name}의 결혼식`
-            const eventDetails = pageSettings.event_details || `${pageSettings.groom_name}과 ${pageSettings.bride_name}의 새로운 출발을 축하해 주세요`
-            const eventLocation = pageSettings.wedding_location || ''
+            // 이벤트명과 설명 자동 생성 (성 제외하고 이름만 사용)
+            const groomFirstName = pageSettings.groom_name_kr ? pageSettings.groom_name_kr.slice(-2) : "신랑"
+            const brideFirstName = pageSettings.bride_name_kr ? pageSettings.bride_name_kr.slice(-2) : "신부"
+            
+            const eventName = `${groomFirstName} ♥ ${brideFirstName}의 결혼식`
+            const eventDetails = `${groomFirstName}과 ${brideFirstName}의 새로운 출발을 축하해 주세요`
+            const eventLocation = pageSettings.venue_name || ''
 
             const url = `https://calendar.google.com/calendar/u/0/r/eventedit?text=${encodeURIComponent(
                 eventName
