@@ -1,9 +1,13 @@
 const { createClient } = require('@supabase/supabase-js')
 const bcrypt = require('bcryptjs')
 
-// 환경 변수에서 Supabase 설정 가져오기 (임시 하드코딩)
-const supabaseUrl = process.env.SUPABASE_URL || 'https://yjlzizakdjghpfduxcki.supabase.co'
-const supabaseKey = process.env.SUPABASE_SERVICE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqbHppemFrZGpnaHBmZHV4Y2tpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczNzI5NjQwOCwiZXhwIjoyMDUyODcyNDA4fQ.Cj8tD8KVzqbgBKwJZGcCpFQktPY3QVh6MJ8b5ZX0_38'
+// 환경 변수에서 Supabase 설정 가져오기
+const supabaseUrl = process.env.SUPABASE_URL
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY
+
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error('SUPABASE_URL and SUPABASE_SERVICE_KEY environment variables are required')
+}
 
 const supabase = createClient(supabaseUrl, supabaseKey)
 

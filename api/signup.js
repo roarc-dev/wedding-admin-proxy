@@ -2,8 +2,12 @@ const { createClient } = require('@supabase/supabase-js')
 const bcrypt = require('bcryptjs')
 
 // Supabase 설정
-const supabaseUrl = process.env.SUPABASE_URL || 'https://ydgqnpmybrlnkmklyokf.supabase.co'
-const supabaseKey = process.env.SUPABASE_SERVICE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlkZ3FucG15YnJsbmtta2x5b2tmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczNzI5NjQwOCwiZXhwIjoyMDUyODcyNDA4fQ.Z0DxoXOJYy7aTSLZHKUJWoMRH0h8qGJz6V4JhZZldjQ'
+const supabaseUrl = process.env.SUPABASE_URL
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY
+
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error('SUPABASE_URL and SUPABASE_SERVICE_KEY environment variables are required')
+}
 
 const supabase = createClient(supabaseUrl, supabaseKey)
 

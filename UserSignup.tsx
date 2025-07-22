@@ -3,30 +3,10 @@ import { motion, AnimatePresence } from "framer-motion"
 import { addPropertyControls, ControlType } from "framer"
 
 // 프록시 서버 URL (최신 배포)
-const PROXY_BASE_URL = "https://wedding-admin-proxy-qxtuyjpk7-roarcs-projects.vercel.app"
+const PROXY_BASE_URL = "https://wedding-admin-proxy-2wca9wciw-roarcs-projects.vercel.app"
 
-// 직접 Supabase 연결 설정 (테스트용)
-const SUPABASE_URL_OPTIONS = [
-    "https://yjlzizakdjghpfduxcki.supabase.co",
-    "https://yjlzizakdjghpfduxcki.supabase.com", 
-    "https://api.yjlzizakdjghpfduxcki.supabase.co"
-];
-const SUPABASE_URL = SUPABASE_URL_OPTIONS[0]; // 기본값
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqbHppemFrZGpnaHBmZHV4Y2tpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MzYyNzgsImV4cCI6MjA2NzUxMjI3OH0.zvvQ1ydbil2rjxlknyYZ7NF9qsgSkO-UbkofJbxe3AU"
-// 테스트용 - 실제로는 anon key만 사용하고 서버에서 처리해야 함
-const SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqbHppemFrZGpnaHBmZHV4Y2tpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MzYyNzgsImV4cCI6MjA2NzUxMjI3OH0.zvvQ1ydbil2rjxlknyYZ7NF9qsgSkO-UbkofJbxe3AU"
-
-// bcrypt 해싱을 위한 간단한 해시 함수 (실제로는 서버에서 해야 함)
-async function simpleHash(password) {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password + "wedding-salt");
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-// 회원가입 함수 - 프록시 버전
-async function signupUserViaProxy(userData) {
+// 회원가입 함수 - 프록시를 통한 안전한 연결
+async function signupUser(userData) {
     try {
         const response = await fetch(`${PROXY_BASE_URL}/api/register`, {
             method: "POST",
@@ -42,135 +22,11 @@ async function signupUserViaProxy(userData) {
 
         return await response.json()
     } catch (error) {
-        console.error("Proxy signup error:", error)
+        console.error("Signup error:", error)
         return {
             success: false,
-            error: "프록시 회원가입 중 오류가 발생했습니다",
+            error: "회원가입 중 네트워크 오류가 발생했습니다",
         }
-    }
-}
-
-// 회원가입 함수 - 직접 Supabase 연결
-async function signupUserDirectly(userData) {
-    try {
-        console.log("Direct Supabase signup attempt:", { username: userData.username, name: userData.name });
-        
-        // Service Role Key 사용 (RLS 우회)
-        const API_KEY = SUPABASE_SERVICE_KEY;
-        let workingUrl = null;
-        
-        // 0. 여러 URL 옵션 테스트
-        console.log("Testing multiple Supabase URLs...");
-        for (const urlOption of SUPABASE_URL_OPTIONS) {
-            try {
-                console.log(`Testing URL: ${urlOption}`);
-                const testResponse = await fetch(`${urlOption}/rest/v1/`, {
-                    method: "GET",
-                    headers: {
-                        "apikey": API_KEY,
-                        "Authorization": `Bearer ${API_KEY}`
-                    }
-                });
-                
-                console.log(`${urlOption} response status:`, testResponse.status);
-                
-                if (testResponse.ok || testResponse.status === 200) {
-                    workingUrl = urlOption;
-                    console.log(`✅ Working URL found: ${workingUrl}`);
-                    break;
-                }
-            } catch (urlError) {
-                console.log(`❌ URL ${urlOption} failed:`, urlError.message);
-                continue;
-            }
-        }
-        
-        if (!workingUrl) {
-            // 모든 URL이 실패한 경우, 프록시로 연결 시도
-            console.log("All direct URLs failed, trying via proxy...");
-            throw new Error("모든 Supabase URL 연결 실패. 프록시 연결을 시도하세요.");
-        }
-        
-        // 1. 중복 사용자명 체크
-        console.log("Checking for existing users...");
-        const checkResponse = await fetch(`${workingUrl}/rest/v1/admin_users?username=eq.${userData.username}&select=username`, {
-            method: "GET",
-            headers: {
-                "apikey": API_KEY,
-                "Authorization": `Bearer ${API_KEY}`,
-                "Content-Type": "application/json"
-            }
-        });
-
-        console.log("User check response status:", checkResponse.status);
-
-        if (!checkResponse.ok) {
-            const errorText = await checkResponse.text();
-            console.error("User check error:", errorText);
-            throw new Error(`중복 체크 실패: ${checkResponse.status} - ${errorText}`);
-        }
-
-        const existingUsers = await checkResponse.json();
-        console.log("Existing users check result:", existingUsers);
-        
-        if (existingUsers.length > 0) {
-            return {
-                success: false,
-                error: "이미 존재하는 사용자명입니다"
-            };
-        }
-
-        // 2. 비밀번호 해싱 (간단한 버전)
-        const hashedPassword = await simpleHash(userData.password);
-        console.log("Password hashed successfully");
-
-        // 3. 새 사용자 삽입
-        console.log("Attempting to insert new user...");
-        const insertData = {
-            username: userData.username,
-            password: hashedPassword,
-            name: userData.name,
-            role: 'admin', // 기본 역할
-            is_active: false // 승인 대기 상태
-        };
-        
-        console.log("Insert data:", insertData);
-        
-        const insertResponse = await fetch(`${workingUrl}/rest/v1/admin_users`, {
-            method: "POST",
-            headers: {
-                "apikey": API_KEY,
-                "Authorization": `Bearer ${API_KEY}`,
-                "Content-Type": "application/json",
-                "Prefer": "return=representation"
-            },
-            body: JSON.stringify(insertData)
-        });
-
-        console.log("Insert response status:", insertResponse.status);
-
-        if (!insertResponse.ok) {
-            const errorText = await insertResponse.text();
-            console.error("Insert error:", errorText);
-            throw new Error(`사용자 생성 실패: ${insertResponse.status} - ${errorText}`);
-        }
-
-        const newUser = await insertResponse.json();
-        console.log("User created successfully:", newUser);
-        
-        return {
-            success: true,
-            message: "회원가입이 완료되었습니다. 관리자 승인을 기다려주세요.",
-            data: newUser[0] || newUser
-        };
-
-    } catch (error) {
-        console.error("Direct signup error details:", error);
-        console.error("Error stack:", error.stack);
-        return {
-            success: false,
-            error: `직접 연결 회원가입 오류: ${error.message}`,
-        };
     }
 }
 
@@ -186,7 +42,6 @@ export default function UserSignup(props) {
     const [isSigningUp, setIsSigningUp] = useState(false)
     const [error, setError] = useState("")
     const [success, setSuccess] = useState("")
-    const [useDirectConnection, setUseDirectConnection] = useState(false)
 
     // 회원가입 처리
     const handleSignup = async (e) => {
@@ -209,53 +64,12 @@ export default function UserSignup(props) {
             return
         }
 
-        // 선택된 방식으로 회원가입 시도
-        let result;
-        
-        if (useDirectConnection) {
-            console.log("🔧 직접 연결 모드로 회원가입 시도");
-            result = await signupUserDirectly({
-                username: signupForm.username,
-                password: signupForm.password,
-                name: signupForm.name
-            });
-            
-            // 직접 연결이 실패하면 프록시로 자동 전환
-            if (!result.success && result.error.includes("URL 연결 실패")) {
-                console.log("🔄 직접 연결 실패, 프록시 모드로 자동 전환");
-                setError(`직접 연결 실패: ${result.error}. 프록시 모드로 재시도 중...`);
-                
-                // 2초 후 프록시로 재시도
-                setTimeout(async () => {
-                    const proxyResult = await signupUserViaProxy({
-                        username: signupForm.username,
-                        password: signupForm.password,
-                        name: signupForm.name
-                    });
-                    
-                    if (proxyResult.success) {
-                        setSuccess(`${proxyResult.message} (프록시를 통해 완료됨)`);
-                        setSignupForm({
-                            username: "",
-                            password: "",
-                            confirmPassword: "",
-                            name: ""
-                        });
-                    } else {
-                        setError(`프록시 연결도 실패: ${proxyResult.error}`);
-                    }
-                    setIsSigningUp(false);
-                }, 2000);
-                return;
-            }
-        } else {
-            console.log("🌐 프록시 모드로 회원가입 시도");
-            result = await signupUserViaProxy({
-                username: signupForm.username,
-                password: signupForm.password,
-                name: signupForm.name
-            });
-        }
+        // 프록시를 통한 안전한 회원가입 시도
+        const result = await signupUser({
+            username: signupForm.username,
+            password: signupForm.password,
+            name: signupForm.name
+        });
 
         if (result.success) {
             setSuccess(result.message)
@@ -319,45 +133,28 @@ export default function UserSignup(props) {
                     </p>
                 </div>
 
-                {/* 연결 방식 선택 */}
+                {/* 보안 정보 */}
                 <div style={{ 
                     marginBottom: "20px", 
                     padding: "15px", 
-                    backgroundColor: "#f0f9ff", 
+                    backgroundColor: "#f0fdf4", 
                     borderRadius: "8px",
-                    border: "1px solid #0ea5e9"
+                    border: "1px solid #22c55e"
                 }}>
-                    <label
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            fontSize: "14px",
-                            fontWeight: "500",
-                            color: "#0c4a6e",
-                            cursor: "pointer",
-                        }}
-                    >
-                        <input
-                            type="checkbox"
-                            checked={useDirectConnection}
-                            onChange={(e) => setUseDirectConnection(e.target.checked)}
-                            style={{
-                                width: "16px",
-                                height: "16px",
-                            }}
-                        />
-                        🔧 테스트 모드: 직접 Supabase 연결 (프록시 우회)
-                    </label>
+                    <div style={{
+                        fontSize: "14px",
+                        fontWeight: "500",
+                        color: "#15803d",
+                        marginBottom: "5px"
+                    }}>
+                        🔒 보안 연결
+                    </div>
                     <p style={{ 
                         fontSize: "12px", 
-                        color: "#0c4a6e", 
-                        margin: "5px 0 0 24px" 
+                        color: "#15803d", 
+                        margin: "0" 
                     }}>
-                        {useDirectConnection 
-                            ? "프록시를 거치지 않고 직접 Supabase에 연결합니다" 
-                            : "프록시 서버를 통해 안전하게 연결합니다"
-                        }
+                        모든 데이터는 안전한 프록시 서버를 통해 암호화되어 전송됩니다
                     </p>
                 </div>
 
@@ -559,7 +356,7 @@ export default function UserSignup(props) {
                             style={{
                                 width: "100%",
                                 padding: "14px",
-                                backgroundColor: isSigningUp ? "#9ca3af" : useDirectConnection ? "#0ea5e9" : "#1a237e",
+                                backgroundColor: isSigningUp ? "#9ca3af" : "#1a237e",
                                 color: "white",
                                 border: "none",
                                 borderRadius: "8px",
@@ -571,7 +368,7 @@ export default function UserSignup(props) {
                             whileHover={!isSigningUp ? { scale: 1.02 } : {}}
                             whileTap={!isSigningUp ? { scale: 0.98 } : {}}
                         >
-                            {isSigningUp ? "가입 중..." : `회원가입 (${useDirectConnection ? "직접 연결" : "프록시"})`}
+                            {isSigningUp ? "가입 중..." : "회원가입"}
                         </motion.button>
 
                         <div 
