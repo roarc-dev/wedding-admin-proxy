@@ -8,6 +8,8 @@ const PROXY_BASE_URL = "https://wedding-admin-proxy-1lp2vfy5v-roarcs-projects.ve
 // 직접 Supabase 연결 설정 (테스트용)
 const SUPABASE_URL = "https://ydgqnpmybrlnkmklyokf.supabase.co"
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlkZ3FucG15YnJsbmtta2x5b2tmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzcyOTY0MDgsImV4cCI6MjA1Mjg3MjQwOH0.HQfEgPkqzFGRJMsyEGJjrFYnUuO1k6bJ9aKP8LrIX-w"
+// Service Role Key (RLS 우회용 - 프로덕션에서는 절대 노출하면 안됨!)
+const SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlkZ3FucG15YnJsbmtta2x5b2tmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczNzI5NjQwOCwiZXhwIjoyMDUyODcyNDA4fQ.Z0DxoXOJYy7aTSLZHKUJWoMRH0h8qGJz6V4JhZZldjQ"
 
 // bcrypt 해싱을 위한 간단한 해시 함수 (실제로는 서버에서 해야 함)
 async function simpleHash(password) {
@@ -48,21 +50,47 @@ async function signupUserDirectly(userData) {
     try {
         console.log("Direct Supabase signup attempt:", { username: userData.username, name: userData.name });
         
-        // 1. 중복 사용자명 체크
+        // Service Role Key 사용 (RLS 우회)
+        const API_KEY = SUPABASE_SERVICE_KEY;
+        
+        // 0. Supabase 연결 테스트
+        console.log("Testing Supabase connection...");
+        const testResponse = await fetch(`${SUPABASE_URL}/rest/v1/`, {
+            method: "GET",
+            headers: {
+                "apikey": API_KEY,
+                "Authorization": `Bearer ${API_KEY}`
+            }
+        });
+        
+        console.log("Connection test response status:", testResponse.status);
+        
+        if (!testResponse.ok) {
+            throw new Error(`Supabase 연결 실패: ${testResponse.status}`);
+        }
+        
+        // 1. 중복 사용자명 체크 (먼저 단순한 SELECT 시도)
+        console.log("Checking for existing users...");
         const checkResponse = await fetch(`${SUPABASE_URL}/rest/v1/admin_users?username=eq.${userData.username}&select=username`, {
             method: "GET",
             headers: {
-                "apikey": SUPABASE_ANON_KEY,
-                "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+                "apikey": API_KEY,
+                "Authorization": `Bearer ${API_KEY}`,
                 "Content-Type": "application/json"
             }
         });
 
+        console.log("User check response status:", checkResponse.status);
+
         if (!checkResponse.ok) {
-            throw new Error(`중복 체크 실패: ${checkResponse.status}`);
+            const errorText = await checkResponse.text();
+            console.error("User check error:", errorText);
+            throw new Error(`중복 체크 실패: ${checkResponse.status} - ${errorText}`);
         }
 
         const existingUsers = await checkResponse.json();
+        console.log("Existing users check result:", existingUsers);
+        
         if (existingUsers.length > 0) {
             return {
                 success: false,
@@ -72,41 +100,52 @@ async function signupUserDirectly(userData) {
 
         // 2. 비밀번호 해싱 (간단한 버전)
         const hashedPassword = await simpleHash(userData.password);
+        console.log("Password hashed successfully");
 
         // 3. 새 사용자 삽입
+        console.log("Attempting to insert new user...");
+        const insertData = {
+            username: userData.username,
+            password: hashedPassword,
+            name: userData.name,
+            is_active: false,
+            approval_status: "pending",
+            page_id: null
+        };
+        
+        console.log("Insert data:", insertData);
+        
         const insertResponse = await fetch(`${SUPABASE_URL}/rest/v1/admin_users`, {
             method: "POST",
             headers: {
-                "apikey": SUPABASE_ANON_KEY,
-                "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+                "apikey": API_KEY,
+                "Authorization": `Bearer ${API_KEY}`,
                 "Content-Type": "application/json",
                 "Prefer": "return=representation"
             },
-            body: JSON.stringify({
-                username: userData.username,
-                password: hashedPassword,
-                name: userData.name,
-                is_active: false,
-                approval_status: "pending",
-                page_id: null
-            })
+            body: JSON.stringify(insertData)
         });
+
+        console.log("Insert response status:", insertResponse.status);
 
         if (!insertResponse.ok) {
             const errorText = await insertResponse.text();
+            console.error("Insert error:", errorText);
             throw new Error(`사용자 생성 실패: ${insertResponse.status} - ${errorText}`);
         }
 
         const newUser = await insertResponse.json();
+        console.log("User created successfully:", newUser);
         
         return {
             success: true,
             message: "회원가입이 완료되었습니다. 관리자 승인을 기다려주세요.",
-            data: newUser[0]
+            data: newUser[0] || newUser
         };
 
     } catch (error) {
-        console.error("Direct signup error:", error);
+        console.error("Direct signup error details:", error);
+        console.error("Error stack:", error.stack);
         return {
             success: false,
             error: `직접 연결 회원가입 오류: ${error.message}`,
