@@ -69,10 +69,10 @@ async function authenticateAdmin(username, password) {
     }
 }
 
-// 사용자 관리 API 함수들
+// 사용자 관리 API 함수들 - auth.js를 사용하도록 수정
 async function getAllUsers() {
     try {
-        const response = await fetch(`${PROXY_BASE_URL}/api/users`, {
+        const response = await fetch(`${PROXY_BASE_URL}/api/auth`, {
             method: "GET",
             headers: {
                 "Authorization": `Bearer ${getAuthToken()}`,
@@ -89,13 +89,18 @@ async function getAllUsers() {
 
 async function createUser(userData) {
     try {
-        const response = await fetch(`${PROXY_BASE_URL}/api/users`, {
+        const response = await fetch(`${PROXY_BASE_URL}/api/auth`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
                 "Authorization": `Bearer ${getAuthToken()}`,
             },
-            body: JSON.stringify(userData),
+            body: JSON.stringify({
+                action: "createUser",
+                username: userData.username,
+                password: userData.password,
+                name: userData.name
+            }),
         })
 
         return await response.json()
@@ -110,7 +115,7 @@ async function createUser(userData) {
 
 async function updateUser(userData) {
     try {
-        const response = await fetch(`${PROXY_BASE_URL}/api/users`, {
+        const response = await fetch(`${PROXY_BASE_URL}/api/auth`, {
             method: "PUT",
             headers: {
                 "Content-Type": "application/json",
@@ -131,7 +136,7 @@ async function updateUser(userData) {
 
 async function deleteUser(userId) {
     try {
-        const response = await fetch(`${PROXY_BASE_URL}/api/users`, {
+        const response = await fetch(`${PROXY_BASE_URL}/api/auth`, {
             method: "DELETE",
             headers: {
                 "Content-Type": "application/json",
