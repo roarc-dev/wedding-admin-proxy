@@ -113,9 +113,11 @@ module.exports = async function handler(req, res) {
             password: passwordHash,
             name,
             is_active: false, // 승인 대기 상태
-            role: 'admin'
+            role: 'admin',
+            approval_status: 'pending',
+            page_id: null
           }])
-          .select('id, username, name, is_active, role')
+          .select('id, username, name, is_active, role, approval_status, page_id')
           .single();
 
         if (error) {
@@ -156,11 +158,25 @@ module.exports = async function handler(req, res) {
           });
         }
 
-        // 활성 상태 확인 (approval_status 대신 is_active 사용)
-        if (!user.is_active) {
+        // 승인 상태 확인
+        if (user.approval_status === 'pending') {
           return res.status(401).json({
             success: false,
             error: '계정이 아직 승인되지 않았습니다. 관리자에게 문의하세요.'
+          });
+        }
+
+        if (user.approval_status === 'rejected') {
+          return res.status(401).json({
+            success: false,
+            error: '계정이 거부되었습니다. 관리자에게 문의하세요.'
+          });
+        }
+
+        if (!user.is_active) {
+          return res.status(401).json({
+            success: false,
+            error: '비활성화된 계정입니다.'
           });
         }
 
@@ -256,9 +272,11 @@ module.exports = async function handler(req, res) {
             password: passwordHash,
             name,
             is_active: true,
-            role: 'admin'
+            role: 'admin',
+            approval_status: 'approved',
+            page_id: page_id || null
           }])
-          .select('id, username, name, is_active, created_at, role')
+          .select('id, username, name, is_active, created_at, role, approval_status, page_id')
           .single();
 
         if (error) {
@@ -278,7 +296,7 @@ module.exports = async function handler(req, res) {
         });
       }
 
-      // 사용자 승인/거부 (관리자용)
+      // 사용자 승인/거부 (관리자용) 
       if (action === "approveUser") {
         // 인증 확인
         const authHeader = req.headers.authorization;
@@ -496,10 +514,10 @@ module.exports = async function handler(req, res) {
         });
       }
 
-      // 모든 사용자 조회 (실제 테이블 컬럼만 사용)
+      // 모든 사용자 조회 (새로 추가된 컬럼들 포함)
       const { data: users, error } = await supabase
         .from('admin_users')
-        .select('id, username, name, is_active, created_at, last_login, updated_at, role')
+        .select('id, username, name, is_active, created_at, last_login, updated_at, role, approval_status, page_id')
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -510,16 +528,9 @@ module.exports = async function handler(req, res) {
         });
       }
 
-             // approval_status 시뮬레이션 (is_active 기반)
-       const usersWithStatus = users.map(user => ({
-         ...user,
-         approval_status: user.is_active ? 'approved' : 'pending',
-         page_id: null // 현재 테이블에 page_id 컬럼이 없음
-       }));
-
       return res.status(200).json({
         success: true,
-        data: usersWithStatus
+        data: users
       });
     }
 

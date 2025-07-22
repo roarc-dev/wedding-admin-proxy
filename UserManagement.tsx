@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { addPropertyControls, ControlType } from "framer"
 
 // 프록시 서버 URL (최신 배포)
-const PROXY_BASE_URL = "https://wedding-admin-proxy-11zu4u6vm-roarcs-projects.vercel.app"
+const PROXY_BASE_URL = "https://wedding-admin-proxy-qxtuyjpk7-roarcs-projects.vercel.app"
 
 // 토큰 관리
 function getAuthToken() {
@@ -316,20 +316,20 @@ export default function UserManagement(props) {
         setShowApprovalModal(true)
     }
 
-    // 사용자 승인
+    // 사용자 승인 (is_active 업데이트)
     const handleApproveUser = async (status) => {
         if (!approvingUser) return
 
         setLoading(true)
         try {
-            const result = await approveUser(
-                approvingUser.id, 
-                status, 
-                status === 'approved' ? pageIdInput : null
-            )
+            // is_active 업데이트
+            const result = await updateUser({
+                id: approvingUser.id,
+                is_active: status === 'approved'
+            })
 
             if (result.success) {
-                setSuccess(result.message)
+                setSuccess(status === 'approved' ? '사용자가 승인되었습니다.' : '사용자가 거부되었습니다.')
                 setShowApprovalModal(false)
                 setApprovingUser(null)
                 setPageIdInput("")
@@ -423,10 +423,10 @@ export default function UserManagement(props) {
         }
     }, [error, success])
 
-    // 승인 상태별 사용자 분류
-    const pendingUsers = users.filter(user => user.approval_status === 'pending')
-    const approvedUsers = users.filter(user => user.approval_status === 'approved')
-    const rejectedUsers = users.filter(user => user.approval_status === 'rejected')
+    // 승인 상태별 사용자 분류 (is_active 기반)
+    const pendingUsers = users.filter(user => !user.is_active)
+    const approvedUsers = users.filter(user => user.is_active)
+    const rejectedUsers = [] // 현재 거부 상태는 별도로 관리하지 않음
 
     // 로그인 화면
     if (!isAuthenticated) {
