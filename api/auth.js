@@ -73,60 +73,11 @@ module.exports = async function handler(req, res) {
       if (action === "signup") {
         console.log('Processing signup request');
         
-        if (!username || !password || !name) {
-          console.log('Missing required fields:', { username: !!username, password: !!password, name: !!name });
-          return res.status(400).json({
-            success: false,
-            error: '사용자명, 비밀번호, 이름을 모두 입력하세요'
-          });
-        }
-
-        // Supabase 연결 확인
-        console.log('Using Supabase URL:', supabaseUrl);
-        console.log('Using Supabase Key:', supabaseKey ? 'Present' : 'Missing');
-
-        // 중복 사용자명 체크
-        const { data: existingUser } = await supabase
-          .from('admin_users')
-          .select('username')
-          .eq('username', username)
-          .single();
-
-        if (existingUser) {
-          return res.status(400).json({
-            success: false,
-            error: '이미 존재하는 사용자명입니다'
-          });
-        }
-
-        // 비밀번호 해싱
-        const passwordHash = await bcrypt.hash(password, 10);
-
-        const { data: newUser, error } = await supabase
-          .from('admin_users')
-          .insert([{
-            username,
-            password: passwordHash,
-            name,
-            is_active: false, // 승인 대기 상태
-            approval_status: 'pending', // 승인 상태 추가
-            page_id: null // 관리자가 승인 시 발급
-          }])
-          .select('id, username, name, approval_status')
-          .single();
-
-        if (error) {
-          console.error('Signup error:', error);
-          return res.status(500).json({
-            success: false,
-            error: '회원가입 중 오류가 발생했습니다'
-          });
-        }
-
-        return res.status(201).json({
+        // 간단한 테스트용 응답
+        return res.status(200).json({
           success: true,
-          message: '회원가입이 완료되었습니다. 관리자 승인을 기다려주세요.',
-          data: newUser
+          message: '회원가입 테스트 성공!',
+          data: { action, username, name }
         });
       }
       
