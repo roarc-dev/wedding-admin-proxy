@@ -57,22 +57,34 @@ export default function CalendarAddBtn({
     }, [pageId])
 
     const fetchPageSettings = async () => {
-        if (!pageId) return
+        if (!pageId) {
+            console.log('❌ pageId가 없습니다:', pageId)
+            return
+        }
         
+        console.log('🔄 페이지 설정 로드 시작:', pageId)
         setLoading(true)
         setError(null)
         
         try {
-            const response = await fetch(`${PROXY_BASE_URL}/api/page-settings?pageId=${pageId}`)
+            const url = `${PROXY_BASE_URL}/api/page-settings?pageId=${pageId}`
+            console.log('📡 API 호출:', url)
+            
+            const response = await fetch(url)
+            console.log('📨 Response status:', response.status)
+            
             const result = await response.json()
+            console.log('📋 API 응답 데이터:', result)
             
             if (result.success) {
+                console.log('✅ 설정 데이터 로드 성공:', result.data)
                 setPageSettings(result.data)
             } else {
+                console.log('❌ API 오류:', result.error)
                 throw new Error(result.error || '설정을 불러올 수 없습니다.')
             }
         } catch (err) {
-            console.error('페이지 설정 로드 실패:', err)
+            console.error('❌ 페이지 설정 로드 실패:', err)
             setError(err instanceof Error ? err.message : '설정을 불러오는데 실패했습니다.')
         } finally {
             setLoading(false)
@@ -80,7 +92,14 @@ export default function CalendarAddBtn({
     }
 
     const handleClick = () => {
+        console.log('🔘 버튼 클릭됨')
+        console.log('📊 현재 pageSettings:', pageSettings)
+        console.log('📅 wedding_date:', pageSettings.wedding_date)
+        console.log('⏰ wedding_hour:', pageSettings.wedding_hour)
+        console.log('⏱️ wedding_minute:', pageSettings.wedding_minute)
+        
         if (!pageSettings.wedding_date || !pageSettings.wedding_hour || !pageSettings.wedding_minute) {
+            console.log('❌ 필수 데이터 누락')
             alert('웨딩 날짜와 시간이 설정되지 않았습니다.')
             return
         }
