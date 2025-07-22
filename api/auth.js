@@ -42,12 +42,29 @@ module.exports = async function handler(req, res) {
     if (req.method === "POST") {
       const { action, username, password, name, page_id } = req.body || {};
       
+      console.log('Received POST request:', { action, username, hasPassword: !!password, name });
+      
       // 사용자 회원가입 (승인 대기 상태로 등록)
       if (action === "signup") {
+        console.log('Processing signup request');
+        
         if (!username || !password || !name) {
+          console.log('Missing required fields:', { username: !!username, password: !!password, name: !!name });
           return res.status(400).json({
             success: false,
             error: '사용자명, 비밀번호, 이름을 모두 입력하세요'
+          });
+        }
+
+        // 환경변수 확인
+        if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
+          console.error('Missing environment variables:', {
+            hasUrl: !!process.env.SUPABASE_URL,
+            hasKey: !!process.env.SUPABASE_SERVICE_KEY
+          });
+          return res.status(500).json({
+            success: false,
+            error: '서버 설정 오류가 발생했습니다. 관리자에게 문의하세요.'
           });
         }
 
@@ -313,6 +330,7 @@ module.exports = async function handler(req, res) {
         });
       }
       
+      console.log('Unrecognized action:', action);
       return res.status(400).json({ success: false, error: "Invalid action" });
     }
 
