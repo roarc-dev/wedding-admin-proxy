@@ -5,8 +5,21 @@ import { addPropertyControls, ControlType } from "framer"
 // 프록시 서버 URL
 const PROXY_BASE_URL = "https://wedding-admin-proxy-1lp2vfy5v-roarcs-projects.vercel.app"
 
-// 회원가입 함수
-async function signupUser(userData) {
+// 직접 Supabase 연결 설정 (테스트용)
+const SUPABASE_URL = "https://ydgqnpmybrlnkmklyokf.supabase.co"
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlkZ3FucG15YnJsbmtta2x5b2tmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzcyOTY0MDgsImV4cCI6MjA1Mjg3MjQwOH0.HQfEgPkqzFGRJMsyEGJjrFYnUuO1k6bJ9aKP8LrIX-w"
+
+// bcrypt 해싱을 위한 간단한 해시 함수 (실제로는 서버에서 해야 함)
+async function simpleHash(password) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password + "wedding-salt");
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// 회원가입 함수 - 프록시 버전
+async function signupUserViaProxy(userData) {
     try {
         const response = await fetch(`${PROXY_BASE_URL}/api/register`, {
             method: "POST",
@@ -22,11 +35,82 @@ async function signupUser(userData) {
 
         return await response.json()
     } catch (error) {
-        console.error("Signup error:", error)
+        console.error("Proxy signup error:", error)
         return {
             success: false,
-            error: "회원가입 중 오류가 발생했습니다",
+            error: "프록시 회원가입 중 오류가 발생했습니다",
         }
+    }
+}
+
+// 회원가입 함수 - 직접 Supabase 연결
+async function signupUserDirectly(userData) {
+    try {
+        console.log("Direct Supabase signup attempt:", { username: userData.username, name: userData.name });
+        
+        // 1. 중복 사용자명 체크
+        const checkResponse = await fetch(`${SUPABASE_URL}/rest/v1/admin_users?username=eq.${userData.username}&select=username`, {
+            method: "GET",
+            headers: {
+                "apikey": SUPABASE_ANON_KEY,
+                "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+                "Content-Type": "application/json"
+            }
+        });
+
+        if (!checkResponse.ok) {
+            throw new Error(`중복 체크 실패: ${checkResponse.status}`);
+        }
+
+        const existingUsers = await checkResponse.json();
+        if (existingUsers.length > 0) {
+            return {
+                success: false,
+                error: "이미 존재하는 사용자명입니다"
+            };
+        }
+
+        // 2. 비밀번호 해싱 (간단한 버전)
+        const hashedPassword = await simpleHash(userData.password);
+
+        // 3. 새 사용자 삽입
+        const insertResponse = await fetch(`${SUPABASE_URL}/rest/v1/admin_users`, {
+            method: "POST",
+            headers: {
+                "apikey": SUPABASE_ANON_KEY,
+                "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+                "Content-Type": "application/json",
+                "Prefer": "return=representation"
+            },
+            body: JSON.stringify({
+                username: userData.username,
+                password: hashedPassword,
+                name: userData.name,
+                is_active: false,
+                approval_status: "pending",
+                page_id: null
+            })
+        });
+
+        if (!insertResponse.ok) {
+            const errorText = await insertResponse.text();
+            throw new Error(`사용자 생성 실패: ${insertResponse.status} - ${errorText}`);
+        }
+
+        const newUser = await insertResponse.json();
+        
+        return {
+            success: true,
+            message: "회원가입이 완료되었습니다. 관리자 승인을 기다려주세요.",
+            data: newUser[0]
+        };
+
+    } catch (error) {
+        console.error("Direct signup error:", error);
+        return {
+            success: false,
+            error: `직접 연결 회원가입 오류: ${error.message}`,
+        };
     }
 }
 
@@ -42,6 +126,7 @@ export default function UserSignup(props) {
     const [isSigningUp, setIsSigningUp] = useState(false)
     const [error, setError] = useState("")
     const [success, setSuccess] = useState("")
+    const [useDirectConnection, setUseDirectConnection] = useState(false)
 
     // 회원가입 처리
     const handleSignup = async (e) => {
@@ -64,11 +149,18 @@ export default function UserSignup(props) {
             return
         }
 
-        const result = await signupUser({
-            username: signupForm.username,
-            password: signupForm.password,
-            name: signupForm.name
-        })
+        // 선택된 방식으로 회원가입 시도
+        const result = useDirectConnection 
+            ? await signupUserDirectly({
+                username: signupForm.username,
+                password: signupForm.password,
+                name: signupForm.name
+            })
+            : await signupUserViaProxy({
+                username: signupForm.username,
+                password: signupForm.password,
+                name: signupForm.name
+            });
 
         if (result.success) {
             setSuccess(result.message)
@@ -129,6 +221,48 @@ export default function UserSignup(props) {
                         }}
                     >
                         계정을 생성하시면 관리자 승인 후 이용하실 수 있습니다
+                    </p>
+                </div>
+
+                {/* 연결 방식 선택 */}
+                <div style={{ 
+                    marginBottom: "20px", 
+                    padding: "15px", 
+                    backgroundColor: "#f0f9ff", 
+                    borderRadius: "8px",
+                    border: "1px solid #0ea5e9"
+                }}>
+                    <label
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            fontSize: "14px",
+                            fontWeight: "500",
+                            color: "#0c4a6e",
+                            cursor: "pointer",
+                        }}
+                    >
+                        <input
+                            type="checkbox"
+                            checked={useDirectConnection}
+                            onChange={(e) => setUseDirectConnection(e.target.checked)}
+                            style={{
+                                width: "16px",
+                                height: "16px",
+                            }}
+                        />
+                        🔧 테스트 모드: 직접 Supabase 연결 (프록시 우회)
+                    </label>
+                    <p style={{ 
+                        fontSize: "12px", 
+                        color: "#0c4a6e", 
+                        margin: "5px 0 0 24px" 
+                    }}>
+                        {useDirectConnection 
+                            ? "프록시를 거치지 않고 직접 Supabase에 연결합니다" 
+                            : "프록시 서버를 통해 안전하게 연결합니다"
+                        }
                     </p>
                 </div>
 
@@ -330,7 +464,7 @@ export default function UserSignup(props) {
                             style={{
                                 width: "100%",
                                 padding: "14px",
-                                backgroundColor: isSigningUp ? "#9ca3af" : "#1a237e",
+                                backgroundColor: isSigningUp ? "#9ca3af" : useDirectConnection ? "#0ea5e9" : "#1a237e",
                                 color: "white",
                                 border: "none",
                                 borderRadius: "8px",
@@ -342,7 +476,7 @@ export default function UserSignup(props) {
                             whileHover={!isSigningUp ? { scale: 1.02 } : {}}
                             whileTap={!isSigningUp ? { scale: 0.98 } : {}}
                         >
-                            {isSigningUp ? "가입 중..." : "회원가입"}
+                            {isSigningUp ? "가입 중..." : `회원가입 (${useDirectConnection ? "직접 연결" : "프록시"})`}
                         </motion.button>
 
                         <div 
