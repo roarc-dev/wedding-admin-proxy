@@ -1,11 +1,11 @@
 const { createClient } = require('@supabase/supabase-js')
 const bcrypt = require('bcryptjs')
 
-// 환경 변수에서 Supabase 설정 가져오기
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY // Service Key 사용
-)
+// 환경 변수에서 Supabase 설정 가져오기 (임시 하드코딩)
+const supabaseUrl = process.env.SUPABASE_URL || 'https://ydgqnpmybrlnkmklyokf.supabase.co'
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlkZ3FucG15YnJsbmtta2x5b2tmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczNzI5NjQwOCwiZXhwIjoyMDUyODcyNDA4fQ.Z0DxoXOJYy7aTSLZHKUJWoMRH0h8qGJz6V4JhZZldjQ'
+
+const supabase = createClient(supabaseUrl, supabaseKey)
 
 function generateSecureToken(user) {
   const payload = {
@@ -81,17 +81,9 @@ module.exports = async function handler(req, res) {
           });
         }
 
-        // 환경변수 확인
-        if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
-          console.error('Missing environment variables:', {
-            hasUrl: !!process.env.SUPABASE_URL,
-            hasKey: !!process.env.SUPABASE_SERVICE_KEY
-          });
-          return res.status(500).json({
-            success: false,
-            error: '서버 설정 오류가 발생했습니다. 관리자에게 문의하세요.'
-          });
-        }
+        // Supabase 연결 확인
+        console.log('Using Supabase URL:', supabaseUrl);
+        console.log('Using Supabase Key:', supabaseKey ? 'Present' : 'Missing');
 
         // 중복 사용자명 체크
         const { data: existingUser } = await supabase
