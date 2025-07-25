@@ -6,6 +6,12 @@ const supabase = createClient(
 )
 
 export default async function handler(req, res) {
+  // 디버깅: 요청 정보 로그
+  console.log('Contacts API - Method:', req.method)
+  console.log('Contacts API - URL:', req.url)
+  console.log('Contacts API - Query:', req.query)
+  console.log('Contacts API - Headers:', req.headers)
+
   // CORS 설정
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
@@ -15,40 +21,62 @@ export default async function handler(req, res) {
     return res.status(200).end()
   }
 
-  // 토큰 검증
-  const authHeader = req.headers.authorization
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ 
-      success: false, 
-      error: '인증 토큰이 필요합니다' 
+  // GET 요청은 인증 없이 허용 (public read access)
+  if (req.method !== 'GET') {
+    // POST, PUT, DELETE는 인증 필요
+    const authHeader = req.headers.authorization
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('Missing or invalid authorization header')
+      return res.status(401).json({ 
+        success: false, 
+        error: '인증 토큰이 필요합니다' 
+      })
+    }
+
+    const token = authHeader.substring(7)
+    const validatedUser = validateToken(token)
+    
+    if (!validatedUser) {
+      console.log('Token validation failed')
+      return res.status(401).json({ 
+        success: false, 
+        error: '유효하지 않은 토큰입니다' 
+      })
+    }
+  }
+
+  // 환경 변수 확인
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
+    console.error('Missing Supabase environment variables')
+    return res.status(500).json({
+      success: false,
+      error: 'Server configuration error'
     })
   }
 
-  const token = authHeader.substring(7)
-  const validatedUser = validateToken(token)
-  
-  if (!validatedUser) {
-    return res.status(401).json({ 
-      success: false, 
-      error: '유효하지 않은 토큰입니다' 
-    })
-  }
+  console.log('Supabase URL exists:', !!process.env.SUPABASE_URL)
+  console.log('Supabase Service Key exists:', !!process.env.SUPABASE_SERVICE_KEY)
 
   try {
     switch (req.method) {
       case 'GET':
+        console.log('Handling GET request')
         return await handleGetContacts(req, res)
       
       case 'POST':
+        console.log('Handling POST request')
         return await handleCreateContact(req, res)
       
       case 'PUT':
+        console.log('Handling PUT request')
         return await handleUpdateContact(req, res)
       
       case 'DELETE':
+        console.log('Handling DELETE request')
         return await handleDeleteContact(req, res)
       
       default:
+        console.log('Method not allowed:', req.method)
         return res.status(405).json({ 
           success: false, 
           error: 'Method not allowed' 
@@ -65,6 +93,8 @@ export default async function handler(req, res) {
 
 async function handleGetContacts(req, res) {
   const { pageId } = req.query
+  
+  console.log('handleGetContacts - pageId:', pageId)
 
   try {
     let query = supabase
@@ -74,12 +104,20 @@ async function handleGetContacts(req, res) {
 
     // 특정 페이지 필터링
     if (pageId) {
+      console.log('Filtering by pageId:', pageId)
       query = query.eq('page_id', pageId)
     }
 
+    console.log('Executing Supabase query...')
     const { data, error } = await query
 
-    if (error) throw error
+    if (error) {
+      console.error('Supabase query error:', error)
+      throw error
+    }
+
+    console.log('Query successful, data length:', data?.length || 0)
+    console.log('Query result:', data)
 
     return res.json({ 
       success: true, 
