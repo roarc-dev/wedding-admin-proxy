@@ -137,10 +137,81 @@ async function handleGetImages(req, res) {
 }
 
 async function handleImageOperation(req, res) {
-  const { action, pageId, fileData, originalName, fileSize, displayOrder } = req.body
+  const { action } = req.body
 
   try {
-    if (action === 'upload') {
+    if (action === 'getPresignedUrl') {
+      // presigned URL 발급
+      const { fileName, pageId } = req.body
+      
+      if (!fileName || !pageId) {
+        return res.status(400).json({
+          success: false,
+          error: 'fileName과 pageId가 필요합니다'
+        })
+      }
+
+      // 고유한 파일명 생성
+      const timestamp = Date.now()
+      const randomStr = Math.random().toString(36).substring(2)
+      const fileExtension = fileName.split('.').pop() || 'jpg'
+      const uniqueFileName = `${pageId}/${timestamp}_${randomStr}.${fileExtension}`
+
+      // presigned URL 생성 (60초 유효)
+      const { data, error } = await supabase.storage
+        .from('images')
+        .createSignedUploadUrl(uniqueFileName, 60)
+
+      if (error) throw error
+
+      return res.json({
+        success: true,
+        signedUrl: data.signedUrl,
+        path: uniqueFileName,
+        originalName: fileName
+      })
+
+    } else if (action === 'saveMeta') {
+      // 업로드 후 메타데이터 저장
+      const { pageId, fileName, displayOrder, storagePath, fileSize } = req.body
+      
+      if (!pageId || !fileName || !storagePath) {
+        return res.status(400).json({
+          success: false,
+          error: '필수 파라미터가 누락되었습니다'
+        })
+      }
+
+      // 공개 URL 생성
+      const { data: { publicUrl } } = supabase.storage
+        .from('images')
+        .getPublicUrl(storagePath)
+
+      // 데이터베이스에 메타데이터 저장
+      const { data, error } = await supabase
+        .from('images')
+        .insert({
+          page_id: pageId,
+          filename: storagePath,
+          original_name: fileName,
+          file_size: fileSize || 0,
+          mime_type: 'image/jpeg',
+          public_url: publicUrl,
+          display_order: displayOrder
+        })
+        .select()
+
+      if (error) throw error
+
+      return res.json({ 
+        success: true, 
+        data: data[0] 
+      })
+
+    } else if (action === 'upload') {
+      // 기존 Base64 업로드 (호환성 유지)
+      const { pageId, fileData, originalName, fileSize, displayOrder } = req.body
+
       // Base64 데이터에서 실제 파일 데이터 추출
       const matches = fileData.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/)
       if (!matches || matches.length !== 3) {

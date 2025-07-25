@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { addPropertyControls, ControlType } from "framer"
 
 // 프록시 서버 URL (고정된 Production URL)
-const PROXY_BASE_URL = "https://wedding-admin-proxy-git-main-roarcs-projects.vercel.app"
+const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app"
 
 // 세션 토큰 관리
 function getAuthToken() {
@@ -127,86 +127,7 @@ async function getImagesByPageId(pageId) {
     }
 }
 
-async function compressImage(file, maxSizeKB = 1024) {
-    return new Promise((resolve) => {
-        const canvas = document.createElement("canvas")
-        const ctx = canvas.getContext("2d")
-        const img = new Image()
-        img.onload = () => {
-            let { width, height } = img
-            const maxDim = 1920
-            if (width > maxDim || height > maxDim) {
-                const ratio = Math.min(maxDim / width, maxDim / height)
-                width *= ratio
-                height *= ratio
-            }
-            canvas.width = width
-            canvas.height = height
-            ctx.fillStyle = "white"
-            ctx.fillRect(0, 0, width, height)
-            ctx.drawImage(img, 0, 0, width, height)
-
-            const compress = (quality) => {
-                canvas.toBlob(
-                    (blob) => {
-                        if (blob.size / 1024 <= maxSizeKB || quality <= 0.1) {
-                            resolve(
-                                new File([blob], file.name, {
-                                    type: "image/jpeg",
-                                })
-                            )
-                        } else {
-                            compress(quality - 0.1)
-                        }
-                    },
-                    "image/jpeg",
-                    quality
-                )
-            }
-            compress(0.8)
-        }
-        img.src = URL.createObjectURL(file)
-    })
-}
-
-async function uploadImage(file, pageId, order) {
-    try {
-        // 1. 파일을 Base64로 인코딩
-        const base64File = await new Promise((resolve) => {
-            const reader = new FileReader()
-            reader.onloadend = () => resolve(reader.result)
-            reader.readAsDataURL(file)
-        })
-
-        // 2. 프록시를 통해 업로드 요청
-        const response = await fetch(`${PROXY_BASE_URL}/api/images`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${getAuthToken()}`,
-            },
-            body: JSON.stringify({
-                action: "upload",
-                pageId,
-                fileData: base64File,
-                originalName: file.name,
-                fileSize: file.size,
-                displayOrder: order,
-            }),
-        })
-
-        const result = await response.json()
-        if (result.success) {
-            return result.data
-        } else {
-            throw new Error(result.error)
-        }
-    } catch (error) {
-        console.error("Upload error:", error)
-        throw new Error("이미지 업로드 중 오류가 발생했습니다: " + error.message)
-    }
-}
-
+// 이미지 삭제 함수
 async function deleteImage(imageId, fileName) {
     try {
         const response = await fetch(`${PROXY_BASE_URL}/api/images`, {
@@ -342,6 +263,90 @@ interface ContactInfo {
     updated_at?: string
 }
 
+// presigned URL 관련 함수들
+async function getPresignedUrl(fileName, pageId) {
+    try {
+        const requestBody = {
+            action: "getPresignedUrl",
+            fileName,
+            pageId,
+        }
+        
+        // 디버깅을 위한 로그 추가
+        console.log('=== getPresignedUrl Debug ===')
+        console.log('requestBody:', requestBody)
+        console.log('PROXY_BASE_URL:', PROXY_BASE_URL)
+        console.log('============================')
+
+        const response = await fetch(`${PROXY_BASE_URL}/api/images`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${getAuthToken()}`,
+            },
+            body: JSON.stringify(requestBody),
+        })
+
+        console.log('Response status:', response.status)
+        console.log('Response headers:', response.headers)
+
+        const result = await response.json()
+        console.log('Response result:', result)
+        
+        if (!result.success) throw new Error(result.error)
+        return result
+    } catch (error) {
+        console.error("Get presigned URL error:", error)
+        throw new Error("presigned URL 요청 실패: " + error.message)
+    }
+}
+
+async function uploadToPresignedUrl(url, file) {
+    try {
+        const response = await fetch(url, {
+            method: "PUT",
+            headers: {
+                "Content-Type": file.type,
+            },
+            body: file,
+        })
+
+        if (!response.ok) {
+            throw new Error(`Storage 업로드 실패: ${response.status}`)
+        }
+    } catch (error) {
+        console.error("Upload to presigned URL error:", error)
+        throw new Error("파일 업로드 실패: " + error.message)
+    }
+}
+
+async function saveImageMeta(pageId, fileName, order, storagePath, fileSize) {
+    try {
+        const response = await fetch(`${PROXY_BASE_URL}/api/images`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${getAuthToken()}`,
+            },
+            body: JSON.stringify({
+                action: "saveMeta",
+                pageId,
+                fileName,
+                displayOrder: order,
+                storagePath,
+                fileSize,
+            }),
+        })
+
+        const result = await response.json()
+        if (!result.success) throw new Error(result.error)
+        return result.data
+    } catch (error) {
+        console.error("Save image meta error:", error)
+        throw new Error("메타데이터 저장 실패: " + error.message)
+    }
+}
+
 export default function UnifiedWeddingAdmin(props) {
     const { maxSizeKB = 1024, style } = props
 
@@ -373,22 +378,20 @@ export default function UnifiedWeddingAdmin(props) {
 
     // 페이지 설정 관련 상태
     const [pageSettings, setPageSettings] = useState({
-        groom_name_kr: '',
-        groom_name_en: '',
-        bride_name_kr: '',
-        bride_name_en: '',
-        wedding_date: '',
-        wedding_hour: '14',
-        wedding_minute: '00',
-        venue_name: '',
-        venue_address: '',
-        photo_section_image_url: '',
-        photo_section_overlay_position: 'bottom',
-        photo_section_overlay_color: '#ffffff'
+        groom_name_kr: "",
+        groom_name_en: "",
+        bride_name_kr: "",
+        bride_name_en: "",
+        wedding_date: "",
+        wedding_hour: "14",
+        wedding_minute: "00",
+        venue_name: "",
+        venue_address: "",
+        photo_section_image_url: "",
+        photo_section_overlay_position: "bottom",
+        photo_section_overlay_color: "#ffffff",
     })
     const [settingsLoading, setSettingsLoading] = useState(false)
-
-
 
     const initialContactData = {
         page_id: "",
@@ -551,21 +554,24 @@ export default function UnifiedWeddingAdmin(props) {
 
     const loadPageSettings = async () => {
         if (!currentPageId) return
-        
+
         setSettingsLoading(true)
         try {
-            const response = await fetch(`${PROXY_BASE_URL}/api/page-settings?pageId=${currentPageId}`, {
-                headers: {
-                    'Authorization': `Bearer ${getAuthToken()}`,
+            const response = await fetch(
+                `${PROXY_BASE_URL}/api/page-settings?pageId=${currentPageId}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${getAuthToken()}`,
+                    },
                 }
-            })
-            
+            )
+
             const result = await response.json()
             if (result.success) {
                 setPageSettings(result.data)
             }
         } catch (err) {
-            console.error('페이지 설정 로드 실패:', err)
+            console.error("페이지 설정 로드 실패:", err)
         } finally {
             setSettingsLoading(false)
         }
@@ -573,78 +579,63 @@ export default function UnifiedWeddingAdmin(props) {
 
     const savePageSettings = async () => {
         if (!currentPageId) return
-        
+
         setSettingsLoading(true)
         try {
-            const response = await fetch(`${PROXY_BASE_URL}/api/page-settings`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${getAuthToken()}`,
-                },
-                body: JSON.stringify({
-                    pageId: currentPageId,
-                    settings: pageSettings
-                })
-            })
-            
+            const response = await fetch(
+                `${PROXY_BASE_URL}/api/page-settings`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${getAuthToken()}`,
+                    },
+                    body: JSON.stringify({
+                        pageId: currentPageId,
+                        settings: pageSettings,
+                    }),
+                }
+            )
+
             const result = await response.json()
             if (result.success) {
-                setSuccess('설정이 저장되었습니다.')
+                setSuccess("설정이 저장되었습니다.")
             } else {
-                setError('설정 저장에 실패했습니다.')
+                setError("설정 저장에 실패했습니다.")
             }
         } catch (err) {
-            setError('설정 저장 중 오류가 발생했습니다.')
+            setError("설정 저장 중 오류가 발생했습니다.")
         } finally {
             setSettingsLoading(false)
         }
     }
 
-
-
-    // 포토섹션 메인 이미지 업로드
+    // 포토섹션 메인 이미지 업로드 (presigned URL 방식)
     const handlePhotoSectionImageUpload = async (event) => {
         const file = event.target.files?.[0]
         if (!file || !currentPageId) return
-        
+
         setSettingsLoading(true)
         try {
-            // 파일을 Base64로 인코딩
-            const base64File = await new Promise((resolve) => {
-                const reader = new FileReader()
-                reader.onloadend = () => resolve(reader.result)
-                reader.readAsDataURL(file)
+            // 1. presigned URL 요청
+            const { signedUrl, path } = await getPresignedUrl(
+                `photosection_${file.name}`,
+                currentPageId
+            )
+            
+            // 2. 파일을 직접 Storage에 업로드
+            await uploadToPresignedUrl(signedUrl, file)
+            
+            // 3. 공개 URL 생성 (Supabase Storage 공개 URL 패턴)
+            const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://your-project.supabase.co'}/storage/v1/object/public/images/${path}`
+            
+            // 4. 페이지 설정에 URL 저장
+            setPageSettings({
+                ...pageSettings,
+                photo_section_image_url: publicUrl,
             })
-
-            // 프록시를 통해 업로드 요청
-            const response = await fetch(`${PROXY_BASE_URL}/api/images`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${getAuthToken()}`,
-                },
-                body: JSON.stringify({
-                    action: "upload",
-                    pageId: currentPageId,
-                    fileData: base64File,
-                    originalName: `photosection_${file.name}`,
-                    fileSize: file.size,
-                    displayOrder: 0, // 포토섹션 이미지는 0번으로 설정
-                }),
-            })
-
-            const result = await response.json()
-            if (result.success) {
-                // 업로드된 이미지 URL을 페이지 설정에 저장
-                setPageSettings({
-                    ...pageSettings,
-                    photo_section_image_url: result.data.public_url
-                })
-                setSuccess('메인 사진이 업로드되었습니다.')
-            } else {
-                throw new Error(result.error)
-            }
+            
+            setSuccess("메인 사진이 업로드되었습니다.")
         } catch (error) {
             console.error("Photo section image upload error:", error)
             setError("메인 사진 업로드 중 오류가 발생했습니다: " + error.message)
@@ -657,7 +648,7 @@ export default function UnifiedWeddingAdmin(props) {
         if (currentPageId && showImageManager) loadExistingImages()
     }, [currentPageId, showImageManager])
 
-    // 이미지 업로드
+    // 이미지 업로드 (presigned URL 방식)
     const handleFileSelect = async (event) => {
         if (!currentPageId) return alert("페이지 ID를 설정하세요")
 
@@ -667,18 +658,44 @@ export default function UnifiedWeddingAdmin(props) {
         setUploadSuccess(0)
 
         try {
-            for (let i = 0; i < files.length; i++) {
-                const compressed = await compressImage(files[i], maxSizeKB)
-                await uploadImage(
-                    compressed,
-                    currentPageId,
-                    existingImages.length + i + 1
-                )
-                setProgress(Math.round(((i + 1) / files.length) * 100))
-            }
+            let completed = 0
+            
+            // 병렬 업로드 (presigned URL 방식)
+            await Promise.all(
+                files.map(async (file, i) => {
+                    try {
+                        // 1. presigned URL 요청
+                        const { signedUrl, path, originalName } = await getPresignedUrl(
+                            file.name, 
+                            currentPageId
+                        )
+                        
+                        // 2. 파일을 직접 Storage에 업로드
+                        await uploadToPresignedUrl(signedUrl, file)
+                        
+                        // 3. DB에 메타데이터 저장
+                        await saveImageMeta(
+                            currentPageId,
+                            originalName,
+                            existingImages.length + i + 1,
+                            path,
+                            file.size
+                        )
+                        
+                        completed++
+                        setProgress(Math.round((completed / files.length) * 100))
+                    } catch (error) {
+                        console.error(`파일 ${file.name} 업로드 실패:`, error)
+                        // 개별 파일 실패시에도 다른 파일은 계속 업로드
+                        completed++
+                        setProgress(Math.round((completed / files.length) * 100))
+                        throw error
+                    }
+                })
+            )
 
             setUploading(false)
-            setProgress(0)
+            setProgress(100)
             setUploadSuccess(files.length)
             loadExistingImages()
             loadAllPages()
@@ -1330,31 +1347,114 @@ export default function UnifiedWeddingAdmin(props) {
 
             {/* 기본정보 탭 */}
             {currentTab === "basic" && (
-                <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-                    <div style={{ padding: "20px", backgroundColor: "white", borderRadius: "10px", boxShadow: "0 2px 4px rgba(0, 0, 0, 0.05)" }}>
-                        <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1f2937", margin: "0 0 20px 0" }}>기본 정보 설정</h2>
-                        
+                <div
+                    style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "20px",
+                    }}
+                >
+                    <div
+                        style={{
+                            padding: "20px",
+                            backgroundColor: "white",
+                            borderRadius: "10px",
+                            boxShadow: "0 2px 4px rgba(0, 0, 0, 0.05)",
+                        }}
+                    >
+                        <h2
+                            style={{
+                                fontSize: "20px",
+                                fontWeight: "600",
+                                color: "#1f2937",
+                                margin: "0 0 20px 0",
+                            }}
+                        >
+                            기본 정보 설정
+                        </h2>
+
                         {/* 신랑 정보 */}
                         <div style={{ marginBottom: "25px" }}>
-                            <h3 style={{ fontSize: "16px", fontWeight: "600", color: "#1f2937", margin: "0 0 15px 0" }}>👰🏻‍♂️ 신랑 정보</h3>
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px" }}>
+                            <h3
+                                style={{
+                                    fontSize: "16px",
+                                    fontWeight: "600",
+                                    color: "#1f2937",
+                                    margin: "0 0 15px 0",
+                                }}
+                            >
+                                👰🏻‍♂️ 신랑 정보
+                            </h3>
+                            <div
+                                style={{
+                                    display: "grid",
+                                    gridTemplateColumns: "1fr 1fr",
+                                    gap: "15px",
+                                }}
+                            >
                                 <div>
-                                    <label style={{ display: "block", fontSize: "14px", fontWeight: "500", color: "#374151", marginBottom: "5px" }}>한글 이름</label>
+                                    <label
+                                        style={{
+                                            display: "block",
+                                            fontSize: "14px",
+                                            fontWeight: "500",
+                                            color: "#374151",
+                                            marginBottom: "5px",
+                                        }}
+                                    >
+                                        한글 이름
+                                    </label>
                                     <input
                                         type="text"
                                         value={pageSettings.groom_name_kr}
-                                        onChange={(e) => setPageSettings({...pageSettings, groom_name_kr: e.target.value})}
-                                        style={{ width: "100%", padding: "10px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "14px", outline: "none", boxSizing: "border-box" }}
+                                        onChange={(e) =>
+                                            setPageSettings({
+                                                ...pageSettings,
+                                                groom_name_kr: e.target.value,
+                                            })
+                                        }
+                                        style={{
+                                            width: "100%",
+                                            padding: "10px",
+                                            border: "1px solid #d1d5db",
+                                            borderRadius: "6px",
+                                            fontSize: "14px",
+                                            outline: "none",
+                                            boxSizing: "border-box",
+                                        }}
                                         placeholder="예: 김태호"
                                     />
                                 </div>
                                 <div>
-                                    <label style={{ display: "block", fontSize: "14px", fontWeight: "500", color: "#374151", marginBottom: "5px" }}>영문 이름</label>
+                                    <label
+                                        style={{
+                                            display: "block",
+                                            fontSize: "14px",
+                                            fontWeight: "500",
+                                            color: "#374151",
+                                            marginBottom: "5px",
+                                        }}
+                                    >
+                                        영문 이름
+                                    </label>
                                     <input
                                         type="text"
                                         value={pageSettings.groom_name_en}
-                                        onChange={(e) => setPageSettings({...pageSettings, groom_name_en: e.target.value})}
-                                        style={{ width: "100%", padding: "10px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "14px", outline: "none", boxSizing: "border-box" }}
+                                        onChange={(e) =>
+                                            setPageSettings({
+                                                ...pageSettings,
+                                                groom_name_en: e.target.value,
+                                            })
+                                        }
+                                        style={{
+                                            width: "100%",
+                                            padding: "10px",
+                                            border: "1px solid #d1d5db",
+                                            borderRadius: "6px",
+                                            fontSize: "14px",
+                                            outline: "none",
+                                            boxSizing: "border-box",
+                                        }}
                                         placeholder="예: TAEHO"
                                     />
                                 </div>
@@ -1363,25 +1463,86 @@ export default function UnifiedWeddingAdmin(props) {
 
                         {/* 신부 정보 */}
                         <div style={{ marginBottom: "25px" }}>
-                            <h3 style={{ fontSize: "16px", fontWeight: "600", color: "#1f2937", margin: "0 0 15px 0" }}>👰🏻‍♀️ 신부 정보</h3>
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px" }}>
+                            <h3
+                                style={{
+                                    fontSize: "16px",
+                                    fontWeight: "600",
+                                    color: "#1f2937",
+                                    margin: "0 0 15px 0",
+                                }}
+                            >
+                                👰🏻‍♀️ 신부 정보
+                            </h3>
+                            <div
+                                style={{
+                                    display: "grid",
+                                    gridTemplateColumns: "1fr 1fr",
+                                    gap: "15px",
+                                }}
+                            >
                                 <div>
-                                    <label style={{ display: "block", fontSize: "14px", fontWeight: "500", color: "#374151", marginBottom: "5px" }}>한글 이름</label>
+                                    <label
+                                        style={{
+                                            display: "block",
+                                            fontSize: "14px",
+                                            fontWeight: "500",
+                                            color: "#374151",
+                                            marginBottom: "5px",
+                                        }}
+                                    >
+                                        한글 이름
+                                    </label>
                                     <input
                                         type="text"
                                         value={pageSettings.bride_name_kr}
-                                        onChange={(e) => setPageSettings({...pageSettings, bride_name_kr: e.target.value})}
-                                        style={{ width: "100%", padding: "10px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "14px", outline: "none", boxSizing: "border-box" }}
+                                        onChange={(e) =>
+                                            setPageSettings({
+                                                ...pageSettings,
+                                                bride_name_kr: e.target.value,
+                                            })
+                                        }
+                                        style={{
+                                            width: "100%",
+                                            padding: "10px",
+                                            border: "1px solid #d1d5db",
+                                            borderRadius: "6px",
+                                            fontSize: "14px",
+                                            outline: "none",
+                                            boxSizing: "border-box",
+                                        }}
                                         placeholder="예: 박보름"
                                     />
                                 </div>
                                 <div>
-                                    <label style={{ display: "block", fontSize: "14px", fontWeight: "500", color: "#374151", marginBottom: "5px" }}>영문 이름</label>
+                                    <label
+                                        style={{
+                                            display: "block",
+                                            fontSize: "14px",
+                                            fontWeight: "500",
+                                            color: "#374151",
+                                            marginBottom: "5px",
+                                        }}
+                                    >
+                                        영문 이름
+                                    </label>
                                     <input
                                         type="text"
                                         value={pageSettings.bride_name_en}
-                                        onChange={(e) => setPageSettings({...pageSettings, bride_name_en: e.target.value})}
-                                        style={{ width: "100%", padding: "10px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "14px", outline: "none", boxSizing: "border-box" }}
+                                        onChange={(e) =>
+                                            setPageSettings({
+                                                ...pageSettings,
+                                                bride_name_en: e.target.value,
+                                            })
+                                        }
+                                        style={{
+                                            width: "100%",
+                                            padding: "10px",
+                                            border: "1px solid #d1d5db",
+                                            borderRadius: "6px",
+                                            fontSize: "14px",
+                                            outline: "none",
+                                            boxSizing: "border-box",
+                                        }}
                                         placeholder="예: BORUM"
                                     />
                                 </div>
@@ -1390,66 +1551,218 @@ export default function UnifiedWeddingAdmin(props) {
 
                         {/* 예식 정보 */}
                         <div style={{ marginBottom: "25px" }}>
-                            <h3 style={{ fontSize: "16px", fontWeight: "600", color: "#1f2937", margin: "0 0 15px 0" }}>💒 예식 정보</h3>
-                            
+                            <h3
+                                style={{
+                                    fontSize: "16px",
+                                    fontWeight: "600",
+                                    color: "#1f2937",
+                                    margin: "0 0 15px 0",
+                                }}
+                            >
+                                💒 예식 정보
+                            </h3>
+
                             {/* 예식 날짜 */}
                             <div style={{ marginBottom: "15px" }}>
-                                <label style={{ display: "block", fontSize: "14px", fontWeight: "500", color: "#374151", marginBottom: "5px" }}>예식 날짜</label>
+                                <label
+                                    style={{
+                                        display: "block",
+                                        fontSize: "14px",
+                                        fontWeight: "500",
+                                        color: "#374151",
+                                        marginBottom: "5px",
+                                    }}
+                                >
+                                    예식 날짜
+                                </label>
                                 <input
                                     type="date"
                                     value={pageSettings.wedding_date}
-                                    onChange={(e) => setPageSettings({...pageSettings, wedding_date: e.target.value})}
-                                    style={{ width: "100%", padding: "10px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "14px", outline: "none", boxSizing: "border-box" }}
+                                    onChange={(e) =>
+                                        setPageSettings({
+                                            ...pageSettings,
+                                            wedding_date: e.target.value,
+                                        })
+                                    }
+                                    style={{
+                                        width: "100%",
+                                        padding: "10px",
+                                        border: "1px solid #d1d5db",
+                                        borderRadius: "6px",
+                                        fontSize: "14px",
+                                        outline: "none",
+                                        boxSizing: "border-box",
+                                    }}
                                 />
                             </div>
 
                             {/* 예식 시간 */}
                             <div style={{ marginBottom: "15px" }}>
-                                <label style={{ display: "block", fontSize: "14px", fontWeight: "500", color: "#374151", marginBottom: "5px" }}>예식 시간</label>
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: "10px", alignItems: "center" }}>
+                                <label
+                                    style={{
+                                        display: "block",
+                                        fontSize: "14px",
+                                        fontWeight: "500",
+                                        color: "#374151",
+                                        marginBottom: "5px",
+                                    }}
+                                >
+                                    예식 시간
+                                </label>
+                                <div
+                                    style={{
+                                        display: "grid",
+                                        gridTemplateColumns: "1fr auto 1fr",
+                                        gap: "10px",
+                                        alignItems: "center",
+                                    }}
+                                >
                                     <select
                                         value={pageSettings.wedding_hour}
-                                        onChange={(e) => setPageSettings({...pageSettings, wedding_hour: e.target.value})}
-                                        style={{ padding: "10px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "14px", outline: "none" }}
+                                        onChange={(e) =>
+                                            setPageSettings({
+                                                ...pageSettings,
+                                                wedding_hour: e.target.value,
+                                            })
+                                        }
+                                        style={{
+                                            padding: "10px",
+                                            border: "1px solid #d1d5db",
+                                            borderRadius: "6px",
+                                            fontSize: "14px",
+                                            outline: "none",
+                                        }}
                                     >
-                                        {Array.from({length: 24}, (_, i) => {
-                                            const hour = i.toString().padStart(2, '0')
-                                            const displayHour = i === 0 ? '12 AM' : i === 12 ? '12 PM' : i < 12 ? `${i} AM` : `${i-12} PM`
-                                            return <option key={hour} value={hour}>{displayHour}</option>
+                                        {Array.from({ length: 24 }, (_, i) => {
+                                            const hour = i
+                                                .toString()
+                                                .padStart(2, "0")
+                                            const displayHour =
+                                                i === 0
+                                                    ? "12 AM"
+                                                    : i === 12
+                                                      ? "12 PM"
+                                                      : i < 12
+                                                        ? `${i} AM`
+                                                        : `${i - 12} PM`
+                                            return (
+                                                <option key={hour} value={hour}>
+                                                    {displayHour}
+                                                </option>
+                                            )
                                         })}
                                     </select>
-                                    <span style={{ fontSize: "14px", color: "#6b7280" }}>:</span>
+                                    <span
+                                        style={{
+                                            fontSize: "14px",
+                                            color: "#6b7280",
+                                        }}
+                                    >
+                                        :
+                                    </span>
                                     <select
                                         value={pageSettings.wedding_minute}
-                                        onChange={(e) => setPageSettings({...pageSettings, wedding_minute: e.target.value})}
-                                        style={{ padding: "10px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "14px", outline: "none" }}
+                                        onChange={(e) =>
+                                            setPageSettings({
+                                                ...pageSettings,
+                                                wedding_minute: e.target.value,
+                                            })
+                                        }
+                                        style={{
+                                            padding: "10px",
+                                            border: "1px solid #d1d5db",
+                                            borderRadius: "6px",
+                                            fontSize: "14px",
+                                            outline: "none",
+                                        }}
                                     >
-                                        {['00', '10', '20', '30', '40', '50'].map(minute => (
-                                            <option key={minute} value={minute}>{minute}분</option>
+                                        {[
+                                            "00",
+                                            "10",
+                                            "20",
+                                            "30",
+                                            "40",
+                                            "50",
+                                        ].map((minute) => (
+                                            <option key={minute} value={minute}>
+                                                {minute}분
+                                            </option>
                                         ))}
                                     </select>
                                 </div>
                             </div>
 
                             {/* 예식장 정보 */}
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px" }}>
+                            <div
+                                style={{
+                                    display: "grid",
+                                    gridTemplateColumns: "1fr 1fr",
+                                    gap: "15px",
+                                }}
+                            >
                                 <div>
-                                    <label style={{ display: "block", fontSize: "14px", fontWeight: "500", color: "#374151", marginBottom: "5px" }}>예식장 이름</label>
+                                    <label
+                                        style={{
+                                            display: "block",
+                                            fontSize: "14px",
+                                            fontWeight: "500",
+                                            color: "#374151",
+                                            marginBottom: "5px",
+                                        }}
+                                    >
+                                        예식장 이름
+                                    </label>
                                     <input
                                         type="text"
                                         value={pageSettings.venue_name}
-                                        onChange={(e) => setPageSettings({...pageSettings, venue_name: e.target.value})}
-                                        style={{ width: "100%", padding: "10px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "14px", outline: "none", boxSizing: "border-box" }}
+                                        onChange={(e) =>
+                                            setPageSettings({
+                                                ...pageSettings,
+                                                venue_name: e.target.value,
+                                            })
+                                        }
+                                        style={{
+                                            width: "100%",
+                                            padding: "10px",
+                                            border: "1px solid #d1d5db",
+                                            borderRadius: "6px",
+                                            fontSize: "14px",
+                                            outline: "none",
+                                            boxSizing: "border-box",
+                                        }}
                                         placeholder="예: 더그랜드컨벤션웨딩홀"
                                     />
                                 </div>
                                 <div>
-                                    <label style={{ display: "block", fontSize: "14px", fontWeight: "500", color: "#374151", marginBottom: "5px" }}>예식장 주소</label>
+                                    <label
+                                        style={{
+                                            display: "block",
+                                            fontSize: "14px",
+                                            fontWeight: "500",
+                                            color: "#374151",
+                                            marginBottom: "5px",
+                                        }}
+                                    >
+                                        예식장 주소
+                                    </label>
                                     <input
                                         type="text"
                                         value={pageSettings.venue_address}
-                                        onChange={(e) => setPageSettings({...pageSettings, venue_address: e.target.value})}
-                                        style={{ width: "100%", padding: "10px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "14px", outline: "none", boxSizing: "border-box" }}
+                                        onChange={(e) =>
+                                            setPageSettings({
+                                                ...pageSettings,
+                                                venue_address: e.target.value,
+                                            })
+                                        }
+                                        style={{
+                                            width: "100%",
+                                            padding: "10px",
+                                            border: "1px solid #d1d5db",
+                                            borderRadius: "6px",
+                                            fontSize: "14px",
+                                            outline: "none",
+                                            boxSizing: "border-box",
+                                        }}
                                         placeholder="예: 서울시 강남구 테헤란로 123"
                                     />
                                 </div>
@@ -1461,14 +1774,18 @@ export default function UnifiedWeddingAdmin(props) {
                             disabled={settingsLoading}
                             style={{
                                 padding: "12px 24px",
-                                backgroundColor: settingsLoading ? "#9ca3af" : "#1a237e",
+                                backgroundColor: settingsLoading
+                                    ? "#9ca3af"
+                                    : "#1a237e",
                                 color: "white",
                                 border: "none",
                                 borderRadius: "6px",
                                 fontSize: "14px",
                                 fontWeight: "500",
-                                cursor: settingsLoading ? "not-allowed" : "pointer",
-                                touchAction: "manipulation"
+                                cursor: settingsLoading
+                                    ? "not-allowed"
+                                    : "pointer",
+                                touchAction: "manipulation",
                             }}
                         >
                             {settingsLoading ? "저장 중..." : "기본 정보 저장"}
@@ -1479,39 +1796,122 @@ export default function UnifiedWeddingAdmin(props) {
 
             {/* 포토섹션 탭 */}
             {currentTab === "photo" && (
-                <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-                    <div style={{ padding: "20px", backgroundColor: "white", borderRadius: "10px", boxShadow: "0 2px 4px rgba(0, 0, 0, 0.05)" }}>
-                        <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1f2937", margin: "0 0 20px 0" }}>📸 포토섹션 설정</h2>
-                        
+                <div
+                    style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "20px",
+                    }}
+                >
+                    <div
+                        style={{
+                            padding: "20px",
+                            backgroundColor: "white",
+                            borderRadius: "10px",
+                            boxShadow: "0 2px 4px rgba(0, 0, 0, 0.05)",
+                        }}
+                    >
+                        <h2
+                            style={{
+                                fontSize: "20px",
+                                fontWeight: "600",
+                                color: "#1f2937",
+                                margin: "0 0 20px 0",
+                            }}
+                        >
+                            📸 포토섹션 설정
+                        </h2>
+
                         {/* 자동 생성된 정보 미리보기 */}
-                        <div style={{ backgroundColor: "#f8fafc", padding: "15px", borderRadius: "8px", marginBottom: "20px" }}>
-                            <h3 style={{ fontSize: "16px", fontWeight: "600", color: "#1f2937", margin: "0 0 10px 0" }}>📋 자동 생성 미리보기</h3>
-                            <div style={{ fontSize: "14px", color: "#6b7280", lineHeight: "1.6" }}>
-                                <div><strong>표시 날짜/시간:</strong> {(() => {
-                                    if (!pageSettings.wedding_date) return "날짜를 입력해주세요"
-                                    const date = new Date(pageSettings.wedding_date)
-                                    const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
-                                    const hour = parseInt(pageSettings.wedding_hour)
-                                    const ampm = hour >= 12 ? 'PM' : 'AM'
-                                    const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
-                                    return `${date.getFullYear()}. ${(date.getMonth() + 1).toString().padStart(2, '0')}. ${date.getDate().toString().padStart(2, '0')}. ${dayNames[date.getDay()]}. ${displayHour} ${ampm}`
-                                })()}</div>
-                                <div><strong>표시 장소:</strong> {pageSettings.venue_name || "예식장 이름을 입력해주세요"}</div>
+                        <div
+                            style={{
+                                backgroundColor: "#f8fafc",
+                                padding: "15px",
+                                borderRadius: "8px",
+                                marginBottom: "20px",
+                            }}
+                        >
+                            <h3
+                                style={{
+                                    fontSize: "16px",
+                                    fontWeight: "600",
+                                    color: "#1f2937",
+                                    margin: "0 0 10px 0",
+                                }}
+                            >
+                                📋 자동 생성 미리보기
+                            </h3>
+                            <div
+                                style={{
+                                    fontSize: "14px",
+                                    color: "#6b7280",
+                                    lineHeight: "1.6",
+                                }}
+                            >
+                                <div>
+                                    <strong>표시 날짜/시간:</strong>{" "}
+                                    {(() => {
+                                        if (!pageSettings.wedding_date)
+                                            return "날짜를 입력해주세요"
+                                        const date = new Date(
+                                            pageSettings.wedding_date
+                                        )
+                                        const dayNames = [
+                                            "SUN",
+                                            "MON",
+                                            "TUE",
+                                            "WED",
+                                            "THU",
+                                            "FRI",
+                                            "SAT",
+                                        ]
+                                        const hour = parseInt(
+                                            pageSettings.wedding_hour
+                                        )
+                                        const ampm = hour >= 12 ? "PM" : "AM"
+                                        const displayHour =
+                                            hour === 0
+                                                ? 12
+                                                : hour > 12
+                                                  ? hour - 12
+                                                  : hour
+                                        return `${date.getFullYear()}. ${(date.getMonth() + 1).toString().padStart(2, "0")}. ${date.getDate().toString().padStart(2, "0")}. ${dayNames[date.getDay()]}. ${displayHour} ${ampm}`
+                                    })()}
+                                </div>
+                                <div>
+                                    <strong>표시 장소:</strong>{" "}
+                                    {pageSettings.venue_name ||
+                                        "예식장 이름을 입력해주세요"}
+                                </div>
                             </div>
                         </div>
 
                         {/* 메인 사진 업로드 */}
                         <div style={{ marginBottom: "25px" }}>
-                            <h3 style={{ fontSize: "16px", fontWeight: "600", color: "#1f2937", margin: "0 0 15px 0" }}>🖼️ 메인 사진</h3>
-                            <div style={{ 
-                                border: "2px dashed #d1d5db", 
-                                borderRadius: "8px", 
-                                padding: "30px", 
-                                textAlign: "center",
-                                backgroundColor: "#f9fafb",
-                                cursor: "pointer"
-                            }}
-                            onClick={() => document.getElementById("photoSectionFileInput")?.click()}
+                            <h3
+                                style={{
+                                    fontSize: "16px",
+                                    fontWeight: "600",
+                                    color: "#1f2937",
+                                    margin: "0 0 15px 0",
+                                }}
+                            >
+                                🖼️ 메인 사진
+                            </h3>
+                            <div
+                                style={{
+                                    border: "2px dashed #d1d5db",
+                                    borderRadius: "8px",
+                                    padding: "30px",
+                                    textAlign: "center",
+                                    backgroundColor: "#f9fafb",
+                                    cursor: "pointer",
+                                }}
+                                onClick={() =>
+                                    document
+                                        .getElementById("photoSectionFileInput")
+                                        ?.click()
+                                }
                             >
                                 <input
                                     id="photoSectionFileInput"
@@ -1520,27 +1920,68 @@ export default function UnifiedWeddingAdmin(props) {
                                     onChange={handlePhotoSectionImageUpload}
                                     style={{ display: "none" }}
                                 />
-                                
+
                                 {pageSettings.photo_section_image_url ? (
                                     <div>
-                                        <img 
-                                            src={pageSettings.photo_section_image_url} 
+                                        <img
+                                            src={
+                                                pageSettings.photo_section_image_url
+                                            }
                                             alt="메인 사진 미리보기"
-                                            style={{ 
-                                                maxWidth: "200px", 
-                                                maxHeight: "200px", 
+                                            style={{
+                                                maxWidth: "200px",
+                                                maxHeight: "200px",
                                                 borderRadius: "8px",
-                                                marginBottom: "10px"
+                                                marginBottom: "10px",
                                             }}
                                         />
-                                        <div style={{ fontSize: "14px", color: "#10b981", marginBottom: "5px" }}>✅ 메인 사진이 업로드되었습니다</div>
-                                        <div style={{ fontSize: "12px", color: "#6b7280" }}>다른 사진으로 변경하려면 클릭하세요</div>
+                                        <div
+                                            style={{
+                                                fontSize: "14px",
+                                                color: "#10b981",
+                                                marginBottom: "5px",
+                                            }}
+                                        >
+                                            ✅ 메인 사진이 업로드되었습니다
+                                        </div>
+                                        <div
+                                            style={{
+                                                fontSize: "12px",
+                                                color: "#6b7280",
+                                            }}
+                                        >
+                                            다른 사진으로 변경하려면 클릭하세요
+                                        </div>
                                     </div>
                                 ) : (
                                     <div>
-                                        <div style={{ fontSize: "48px", marginBottom: "10px" }}>📷</div>
-                                        <div style={{ fontSize: "16px", fontWeight: "500", color: "#374151", marginBottom: "5px" }}>메인 사진을 업로드하세요</div>
-                                        <div style={{ fontSize: "14px", color: "#6b7280" }}>PhotoSection 컴포넌트에 표시될 사진입니다</div>
+                                        <div
+                                            style={{
+                                                fontSize: "48px",
+                                                marginBottom: "10px",
+                                            }}
+                                        >
+                                            📷
+                                        </div>
+                                        <div
+                                            style={{
+                                                fontSize: "16px",
+                                                fontWeight: "500",
+                                                color: "#374151",
+                                                marginBottom: "5px",
+                                            }}
+                                        >
+                                            메인 사진을 업로드하세요
+                                        </div>
+                                        <div
+                                            style={{
+                                                fontSize: "14px",
+                                                color: "#6b7280",
+                                            }}
+                                        >
+                                            PhotoSection 컴포넌트에 표시될
+                                            사진입니다
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -1548,25 +1989,90 @@ export default function UnifiedWeddingAdmin(props) {
 
                         {/* 오버레이 설정 */}
                         <div style={{ marginBottom: "25px" }}>
-                            <h3 style={{ fontSize: "16px", fontWeight: "600", color: "#1f2937", margin: "0 0 15px 0" }}>⚙️ 오버레이 설정</h3>
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px" }}>
+                            <h3
+                                style={{
+                                    fontSize: "16px",
+                                    fontWeight: "600",
+                                    color: "#1f2937",
+                                    margin: "0 0 15px 0",
+                                }}
+                            >
+                                ⚙️ 오버레이 설정
+                            </h3>
+                            <div
+                                style={{
+                                    display: "grid",
+                                    gridTemplateColumns: "1fr 1fr",
+                                    gap: "15px",
+                                }}
+                            >
                                 <div>
-                                    <label style={{ display: "block", fontSize: "14px", fontWeight: "500", color: "#374151", marginBottom: "5px" }}>텍스트 위치</label>
+                                    <label
+                                        style={{
+                                            display: "block",
+                                            fontSize: "14px",
+                                            fontWeight: "500",
+                                            color: "#374151",
+                                            marginBottom: "5px",
+                                        }}
+                                    >
+                                        텍스트 위치
+                                    </label>
                                     <select
-                                        value={pageSettings.photo_section_overlay_position}
-                                        onChange={(e) => setPageSettings({...pageSettings, photo_section_overlay_position: e.target.value})}
-                                        style={{ width: "100%", padding: "10px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "14px", outline: "none" }}
+                                        value={
+                                            pageSettings.photo_section_overlay_position
+                                        }
+                                        onChange={(e) =>
+                                            setPageSettings({
+                                                ...pageSettings,
+                                                photo_section_overlay_position:
+                                                    e.target.value,
+                                            })
+                                        }
+                                        style={{
+                                            width: "100%",
+                                            padding: "10px",
+                                            border: "1px solid #d1d5db",
+                                            borderRadius: "6px",
+                                            fontSize: "14px",
+                                            outline: "none",
+                                        }}
                                     >
                                         <option value="top">상단</option>
                                         <option value="bottom">하단</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label style={{ display: "block", fontSize: "14px", fontWeight: "500", color: "#374151", marginBottom: "5px" }}>텍스트 색상</label>
+                                    <label
+                                        style={{
+                                            display: "block",
+                                            fontSize: "14px",
+                                            fontWeight: "500",
+                                            color: "#374151",
+                                            marginBottom: "5px",
+                                        }}
+                                    >
+                                        텍스트 색상
+                                    </label>
                                     <select
-                                        value={pageSettings.photo_section_overlay_color}
-                                        onChange={(e) => setPageSettings({...pageSettings, photo_section_overlay_color: e.target.value})}
-                                        style={{ width: "100%", padding: "10px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "14px", outline: "none" }}
+                                        value={
+                                            pageSettings.photo_section_overlay_color
+                                        }
+                                        onChange={(e) =>
+                                            setPageSettings({
+                                                ...pageSettings,
+                                                photo_section_overlay_color:
+                                                    e.target.value,
+                                            })
+                                        }
+                                        style={{
+                                            width: "100%",
+                                            padding: "10px",
+                                            border: "1px solid #d1d5db",
+                                            borderRadius: "6px",
+                                            fontSize: "14px",
+                                            outline: "none",
+                                        }}
                                     >
                                         <option value="#ffffff">흰색</option>
                                         <option value="#000000">검정</option>
@@ -1580,17 +2086,23 @@ export default function UnifiedWeddingAdmin(props) {
                             disabled={settingsLoading}
                             style={{
                                 padding: "12px 24px",
-                                backgroundColor: settingsLoading ? "#9ca3af" : "#1a237e",
+                                backgroundColor: settingsLoading
+                                    ? "#9ca3af"
+                                    : "#1a237e",
                                 color: "white",
                                 border: "none",
                                 borderRadius: "6px",
                                 fontSize: "14px",
                                 fontWeight: "500",
-                                cursor: settingsLoading ? "not-allowed" : "pointer",
-                                touchAction: "manipulation"
+                                cursor: settingsLoading
+                                    ? "not-allowed"
+                                    : "pointer",
+                                touchAction: "manipulation",
                             }}
                         >
-                            {settingsLoading ? "저장 중..." : "포토섹션 설정 저장"}
+                            {settingsLoading
+                                ? "저장 중..."
+                                : "포토섹션 설정 저장"}
                         </button>
                     </div>
                 </div>
@@ -2617,52 +3129,202 @@ export default function UnifiedWeddingAdmin(props) {
 
             {/* 지도 탭 */}
             {currentTab === "map" && (
-                <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-                    <div style={{ padding: "20px", backgroundColor: "white", borderRadius: "10px", boxShadow: "0 2px 4px rgba(0, 0, 0, 0.05)" }}>
-                        <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1f2937", margin: "0 0 20px 0" }}>🗺️ 지도 및 캘린더 설정</h2>
-                        
+                <div
+                    style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "20px",
+                    }}
+                >
+                    <div
+                        style={{
+                            padding: "20px",
+                            backgroundColor: "white",
+                            borderRadius: "10px",
+                            boxShadow: "0 2px 4px rgba(0, 0, 0, 0.05)",
+                        }}
+                    >
+                        <h2
+                            style={{
+                                fontSize: "20px",
+                                fontWeight: "600",
+                                color: "#1f2937",
+                                margin: "0 0 20px 0",
+                            }}
+                        >
+                            🗺️ 지도 및 캘린더 설정
+                        </h2>
+
                         {/* 자동 생성된 정보 미리보기 */}
-                        <div style={{ backgroundColor: "#f8fafc", padding: "15px", borderRadius: "8px", marginBottom: "20px" }}>
-                            <h3 style={{ fontSize: "16px", fontWeight: "600", color: "#1f2937", margin: "0 0 10px 0" }}>📋 자동 생성 미리보기</h3>
-                            <div style={{ fontSize: "14px", color: "#6b7280", lineHeight: "1.6" }}>
-                                <div><strong>장소명:</strong> {pageSettings.venue_name || "예식장 이름을 입력해주세요"}</div>
-                                <div><strong>캘린더 이벤트명:</strong> {(() => {
-                                    const groomFirst = pageSettings.groom_name_kr ? pageSettings.groom_name_kr.slice(-2) : "신랑"
-                                    const brideFirst = pageSettings.bride_name_kr ? pageSettings.bride_name_kr.slice(-2) : "신부"
-                                    return `${groomFirst} ♥ ${brideFirst}의 결혼식`
-                                })()}</div>
-                                <div><strong>캘린더 설명:</strong> {(() => {
-                                    const groomFirst = pageSettings.groom_name_kr ? pageSettings.groom_name_kr.slice(-2) : "신랑"
-                                    const brideFirst = pageSettings.bride_name_kr ? pageSettings.bride_name_kr.slice(-2) : "신부"
-                                    return `${groomFirst}과 ${brideFirst}의 새로운 출발을 축하해 주세요`
-                                })()}</div>
-                                <div><strong>예식 일시:</strong> {(() => {
-                                    if (!pageSettings.wedding_date) return "날짜를 입력해주세요"
-                                    const date = new Date(pageSettings.wedding_date)
-                                    const hour = parseInt(pageSettings.wedding_hour)
-                                    const minute = pageSettings.wedding_minute
-                                    const ampm = hour >= 12 ? '오후' : '오전'
-                                    const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
-                                    return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일 ${ampm} ${displayHour}:${minute}`
-                                })()}</div>
+                        <div
+                            style={{
+                                backgroundColor: "#f8fafc",
+                                padding: "15px",
+                                borderRadius: "8px",
+                                marginBottom: "20px",
+                            }}
+                        >
+                            <h3
+                                style={{
+                                    fontSize: "16px",
+                                    fontWeight: "600",
+                                    color: "#1f2937",
+                                    margin: "0 0 10px 0",
+                                }}
+                            >
+                                📋 자동 생성 미리보기
+                            </h3>
+                            <div
+                                style={{
+                                    fontSize: "14px",
+                                    color: "#6b7280",
+                                    lineHeight: "1.6",
+                                }}
+                            >
+                                <div>
+                                    <strong>장소명:</strong>{" "}
+                                    {pageSettings.venue_name ||
+                                        "예식장 이름을 입력해주세요"}
+                                </div>
+                                <div>
+                                    <strong>캘린더 이벤트명:</strong>{" "}
+                                    {(() => {
+                                        const groomFirst =
+                                            pageSettings.groom_name_kr
+                                                ? pageSettings.groom_name_kr.slice(
+                                                      -2
+                                                  )
+                                                : "신랑"
+                                        const brideFirst =
+                                            pageSettings.bride_name_kr
+                                                ? pageSettings.bride_name_kr.slice(
+                                                      -2
+                                                  )
+                                                : "신부"
+                                        return `${groomFirst} ♥ ${brideFirst}의 결혼식`
+                                    })()}
+                                </div>
+                                <div>
+                                    <strong>캘린더 설명:</strong>{" "}
+                                    {(() => {
+                                        const groomFirst =
+                                            pageSettings.groom_name_kr
+                                                ? pageSettings.groom_name_kr.slice(
+                                                      -2
+                                                  )
+                                                : "신랑"
+                                        const brideFirst =
+                                            pageSettings.bride_name_kr
+                                                ? pageSettings.bride_name_kr.slice(
+                                                      -2
+                                                  )
+                                                : "신부"
+                                        return `${groomFirst}과 ${brideFirst}의 새로운 출발을 축하해 주세요`
+                                    })()}
+                                </div>
+                                <div>
+                                    <strong>예식 일시:</strong>{" "}
+                                    {(() => {
+                                        if (!pageSettings.wedding_date)
+                                            return "날짜를 입력해주세요"
+                                        const date = new Date(
+                                            pageSettings.wedding_date
+                                        )
+                                        const hour = parseInt(
+                                            pageSettings.wedding_hour
+                                        )
+                                        const minute =
+                                            pageSettings.wedding_minute
+                                        const ampm =
+                                            hour >= 12 ? "오후" : "오전"
+                                        const displayHour =
+                                            hour === 0
+                                                ? 12
+                                                : hour > 12
+                                                  ? hour - 12
+                                                  : hour
+                                        return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일 ${ampm} ${displayHour}:${minute}`
+                                    })()}
+                                </div>
                             </div>
                         </div>
 
                         {/* 정보 안내 */}
-                        <div style={{ backgroundColor: "#f0f9ff", padding: "15px", borderRadius: "8px", border: "1px solid #e0f2fe", marginBottom: "20px" }}>
-                            <h3 style={{ fontSize: "16px", fontWeight: "600", color: "#0369a1", margin: "0 0 10px 0" }}>ℹ️ 자동 연동 정보</h3>
-                            <div style={{ fontSize: "14px", color: "#0c4a6e", lineHeight: "1.6" }}>
-                                <div>• <strong>지도 컴포넌트</strong>: 기본정보의 예식장 이름이 자동으로 연동됩니다</div>
-                                <div>• <strong>캘린더 버튼</strong>: 신랑신부 이름(성 제외)과 예식 일시가 자동으로 연동됩니다</div>
-                                <div>• <strong>Calendar 컴포넌트</strong>: 예식 날짜가 자동으로 하이라이트됩니다</div>
-                                <div>• <strong>PhotoSection</strong>: 업로드한 메인 사진과 예식 정보가 자동으로 표시됩니다</div>
+                        <div
+                            style={{
+                                backgroundColor: "#f0f9ff",
+                                padding: "15px",
+                                borderRadius: "8px",
+                                border: "1px solid #e0f2fe",
+                                marginBottom: "20px",
+                            }}
+                        >
+                            <h3
+                                style={{
+                                    fontSize: "16px",
+                                    fontWeight: "600",
+                                    color: "#0369a1",
+                                    margin: "0 0 10px 0",
+                                }}
+                            >
+                                ℹ️ 자동 연동 정보
+                            </h3>
+                            <div
+                                style={{
+                                    fontSize: "14px",
+                                    color: "#0c4a6e",
+                                    lineHeight: "1.6",
+                                }}
+                            >
+                                <div>
+                                    • <strong>지도 컴포넌트</strong>: 기본정보의
+                                    예식장 이름이 자동으로 연동됩니다
+                                </div>
+                                <div>
+                                    • <strong>캘린더 버튼</strong>: 신랑신부
+                                    이름(성 제외)과 예식 일시가 자동으로
+                                    연동됩니다
+                                </div>
+                                <div>
+                                    • <strong>Calendar 컴포넌트</strong>: 예식
+                                    날짜가 자동으로 하이라이트됩니다
+                                </div>
+                                <div>
+                                    • <strong>PhotoSection</strong>: 업로드한
+                                    메인 사진과 예식 정보가 자동으로 표시됩니다
+                                </div>
                             </div>
                         </div>
 
-                        <div style={{ padding: "15px", backgroundColor: "#f9fafb", borderRadius: "8px", textAlign: "center" }}>
-                            <div style={{ fontSize: "48px", marginBottom: "10px" }}>✅</div>
-                            <div style={{ fontSize: "16px", fontWeight: "500", color: "#374151", marginBottom: "5px" }}>설정 완료!</div>
-                            <div style={{ fontSize: "14px", color: "#6b7280" }}>모든 정보가 기본정보 탭에서 자동으로 연동됩니다</div>
+                        <div
+                            style={{
+                                padding: "15px",
+                                backgroundColor: "#f9fafb",
+                                borderRadius: "8px",
+                                textAlign: "center",
+                            }}
+                        >
+                            <div
+                                style={{
+                                    fontSize: "48px",
+                                    marginBottom: "10px",
+                                }}
+                            >
+                                ✅
+                            </div>
+                            <div
+                                style={{
+                                    fontSize: "16px",
+                                    fontWeight: "500",
+                                    color: "#374151",
+                                    marginBottom: "5px",
+                                }}
+                            >
+                                설정 완료!
+                            </div>
+                            <div style={{ fontSize: "14px", color: "#6b7280" }}>
+                                모든 정보가 기본정보 탭에서 자동으로 연동됩니다
+                            </div>
                         </div>
                     </div>
                 </div>

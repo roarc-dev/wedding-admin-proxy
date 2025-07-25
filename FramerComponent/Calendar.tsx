@@ -3,7 +3,7 @@ import { motion } from "framer-motion"
 import { useState, useEffect } from "react"
 
 // 프록시 서버 URL (고정된 Production URL)
-const PROXY_BASE_URL = "https://wedding-admin-proxy-git-main-roarcs-projects.vercel.app"
+const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app"
 
 interface CalendarComponentProps {
     pageId: string

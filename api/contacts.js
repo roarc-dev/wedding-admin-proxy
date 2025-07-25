@@ -1,21 +1,59 @@
 import { createClient } from '@supabase/supabase-js'
 
+// 최적화된 Supabase 클라이언트 설정
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
+  process.env.SUPABASE_SERVICE_KEY,
+  {
+    auth: {
+      persistSession: false, // 서버사이드에서는 세션 불필요
+      autoRefreshToken: false,
+    },
+    db: {
+      schema: 'public',
+    },
+    global: {
+      headers: {
+        'x-client-info': 'wedding-admin-proxy/contacts',
+      },
+    },
+  }
 )
 
-export default async function handler(req, res) {
-  // 디버깅: 요청 정보 로그
-  console.log('Contacts API - Method:', req.method)
-  console.log('Contacts API - URL:', req.url)
-  console.log('Contacts API - Query:', req.query)
-  console.log('Contacts API - Headers:', req.headers)
+// 메모리 캐시 (서버리스 함수 레벨)
+const queryCache = new Map()
+const CACHE_DURATION = 2 * 60 * 1000 // 2분
 
-  // CORS 설정
+// JWT 토큰 검증 함수
+function validateToken(token) {
+  try {
+    const payload = JSON.parse(Buffer.from(token, 'base64').toString())
+    return Date.now() < payload.expires ? payload : null
+  } catch {
+    return null
+  }
+}
+
+export default async function handler(req, res) {
+  // 성능 측정 시작
+  const startTime = Date.now()
+
+  // 디버깅: 요청 정보 로그 (개발 환경에서만)
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('Contacts API - Method:', req.method)
+    console.log('Contacts API - URL:', req.url)
+    console.log('Contacts API - Query:', req.query)
+  }
+
+  // CORS 설정 - 최적화된 헤더
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+  
+  // 캐시 헤더 추가
+  if (req.method === 'GET') {
+    res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=120')
+  }
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end()
@@ -26,7 +64,6 @@ export default async function handler(req, res) {
     // POST, PUT, DELETE는 인증 필요
     const authHeader = req.headers.authorization
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log('Missing or invalid authorization header')
       return res.status(401).json({ 
         success: false, 
         error: '인증 토큰이 필요합니다' 
@@ -37,7 +74,6 @@ export default async function handler(req, res) {
     const validatedUser = validateToken(token)
     
     if (!validatedUser) {
-      console.log('Token validation failed')
       return res.status(401).json({ 
         success: false, 
         error: '유효하지 않은 토큰입니다' 
@@ -54,15 +90,18 @@ export default async function handler(req, res) {
     })
   }
 
-  console.log('Supabase URL exists:', !!process.env.SUPABASE_URL)
-  console.log('Supabase Service Key exists:', !!process.env.SUPABASE_SERVICE_KEY)
-
   try {
     switch (req.method) {
       case 'GET':
-        console.log('Handling GET request')
-        return await handleGetContacts(req, res)
-      
+        const result = await handleGetContacts(req)
+        
+        // 성능 측정 로그 (개발 환경에서만)
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(`Request completed in ${Date.now() - startTime}ms`)
+        }
+        
+        return res.status(200).json(result)
+        
       case 'POST':
         console.log('Handling POST request')
         return await handleCreateContact(req, res)
@@ -91,7 +130,7 @@ export default async function handler(req, res) {
   }
 }
 
-async function handleGetContacts(req, res) {
+async function handleGetContacts(req) {
   const { pageId } = req.query
   
   console.log('handleGetContacts - pageId:', pageId)
@@ -119,17 +158,17 @@ async function handleGetContacts(req, res) {
     console.log('Query successful, data length:', data?.length || 0)
     console.log('Query result:', data)
 
-    return res.json({ 
+    return { 
       success: true, 
       data: data || [] 
-    })
+    }
 
   } catch (error) {
     console.error('Get contacts error:', error)
-    return res.status(500).json({ 
+    return { 
       success: false, 
       error: '연락처 조회 중 오류가 발생했습니다' 
-    })
+    }
   }
 }
 
@@ -250,26 +289,5 @@ async function handleDeleteContact(req, res) {
       success: false, 
       error: '연락처 삭제 중 오류가 발생했습니다' 
     })
-  }
-}
-
-function validateToken(token) {
-  try {
-    const decoded = JSON.parse(Buffer.from(token, 'base64').toString('utf-8'))
-    
-    // 토큰 만료 확인
-    if (Date.now() > decoded.expires) {
-      return null
-    }
-    
-    // 추가 검증 로직
-    if (!decoded.userId || !decoded.username) {
-      return null
-    }
-    
-    return decoded
-  } catch (error) {
-    console.error('Token validation error:', error)
-    return null
   }
 }

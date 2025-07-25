@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { addPropertyControls, ControlType } from "framer"
 
 // 프록시 서버 URL (고정된 Production URL)
-const PROXY_BASE_URL = "https://wedding-admin-proxy-git-main-roarcs-projects.vercel.app"
+const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app"
 
 // 프록시를 통한 안전한 이미지 목록 가져오기
 async function getImagesByPageId(pageId: string) {

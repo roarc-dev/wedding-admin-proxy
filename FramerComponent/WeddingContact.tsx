@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { addPropertyControls, ControlType } from "framer"
+import { useQuery, useQueryClient, QueryClient, QueryClientProvider } from "@tanstack/react-query"
 
 /**
  * @framerDisableUnlink
@@ -11,9 +12,115 @@ import { addPropertyControls, ControlType } from "framer"
 // 프록시 서버 URL (고정된 Production URL)
 const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app"
 
-// 간단한 메모리 캐시 (컴포넌트 레벨)
+// React Query Client 설정 (최적화)
+const queryClient = new QueryClient({
+    defaultOptions: {
+        queries: {
+            staleTime: 5 * 60 * 1000, // 5분
+            gcTime: 15 * 60 * 1000, // 15분 (구 cacheTime)
+            refetchOnWindowFocus: false,
+            refetchOnMount: false,
+            refetchOnReconnect: true,
+            retry: 2,
+            retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
+        },
+    },
+})
+
+// 고급 캐싱 시스템 (React Query와 병행)
 const contactCache = new Map()
-const CACHE_DURATION = 5 * 60 * 1000 // 5분
+const CACHE_DURATION = 15 * 60 * 1000 // 15분으로 연장
+const STALE_WHILE_REVALIDATE = 5 * 60 * 1000 // 5분 후 백그라운드 갱신
+const PRELOAD_DELAY = 50 // 50ms 후 프리로딩 시작
+const MAX_RETRIES = 2 // 최대 재시도 횟수
+
+// 요청 최적화 옵션
+const FETCH_OPTIONS = {
+    method: "GET",
+    headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Cache-Control": "public, max-age=60"
+    },
+    keepalive: true, // 연결 재사용
+}
+
+// React Query용 데이터 fetcher
+const fetchContactData = async (pageId: string): Promise<ContactInfo> => {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 8000)
+
+    try {
+        const response = await fetchWithRetry(`${PROXY_BASE_URL}/api/contacts?pageId=${pageId}`, {
+            ...FETCH_OPTIONS,
+            signal: controller.signal,
+        })
+
+        clearTimeout(timeoutId)
+        const result = await response.json()
+
+        if (result.success && result.data?.length > 0) {
+            return result.data[0]
+        }
+
+        throw new Error(`페이지 ID "${pageId}"에 해당하는 연락처 정보를 찾을 수 없습니다.`)
+    } catch (error) {
+        clearTimeout(timeoutId)
+        throw error
+    }
+}
+
+// 프리로딩 함수 (React Query 활용)
+const preloadContactInfo = async (pageId: string) => {
+    if (!pageId) return
+
+    try {
+        await queryClient.prefetchQuery({
+            queryKey: ['contacts', pageId],
+            queryFn: () => fetchContactData(pageId),
+            staleTime: STALE_WHILE_REVALIDATE,
+        })
+        console.log(`✅ Preloaded contact data for pageId: ${pageId}`)
+    } catch (error) {
+        console.log(`⚠️ Preload failed for pageId: ${pageId}`)
+    }
+}
+
+// 글로벌 프리로딩 스케줄러
+const schedulePreload = (pageId: string) => {
+    setTimeout(() => preloadContactInfo(pageId), PRELOAD_DELAY)
+}
+
+// Stale-While-Revalidate 전략 구현
+const shouldRevalidate = (cached: any): boolean => {
+    return Date.now() - cached.timestamp > STALE_WHILE_REVALIDATE
+}
+
+// 재시도 로직 구현
+const fetchWithRetry = async (url: string, options: RequestInit, maxRetries: number = MAX_RETRIES): Promise<Response> => {
+    let lastError: Error | null = null
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            const response = await fetch(url, options)
+            if (response.ok) {
+                return response
+            }
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        } catch (error) {
+            lastError = error as Error
+            
+            // 마지막 시도가 아니면 지수 백오프로 재시도
+            if (attempt < maxRetries) {
+                const delay = Math.min(1000 * Math.pow(2, attempt), 5000) // 최대 5초
+                await new Promise(resolve => setTimeout(resolve, delay))
+                console.log(`🔄 Retrying request (attempt ${attempt + 2}/${maxRetries + 1})`)
+            }
+        }
+    }
+    
+    throw lastError
+}
 
 interface ContactInfo {
     id?: string
@@ -43,109 +150,37 @@ interface WeddingContactProps {
 
 type ViewState = "closed" | "selection" | "groom" | "bride"
 
-export default function WeddingContact(props: WeddingContactProps) {
+// React Query를 사용한 최적화된 컴포넌트
+function WeddingContactInner(props: WeddingContactProps) {
     const { pageId = "demo", callIcon = "", smsIcon = "", style = {} } = props
 
     const [viewState, setViewState] = useState<ViewState>("selection")
-    const [contactInfo, setContactInfo] = useState<ContactInfo | null>(null)
-    const [error, setError] = useState<string | null>(null)
-    const [isLoading, setIsLoading] = useState(true)
+    
+    // React Query로 데이터 관리
+    const {
+        data: contactInfo,
+        error,
+        isLoading,
+        isFetching,
+        refetch
+    } = useQuery({
+        queryKey: ['contacts', pageId],
+        queryFn: () => fetchContactData(pageId),
+        enabled: !!pageId,
+        staleTime: 5 * 60 * 1000, // 5분
+        gcTime: 15 * 60 * 1000, // 15분
+        retry: 2,
+        retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 5000),
+        refetchOnWindowFocus: false,
+        refetchOnMount: false,
+    })
 
-    // 연락처 정보 가져오기 (캐싱 및 최적화)
-    const fetchContactInfo = useCallback(async () => {
-        if (!pageId) {
-            setIsLoading(false)
-            return
-        }
-
-        // 캐시 확인
-        const cacheKey = `contact_${pageId}`
-        const cached = contactCache.get(cacheKey)
-        if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-            setContactInfo(cached.data)
-            setError(null)
-            setIsLoading(false)
-            return
-        }
-
-        setError(null)
-        setIsLoading(true)
-
-        try {
-            // AbortController로 요청 최적화
-            const controller = new AbortController()
-            const timeoutId = setTimeout(() => controller.abort(), 10000) // 10초 타임아웃
-
-            const url = `${PROXY_BASE_URL}/api/contacts?pageId=${pageId}`
-            
-            console.log('Fetching contacts from:', url)
-            console.log('Request method: GET')
-
-            const response = await fetch(url, {
-                method: "GET",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                signal: controller.signal,
-            })
-
-            clearTimeout(timeoutId)
-
-            console.log('Response status:', response.status)
-            console.log('Response headers:', Object.fromEntries(response.headers.entries()))
-
-            if (!response.ok) {
-                const errorText = await response.text()
-                console.error('Error response text:', errorText)
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-            }
-
-            const result = await response.json()
-            console.log('Response result:', result)
-
-            if (result.success) {
-                if (result.data && result.data.length > 0) {
-                    const contactData = result.data[0]
-                    setContactInfo(contactData)
-
-                    // 캐시에 저장
-                    contactCache.set(cacheKey, {
-                        data: contactData,
-                        timestamp: Date.now(),
-                    })
-                } else {
-                    throw new Error(
-                        `페이지 ID "${pageId}"에 해당하는 연락처 정보를 찾을 수 없습니다.`
-                    )
-                }
-            } else {
-                throw new Error(
-                    result.error || "연락처 정보를 불러오는데 실패했습니다."
-                )
-            }
-        } catch (err) {
-            console.error("연락처 정보 조회 실패:", err)
-
-            if (err instanceof Error) {
-                if (err.name === "AbortError") {
-                    setError(
-                        "연결 시간이 초과되었습니다. 네트워크 상태를 확인해주세요."
-                    )
-                } else {
-                    setError(err.message)
-                }
-            } else {
-                setError("연락처 정보를 불러오는데 실패했습니다.")
-            }
-        } finally {
-            setIsLoading(false)
+    // 프리로딩 스케줄링
+    useEffect(() => {
+        if (pageId) {
+            schedulePreload(pageId)
         }
     }, [pageId])
-
-    // 컴포넌트 마운트 시 연락처 정보 fetch
-    useEffect(() => {
-        fetchContactInfo()
-    }, [fetchContactInfo])
 
     // 연락처 데이터 메모이제이션
     const processedContacts = useMemo(() => {
@@ -223,9 +258,7 @@ export default function WeddingContact(props: WeddingContactProps) {
 
     // 재시도 함수
     const retry = () => {
-        // 캐시 클리어 후 재시도
-        contactCache.delete(`contact_${pageId}`)
-        fetchContactInfo()
+        refetch()
     }
 
     return (
@@ -318,7 +351,7 @@ export default function WeddingContact(props: WeddingContactProps) {
                                         fontSize: "14px",
                                     }}
                                 >
-                                    {error}
+                                    {error instanceof Error ? error.message : String(error)}
                                 </div>
                                 <motion.button
                                     onClick={retry}
@@ -733,6 +766,15 @@ const ContactItem = React.memo(function ContactItem({
         </div>
     )
 })
+
+// QueryClientProvider로 래핑된 메인 컴포넌트
+export default function WeddingContact(props: WeddingContactProps) {
+    return (
+        <QueryClientProvider client={queryClient}>
+            <WeddingContactInner {...props} />
+        </QueryClientProvider>
+    )
+}
 
 // Property Controls
 addPropertyControls(WeddingContact, {
