@@ -80,7 +80,7 @@ type SideType = "groom" | "bride"
  * @framerSupportedLayoutWidth fixed
  * @framerSupportedLayoutHeight auto
  * @framerIntrinsicWidth 378
- * @framerIntrinsicHeight 118
+ * @framerIntrinsicHeight 300
  */
 export default function AccountBtn(props: AccountBtnProps) {
     const { pageId = "default", style } = props
@@ -184,18 +184,10 @@ export default function AccountBtn(props: AccountBtnProps) {
     // 토글 함수들
     const toggleGroomView = () => {
         setGroomViewState(groomViewState === "closed" ? "open" : "closed")
-        // 신부측이 열려있으면 닫기
-        if (brideViewState === "open") {
-            setBrideViewState("closed")
-        }
     }
 
     const toggleBrideView = () => {
         setBrideViewState(brideViewState === "closed" ? "open" : "closed")
-        // 신랑측이 열려있으면 닫기
-        if (groomViewState === "open") {
-            setGroomViewState("closed")
-        }
     }
 
     // 로딩 상태
@@ -396,15 +388,23 @@ const GroomAccountButton = React.memo(function GroomAccountButton({
     }
 
     return (
-        <div style={{
-            width: 378,
-            background: 'white',
-            overflow: 'hidden',
-            flexDirection: 'column',
-            justifyContent: 'flex-start',
-            alignItems: 'center',
-            display: 'inline-flex'
-        }}>
+        <motion.div
+            style={{
+                width: 378,
+                background: 'white',
+                overflow: 'hidden',
+                flexDirection: 'column',
+                justifyContent: 'flex-start',
+                alignItems: 'center',
+                display: 'inline-flex'
+            }}
+            initial={{ height: 54 }}
+            animate={{ height: "auto" }}
+            transition={{ 
+                duration: 0.3,
+                ease: "easeInOut"
+            }}
+        >
             {/* 헤더 */}
             <div style={{
                 alignSelf: 'stretch',
@@ -425,25 +425,42 @@ const GroomAccountButton = React.memo(function GroomAccountButton({
                 }}>
                     신랑측에게
                 </div>
-                <svg width="15" height="8" viewBox="0 0 15 8" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ transform: 'rotate(180deg)' }}>
+                <motion.svg 
+                    width="15" 
+                    height="8" 
+                    viewBox="0 0 15 8" 
+                    fill="none" 
+                    xmlns="http://www.w3.org/2000/svg"
+                    animate={{ rotate: 180 }}
+                    transition={{ duration: 0.3 }}
+                >
                     <g id="Group 2117912660">
                         <path id="Vector 1121" d="M1.5 1L7.5 6.5L13.5 1" stroke="black" strokeWidth="1.5"/>
                     </g>
-                </svg>
+                </motion.svg>
             </div>
 
             {/* 계좌 정보 목록 */}
-            <div style={{
-                alignSelf: 'stretch',
-                paddingTop: 20,
-                paddingLeft: 20,
-                paddingRight: 20,
-                flexDirection: 'column',
-                justifyContent: 'flex-start',
-                alignItems: 'flex-start',
-                gap: 16,
-                display: 'flex'
-            }}>
+            <motion.div 
+                style={{
+                    alignSelf: 'stretch',
+                    paddingTop: 20,
+                    paddingLeft: 20,
+                    paddingRight: 20,
+                    flexDirection: 'column',
+                    justifyContent: 'flex-start',
+                    alignItems: 'flex-start',
+                    gap: 16,
+                    display: 'flex'
+                }}
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ 
+                    duration: 0.3,
+                    delay: 0.1,
+                    ease: "easeOut"
+                }}
+            >
                 <AccountItem
                     label="신랑"
                     name={accountInfo.groom_name}
@@ -465,8 +482,8 @@ const GroomAccountButton = React.memo(function GroomAccountButton({
                     bank={accountInfo.groom_mother_bank}
                     onCopy={onCopyGroomMother}
                 />
-            </div>
-        </div>
+            </motion.div>
+        </motion.div>
     )
 })
 
@@ -528,15 +545,23 @@ const BrideAccountButton = React.memo(function BrideAccountButton({
     }
 
     return (
-        <div style={{
-            width: 378,
-            background: 'white',
-            overflow: 'hidden',
-            flexDirection: 'column',
-            justifyContent: 'flex-start',
-            alignItems: 'center',
-            display: 'inline-flex'
-        }}>
+        <motion.div
+            style={{
+                width: 378,
+                background: 'white',
+                overflow: 'hidden',
+                flexDirection: 'column',
+                justifyContent: 'flex-start',
+                alignItems: 'center',
+                display: 'inline-flex'
+            }}
+            initial={{ height: 54 }}
+            animate={{ height: "auto" }}
+            transition={{ 
+                duration: 0.3,
+                ease: "easeInOut"
+            }}
+        >
             {/* 헤더 */}
             <div style={{
                 alignSelf: 'stretch',
@@ -557,25 +582,42 @@ const BrideAccountButton = React.memo(function BrideAccountButton({
                 }}>
                     신부측에게
                 </div>
-                <svg width="15" height="8" viewBox="0 0 15 8" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ transform: 'rotate(180deg)' }}>
+                <motion.svg 
+                    width="15" 
+                    height="8" 
+                    viewBox="0 0 15 8" 
+                    fill="none" 
+                    xmlns="http://www.w3.org/2000/svg"
+                    animate={{ rotate: 180 }}
+                    transition={{ duration: 0.3 }}
+                >
                     <g id="Group 2117912660">
                         <path id="Vector 1121" d="M1.5 1L7.5 6.5L13.5 1" stroke="black" strokeWidth="1.5"/>
                     </g>
-                </svg>
+                </motion.svg>
             </div>
 
             {/* 계좌 정보 목록 */}
-            <div style={{
-                alignSelf: 'stretch',
-                paddingTop: 20,
-                paddingLeft: 20,
-                paddingRight: 20,
-                flexDirection: 'column',
-                justifyContent: 'flex-start',
-                alignItems: 'flex-start',
-                gap: 16,
-                display: 'flex'
-            }}>
+            <motion.div 
+                style={{
+                    alignSelf: 'stretch',
+                    paddingTop: 20,
+                    paddingLeft: 20,
+                    paddingRight: 20,
+                    flexDirection: 'column',
+                    justifyContent: 'flex-start',
+                    alignItems: 'flex-start',
+                    gap: 16,
+                    display: 'flex'
+                }}
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ 
+                    duration: 0.3,
+                    delay: 0.1,
+                    ease: "easeOut"
+                }}
+            >
                 <AccountItem
                     label="신부"
                     name={accountInfo.bride_name}
@@ -597,8 +639,8 @@ const BrideAccountButton = React.memo(function BrideAccountButton({
                     bank={accountInfo.bride_mother_bank}
                     onCopy={onCopyBrideMother}
                 />
-            </div>
-        </div>
+            </motion.div>
+        </motion.div>
     )
 })
 
