@@ -142,42 +142,42 @@ export default function AccountBtn(props: AccountBtnProps) {
     const copyGroomAccount = () => {
         if (accountInfo) {
             const text = `${accountInfo.groom_bank} ${accountInfo.groom_account} ${accountInfo.groom_name}`
-            copyToClipboard(text, "신랑")
+            copyToClipboard(text, "복사되었습니다")
         }
     }
 
     const copyGroomFatherAccount = () => {
         if (accountInfo) {
             const text = `${accountInfo.groom_father_bank} ${accountInfo.groom_father_account} ${accountInfo.groom_father_name}`
-            copyToClipboard(text, "신랑 아버지")
+            copyToClipboard(text, "복사되었습니다")
         }
     }
 
     const copyGroomMotherAccount = () => {
         if (accountInfo) {
             const text = `${accountInfo.groom_mother_bank} ${accountInfo.groom_mother_account} ${accountInfo.groom_mother_name}`
-            copyToClipboard(text, "신랑 어머니")
+            copyToClipboard(text, "복사되었습니다")
         }
     }
 
     const copyBrideAccount = () => {
         if (accountInfo) {
             const text = `${accountInfo.bride_bank} ${accountInfo.bride_account} ${accountInfo.bride_name}`
-            copyToClipboard(text, "신부")
+            copyToClipboard(text, "복사되었습니다")
         }
     }
 
     const copyBrideFatherAccount = () => {
         if (accountInfo) {
             const text = `${accountInfo.bride_father_bank} ${accountInfo.bride_father_account} ${accountInfo.bride_father_name}`
-            copyToClipboard(text, "신부 아버지")
+            copyToClipboard(text, "복사되었습니다")
         }
     }
 
     const copyBrideMotherAccount = () => {
         if (accountInfo) {
             const text = `${accountInfo.bride_mother_bank} ${accountInfo.bride_mother_account} ${accountInfo.bride_mother_name}`
-            copyToClipboard(text, "신부 어머니")
+            copyToClipboard(text, "복사되었습니다")
         }
     }
 
@@ -268,6 +268,7 @@ export default function AccountBtn(props: AccountBtnProps) {
             display: 'flex',
             flexDirection: 'column',
             gap: 10,
+            position: 'relative',
             ...style
         }}>
             {/* 신랑측에게 버튼 */}
@@ -295,7 +296,7 @@ export default function AccountBtn(props: AccountBtnProps) {
                 {showCopyMessage && (
                     <motion.div
                         style={{
-                            position: 'fixed',
+                            position: 'absolute',
                             top: '50%',
                             left: '50%',
                             transform: 'translate(-50%, -50%)',
@@ -375,7 +376,7 @@ const GroomAccountButton = React.memo(function GroomAccountButton({
                         fontWeight: '600',
                         wordWrap: 'break-word'
                     }}>
-                        신랑측에게
+                        신랑측 계좌번호
                     </div>
                     <svg width="15" height="8" viewBox="0 0 15 8" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <g id="Group 2117912660">
@@ -400,6 +401,7 @@ const GroomAccountButton = React.memo(function GroomAccountButton({
             }}
             initial={{ height: 54 }}
             animate={{ height: "auto" }}
+            exit={{ height: 54 }}
             transition={{ 
                 duration: 0.3,
                 ease: "easeInOut"
@@ -423,21 +425,20 @@ const GroomAccountButton = React.memo(function GroomAccountButton({
                     fontWeight: '600',
                     wordWrap: 'break-word'
                 }}>
-                    신랑측에게
+                    신랑측 계좌번호
                 </div>
-                <motion.svg 
+                <svg 
                     width="15" 
                     height="8" 
                     viewBox="0 0 15 8" 
                     fill="none" 
                     xmlns="http://www.w3.org/2000/svg"
-                    animate={{ rotate: 180 }}
-                    transition={{ duration: 0.3 }}
+                    style={{ transform: 'rotate(180deg)' }}
                 >
                     <g id="Group 2117912660">
                         <path id="Vector 1121" d="M1.5 1L7.5 6.5L13.5 1" stroke="black" strokeWidth="1.5"/>
                     </g>
-                </motion.svg>
+                </svg>
             </div>
 
             {/* 계좌 정보 목록 */}
@@ -455,6 +456,7 @@ const GroomAccountButton = React.memo(function GroomAccountButton({
                 }}
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
                 transition={{ 
                     duration: 0.3,
                     delay: 0.1,
@@ -532,7 +534,7 @@ const BrideAccountButton = React.memo(function BrideAccountButton({
                         fontWeight: '600',
                         wordWrap: 'break-word'
                     }}>
-                        신부측에게
+                        신부측 계좌번호
                     </div>
                     <svg width="15" height="8" viewBox="0 0 15 8" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <g id="Group 2117912660">
@@ -557,6 +559,7 @@ const BrideAccountButton = React.memo(function BrideAccountButton({
             }}
             initial={{ height: 54 }}
             animate={{ height: "auto" }}
+            exit={{ height: 54 }}
             transition={{ 
                 duration: 0.3,
                 ease: "easeInOut"
@@ -582,19 +585,18 @@ const BrideAccountButton = React.memo(function BrideAccountButton({
                 }}>
                     신부측에게
                 </div>
-                <motion.svg 
+                <svg 
                     width="15" 
                     height="8" 
                     viewBox="0 0 15 8" 
                     fill="none" 
                     xmlns="http://www.w3.org/2000/svg"
-                    animate={{ rotate: 180 }}
-                    transition={{ duration: 0.3 }}
+                    style={{ transform: 'rotate(180deg)' }}
                 >
                     <g id="Group 2117912660">
                         <path id="Vector 1121" d="M1.5 1L7.5 6.5L13.5 1" stroke="black" strokeWidth="1.5"/>
                     </g>
-                </motion.svg>
+                </svg>
             </div>
 
             {/* 계좌 정보 목록 */}
@@ -612,6 +614,7 @@ const BrideAccountButton = React.memo(function BrideAccountButton({
                 }}
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
                 transition={{ 
                     duration: 0.3,
                     delay: 0.1,
