@@ -380,6 +380,22 @@ export default function SupabaseImageGallery(props: any) {
         }
     }
 
+    // 이미지 비율에 따른 표시 방식 결정
+    const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+        const img = e.currentTarget
+        const isLandscape = img.naturalWidth > img.naturalHeight
+        
+        if (isLandscape) {
+            // 가로 사진: 가로를 100% 채우고 세로는 중앙 정렬
+            img.style.objectFit = "cover"
+            img.style.objectPosition = "center"
+        } else {
+            // 세로 사진: 세로를 100% 채우고 가로는 중앙 정렬
+            img.style.objectFit = "cover"
+            img.style.objectPosition = "center"
+        }
+    }
+
     // 로딩 상태
     if (loading && showLoadingState) {
         return <LoadingSkeleton />
@@ -530,6 +546,7 @@ export default function SupabaseImageGallery(props: any) {
                     height: "529px",
                     position: "relative",
                     overflow: "hidden",
+                    backgroundColor: "rgba(0,0,0,0.02)",
                 }}
             >
                 <div
@@ -558,11 +575,12 @@ export default function SupabaseImageGallery(props: any) {
                                 height: "529px",
                                 borderRadius: `${mainImageBorderRadius}px`,
                                 overflow: "hidden",
-                                backgroundColor: "#rgba(0,0,0,0)",
+                                backgroundColor: "rgba(0,0,0,0.05)",
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
                                 scrollSnapAlign: "start",
+                                position: "relative",
                             }}
                         >
                             <img
@@ -572,6 +590,7 @@ export default function SupabaseImageGallery(props: any) {
                                     width: "100%",
                                     height: "100%",
                                     objectFit: "cover",
+                                    objectPosition: "center",
                                     userSelect: "none",
                                     pointerEvents: "none",
                                     display: "block",
