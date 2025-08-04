@@ -105,18 +105,21 @@ export default function SupabaseImageGallery(props: any) {
     }))
 
     // 표시할 이미지 결정 - 네트워크 상태에 따라 조정
-    const galleryImages = images.length > 0 ? images : showLoadingState ? [] : defaultImages
-    const displayImages = isSlowNetwork ? galleryImages.slice(0, 3) : galleryImages
+    const galleryImages =
+        images.length > 0 ? images : showLoadingState ? [] : defaultImages
+    const displayImages = isSlowNetwork
+        ? galleryImages.slice(0, 3)
+        : galleryImages
 
     // 네트워크 상태 감지
     useEffect(() => {
-        if ('connection' in navigator) {
+        if ("connection" in navigator) {
             const connection = (navigator as any).connection as NetworkInfo
             setNetworkInfo(connection)
             setIsSlowNetwork(
-                connection.effectiveType === 'slow-2g' || 
-                connection.effectiveType === '2g' ||
-                connection.downlink < 1
+                connection.effectiveType === "slow-2g" ||
+                    connection.effectiveType === "2g" ||
+                    connection.downlink < 1
             )
         }
     }, [])
@@ -124,10 +127,10 @@ export default function SupabaseImageGallery(props: any) {
     // 이미지 프리로딩 함수
     const preloadImage = (src: string) => {
         if (!src || preloadedImages.has(src)) return
-        
+
         const img = new Image()
         img.onload = () => {
-            setPreloadedImages(prev => new Set([...prev, src]))
+            setPreloadedImages((prev) => new Set([...prev, src]))
         }
         img.onerror = () => {
             console.warn(`이미지 프리로딩 실패: ${src}`)
@@ -150,7 +153,7 @@ export default function SupabaseImageGallery(props: any) {
         if (galleryImages.length > 0 && loadedImages.length === 0) {
             // 첫 번째 이미지만 먼저 표시
             setLoadedImages([galleryImages[0]])
-            
+
             // 나머지 이미지들을 백그라운드에서 로드
             setTimeout(() => {
                 setLoadedImages(galleryImages)
@@ -166,14 +169,16 @@ export default function SupabaseImageGallery(props: any) {
             const data = await getImagesByPageId(pageId)
 
             // 이미지 데이터를 갤러리 형식으로 변환
-            const galleryImages: GalleryImage[] = data.map((img: any, index: number) => ({
-                id: img.id,
-                src: img.public_url,
-                alt: img.original_name || `Image ${index + 1}`,
-                original_name: img.original_name,
-                file_size: img.file_size,
-                created_at: img.created_at,
-            }))
+            const galleryImages: GalleryImage[] = data.map(
+                (img: any, index: number) => ({
+                    id: img.id,
+                    src: img.public_url,
+                    alt: img.original_name || `Image ${index + 1}`,
+                    original_name: img.original_name,
+                    file_size: img.file_size,
+                    created_at: img.created_at,
+                })
+            )
 
             setImages(galleryImages)
 
@@ -190,12 +195,16 @@ export default function SupabaseImageGallery(props: any) {
                 preloadImage(galleryImages[0].src)
             }
         } catch (error) {
-            setError(error instanceof Error ? error.message : "알 수 없는 오류가 발생했습니다")
+            setError(
+                error instanceof Error
+                    ? error.message
+                    : "알 수 없는 오류가 발생했습니다"
+            )
 
             // 에러 시 fallback 이미지 사용
             if (fallbackImages.length > 0) {
-                const fallbackGalleryImages: GalleryImage[] = fallbackImages.map(
-                    (img: any, index: number) => ({
+                const fallbackGalleryImages: GalleryImage[] =
+                    fallbackImages.map((img: any, index: number) => ({
                         id: `fallback-${index}`,
                         src: typeof img === "string" ? img : img.src || img,
                         alt:
@@ -204,8 +213,7 @@ export default function SupabaseImageGallery(props: any) {
                                 : `Fallback image ${index + 1}`,
                         original_name: `Fallback ${index + 1}`,
                         created_at: new Date().toISOString(),
-                    })
-                )
+                    }))
                 setImages(fallbackGalleryImages)
             }
         } finally {
@@ -322,15 +330,17 @@ export default function SupabaseImageGallery(props: any) {
 
     // 로딩 스켈레톤 컴포넌트
     const LoadingSkeleton = () => (
-        <div style={{
-            ...containerStyle,
-            height: "650px",
-            padding: "20px",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-        }}>
+        <div
+            style={{
+                ...containerStyle,
+                height: "650px",
+                padding: "20px",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+            }}
+        >
             <motion.div
                 style={{
                     display: "flex",
@@ -344,19 +354,22 @@ export default function SupabaseImageGallery(props: any) {
                 transition={{ duration: 0.3 }}
             >
                 {/* 메인 이미지 스켈레톤 */}
-                <div style={{
-                    width: "100%",
-                    height: "529px",
-                    backgroundColor: "rgba(255,255,255,0.1)",
-                    borderRadius: "12px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    marginBottom: "30px"
-                }}>
-                    <div style={{ fontSize: "32px", opacity: 0.5 }}>Loading</div>
+                <div
+                    style={{
+                        width: "100%",
+                        height: "529px",
+                        borderRadius: "12px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        marginBottom: "30px",
+                    }}
+                >
+                    <div style={{ fontSize: "32px", opacity: 0.5 }}>
+                        Loading
+                    </div>
                 </div>
-                
+
                 <div style={{ fontSize: "16px", fontWeight: 500 }}>
                     이미지를 불러오는 중...
                 </div>
@@ -368,7 +381,7 @@ export default function SupabaseImageGallery(props: any) {
     const handleImageError = (e: any, fallbackSrc?: string) => {
         const target = e.target as HTMLImageElement
         target.style.display = "none"
-        
+
         if (target.parentNode) {
             const parent = target.parentNode as HTMLElement
             parent.innerHTML = `
@@ -384,10 +397,10 @@ export default function SupabaseImageGallery(props: any) {
     const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
         const img = e.currentTarget
         const isLandscape = img.naturalWidth > img.naturalHeight
-        
+
         if (isLandscape) {
-            // 가로 사진: 가로를 100% 채우고 세로는 중앙 정렬
-            img.style.objectFit = "cover"
+            // 가로 사진: 가로를 100% 채우고 세로는 비율에 맞게 조정
+            img.style.objectFit = "contain"
             img.style.objectPosition = "center"
         } else {
             // 세로 사진: 세로를 100% 채우고 가로는 중앙 정렬
@@ -488,7 +501,9 @@ export default function SupabaseImageGallery(props: any) {
                     animate={{ opacity: 1 }}
                     transition={{ duration: 0.3 }}
                 >
-                    <div style={{ fontSize: "64px", opacity: 0.3 }}>No Images</div>
+                    <div style={{ fontSize: "64px", opacity: 0.3 }}>
+                        No Images
+                    </div>
                     <div style={{ fontSize: "16px", fontWeight: 500 }}>
                         업로드된 이미지가 없습니다
                     </div>
@@ -525,16 +540,18 @@ export default function SupabaseImageGallery(props: any) {
         <div style={containerStyle}>
             {/* 네트워크 상태 표시 (느린 네트워크일 때만) */}
             {isSlowNetwork && (
-                <div style={{
-                    padding: "8px 12px",
-                    backgroundColor: "rgba(255, 193, 7, 0.2)",
-                    color: "#856404",
-                    borderRadius: "6px",
-                    fontSize: "12px",
-                    marginBottom: "10px",
-                    textAlign: "center",
-                    border: "1px solid rgba(255, 193, 7, 0.3)"
-                }}>
+                <div
+                    style={{
+                        padding: "8px 12px",
+                        backgroundColor: "rgba(255, 193, 7, 0.2)",
+                        color: "#856404",
+                        borderRadius: "6px",
+                        fontSize: "12px",
+                        marginBottom: "10px",
+                        textAlign: "center",
+                        border: "1px solid rgba(255, 193, 7, 0.3)",
+                    }}
+                >
                     느린 네트워크 감지됨 - 최적화된 로딩 모드
                 </div>
             )}
@@ -546,7 +563,7 @@ export default function SupabaseImageGallery(props: any) {
                     height: "529px",
                     position: "relative",
                     overflow: "hidden",
-                    backgroundColor: "rgba(0,0,0,0.02)",
+                    backgroundColor: "rgba(0,0,0,0)",
                 }}
             >
                 <div
@@ -575,7 +592,6 @@ export default function SupabaseImageGallery(props: any) {
                                 height: "529px",
                                 borderRadius: `${mainImageBorderRadius}px`,
                                 overflow: "hidden",
-                                backgroundColor: "rgba(0,0,0,0.05)",
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
@@ -595,6 +611,7 @@ export default function SupabaseImageGallery(props: any) {
                                     pointerEvents: "none",
                                     display: "block",
                                 }}
+                                onLoad={handleImageLoad}
                                 onError={handleImageError}
                             />
                         </div>
@@ -683,13 +700,15 @@ export default function SupabaseImageGallery(props: any) {
             </div>
 
             {/* 스크롤바 숨김을 위한 스타일 */}
-            <style dangerouslySetInnerHTML={{
-                __html: `
+            <style
+                dangerouslySetInnerHTML={{
+                    __html: `
                     div::-webkit-scrollbar {
                         display: none;
                     }
-                `
-            }} />
+                `,
+                }}
+            />
         </div>
     )
 }

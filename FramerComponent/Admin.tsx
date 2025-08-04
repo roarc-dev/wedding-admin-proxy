@@ -249,16 +249,28 @@ interface ContactInfo {
     page_id: string
     groom_name: string
     groom_phone: string
+    groom_account: string
+    groom_bank: string
     groom_father_name: string
     groom_father_phone: string
+    groom_father_account: string
+    groom_father_bank: string
     groom_mother_name: string
     groom_mother_phone: string
+    groom_mother_account: string
+    groom_mother_bank: string
     bride_name: string
     bride_phone: string
+    bride_account: string
+    bride_bank: string
     bride_father_name: string
     bride_father_phone: string
+    bride_father_account: string
+    bride_father_bank: string
     bride_mother_name: string
     bride_mother_phone: string
+    bride_mother_account: string
+    bride_mother_bank: string
     created_at?: string
     updated_at?: string
 }
@@ -587,16 +599,28 @@ export default function UnifiedWeddingAdmin2(props) {
         page_id: "",
         groom_name: "",
         groom_phone: "",
+        groom_account: "",
+        groom_bank: "",
         groom_father_name: "",
         groom_father_phone: "",
+        groom_father_account: "",
+        groom_father_bank: "",
         groom_mother_name: "",
         groom_mother_phone: "",
+        groom_mother_account: "",
+        groom_mother_bank: "",
         bride_name: "",
         bride_phone: "",
+        bride_account: "",
+        bride_bank: "",
         bride_father_name: "",
         bride_father_phone: "",
+        bride_father_account: "",
+        bride_father_bank: "",
         bride_mother_name: "",
         bride_mother_phone: "",
+        bride_mother_account: "",
+        bride_mother_bank: "",
     }
 
     // 임시 테스트 함수 (디버깅용)
@@ -3640,6 +3664,26 @@ export default function UnifiedWeddingAdmin2(props) {
                                         }
                                     />
                                     <InputField
+                                        label="신랑 계좌번호"
+                                        value={selectedContact.groom_account}
+                                        onChange={(value) =>
+                                            handleContactInputChange(
+                                                "groom_account",
+                                                value
+                                            )
+                                        }
+                                    />
+                                    <InputField
+                                        label="신랑 은행명"
+                                        value={selectedContact.groom_bank}
+                                        onChange={(value) =>
+                                            handleContactInputChange(
+                                                "groom_bank",
+                                                value
+                                            )
+                                        }
+                                    />
+                                    <InputField
                                         label="신랑 아버지 이름"
                                         value={
                                             selectedContact.groom_father_name
@@ -3664,6 +3708,26 @@ export default function UnifiedWeddingAdmin2(props) {
                                         }
                                     />
                                     <InputField
+                                        label="신랑 아버지 계좌번호"
+                                        value={selectedContact.groom_father_account}
+                                        onChange={(value) =>
+                                            handleContactInputChange(
+                                                "groom_father_account",
+                                                value
+                                            )
+                                        }
+                                    />
+                                    <InputField
+                                        label="신랑 아버지 은행명"
+                                        value={selectedContact.groom_father_bank}
+                                        onChange={(value) =>
+                                            handleContactInputChange(
+                                                "groom_father_bank",
+                                                value
+                                            )
+                                        }
+                                    />
+                                    <InputField
                                         label="신랑 어머니 이름"
                                         value={
                                             selectedContact.groom_mother_name
@@ -3683,6 +3747,26 @@ export default function UnifiedWeddingAdmin2(props) {
                                         onChange={(value) =>
                                             handleContactInputChange(
                                                 "groom_mother_phone",
+                                                value
+                                            )
+                                        }
+                                    />
+                                    <InputField
+                                        label="신랑 어머니 계좌번호"
+                                        value={selectedContact.groom_mother_account}
+                                        onChange={(value) =>
+                                            handleContactInputChange(
+                                                "groom_mother_account",
+                                                value
+                                            )
+                                        }
+                                    />
+                                    <InputField
+                                        label="신랑 어머니 은행명"
+                                        value={selectedContact.groom_mother_bank}
+                                        onChange={(value) =>
+                                            handleContactInputChange(
+                                                "groom_mother_bank",
                                                 value
                                             )
                                         }
@@ -3729,6 +3813,26 @@ export default function UnifiedWeddingAdmin2(props) {
                                         }
                                     />
                                     <InputField
+                                        label="신부 계좌번호"
+                                        value={selectedContact.bride_account}
+                                        onChange={(value) =>
+                                            handleContactInputChange(
+                                                "bride_account",
+                                                value
+                                            )
+                                        }
+                                    />
+                                    <InputField
+                                        label="신부 은행명"
+                                        value={selectedContact.bride_bank}
+                                        onChange={(value) =>
+                                            handleContactInputChange(
+                                                "bride_bank",
+                                                value
+                                            )
+                                        }
+                                    />
+                                    <InputField
                                         label="신부 아버지 이름"
                                         value={
                                             selectedContact.bride_father_name
@@ -3753,6 +3857,26 @@ export default function UnifiedWeddingAdmin2(props) {
                                         }
                                     />
                                     <InputField
+                                        label="신부 아버지 계좌번호"
+                                        value={selectedContact.bride_father_account}
+                                        onChange={(value) =>
+                                            handleContactInputChange(
+                                                "bride_father_account",
+                                                value
+                                            )
+                                        }
+                                    />
+                                    <InputField
+                                        label="신부 아버지 은행명"
+                                        value={selectedContact.bride_father_bank}
+                                        onChange={(value) =>
+                                            handleContactInputChange(
+                                                "bride_father_bank",
+                                                value
+                                            )
+                                        }
+                                    />
+                                    <InputField
                                         label="신부 어머니 이름"
                                         value={
                                             selectedContact.bride_mother_name
@@ -3772,6 +3896,26 @@ export default function UnifiedWeddingAdmin2(props) {
                                         onChange={(value) =>
                                             handleContactInputChange(
                                                 "bride_mother_phone",
+                                                value
+                                            )
+                                        }
+                                    />
+                                    <InputField
+                                        label="신부 어머니 계좌번호"
+                                        value={selectedContact.bride_mother_account}
+                                        onChange={(value) =>
+                                            handleContactInputChange(
+                                                "bride_mother_account",
+                                                value
+                                            )
+                                        }
+                                    />
+                                    <InputField
+                                        label="신부 어머니 은행명"
+                                        value={selectedContact.bride_mother_bank}
+                                        onChange={(value) =>
+                                            handleContactInputChange(
+                                                "bride_mother_bank",
                                                 value
                                             )
                                         }

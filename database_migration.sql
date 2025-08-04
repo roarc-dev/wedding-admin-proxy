@@ -38,3 +38,18 @@ SET
     ELSE '00'
   END
 WHERE wedding_time IS NOT NULL;
+
+-- wedding_contacts 테이블에 계좌 정보 필드 추가
+ALTER TABLE wedding_contacts 
+ADD COLUMN IF NOT EXISTS groom_account TEXT DEFAULT '',
+ADD COLUMN IF NOT EXISTS groom_bank TEXT DEFAULT '',
+ADD COLUMN IF NOT EXISTS groom_father_account TEXT DEFAULT '',
+ADD COLUMN IF NOT EXISTS groom_father_bank TEXT DEFAULT '',
+ADD COLUMN IF NOT EXISTS groom_mother_account TEXT DEFAULT '',
+ADD COLUMN IF NOT EXISTS groom_mother_bank TEXT DEFAULT '',
+ADD COLUMN IF NOT EXISTS bride_account TEXT DEFAULT '',
+ADD COLUMN IF NOT EXISTS bride_bank TEXT DEFAULT '',
+ADD COLUMN IF NOT EXISTS bride_father_account TEXT DEFAULT '',
+ADD COLUMN IF NOT EXISTS bride_father_bank TEXT DEFAULT '',
+ADD COLUMN IF NOT EXISTS bride_mother_account TEXT DEFAULT '',
+ADD COLUMN IF NOT EXISTS bride_mother_bank TEXT DEFAULT '';
