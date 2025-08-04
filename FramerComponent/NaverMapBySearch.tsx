@@ -11,14 +11,13 @@ declare global {
         naver: any
         google: any
         initGoogleMaps: () => void
+        navermap_authFailure: () => void
     }
 }
 
-// pageId prop 추가
 interface Props {
     pageId: string
     placeName: string
-    markerImage: string
     retina: boolean
     style?: React.CSSProperties
 }
@@ -26,7 +25,6 @@ interface Props {
 export default function NaverPlaceSearchMap({
     pageId = "default",
     placeName = "",
-    markerImage,
     retina,
     style,
 }: Props) {
@@ -37,12 +35,39 @@ export default function NaverPlaceSearchMap({
     const placesServiceInstance = useRef<any>(null)
     const [venueName, setVenueName] = useState("")
     const [naverClientId, setNaverClientId] = useState("")
+    const [naverKeyId, setNaverKeyId] = useState("")
     const [googleMapsApiKey, setGoogleMapsApiKey] = useState("")
     const [tmapApiKey, setTmapApiKey] = useState("")
-    const [currentPosition, setCurrentPosition] = useState<{ lat: number; lng: number }>({ lat: 37.3595704, lng: 127.105399 })
+    const [currentPosition, setCurrentPosition] = useState<{
+        lat: number
+        lng: number
+    }>({ lat: 37.3595704, lng: 127.105399 })
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string>("")
     const [apiKeysLoaded, setApiKeysLoaded] = useState(false)
+    const [searchAttempted, setSearchAttempted] = useState(false)
+    const [searchSuccess, setSearchSuccess] = useState(false)
+
+    // 검색 재시도 관련 state
+    const searchRetryCount = useRef(0)
+    const maxRetries = 3
+    const retryDelay = 2000 // 2초
+
+    // 기본 마커 SVG 데이터 URL
+    const defaultMarkerSvg = `data:image/svg+xml;base64,${btoa(`<svg width="800" height="1000" viewBox="0 0 800 1000" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M676.89 393.29C676.89 561.91 497.9 788.29 427.74 870.55C413.08 887.74 386.6 887.98 371.66 871.04C301.08 791.03 123.11 571.59 123.11 393.3C123.11 240.38 247.08 116.41 400 116.41C552.92 116.41 676.89 240.38 676.89 393.3V393.29Z" fill="url(#paint0_linear_16_59)"/>
+<path d="M400.001 514.31C470.688 514.31 527.991 457.007 527.991 386.32C527.991 315.633 470.688 258.33 400.001 258.33C329.314 258.33 272.011 315.633 272.011 386.32C272.011 457.007 329.314 514.31 400.001 514.31Z" fill="url(#paint1_linear_16_59)"/>
+<defs>
+<linearGradient id="paint0_linear_16_59" x1="400" y1="883.6" x2="400" y2="116.4" gradientUnits="userSpaceOnUse">
+<stop stop-color="#5C5C5C"/>
+<stop offset="1" stop-color="#C8C8C8"/>
+</linearGradient>
+<linearGradient id="paint1_linear_16_59" x1="400.001" y1="514.32" x2="400.001" y2="258.33" gradientUnits="userSpaceOnUse">
+<stop stop-color="white"/>
+<stop offset="1" stop-color="#C8C8C8"/>
+</linearGradient>
+</defs>
+</svg>`)}`
 
     // 구글 Places Text Search 사용
     const searchWithPlacesTextSearch = async (query: string): Promise<any> => {
@@ -189,16 +214,27 @@ export default function NaverPlaceSearchMap({
         })
     }
 
-    // 메인 검색 함수
-    const searchPlace = async (query: string) => {
+    // 검색 재시도 로직이 포함된 메인 검색 함수
+    const searchPlaceWithRetry = async (
+        query: string,
+        retryCount = 0
+    ): Promise<void> => {
         if (!query.trim()) return
+
+        console.log(`검색 시도 ${retryCount + 1}/${maxRetries + 1}: ${query}`)
+
         if (!googleMapsApiKey) {
-            setError("구글 Maps API 키가 필요합니다")
+            console.log("구글 Maps API 키가 필요합니다")
+            setSearchAttempted(true)
+            setSearchSuccess(false)
             return
         }
 
         setIsLoading(true)
-        setError("")
+        if (retryCount === 0) {
+            setSearchAttempted(false)
+            setSearchSuccess(false)
+        }
 
         try {
             let result = null
@@ -206,15 +242,21 @@ export default function NaverPlaceSearchMap({
             // 방법 1: Places Text Search (가장 정확함)
             try {
                 result = await searchWithPlacesTextSearch(query)
+                console.log("Places Text Search 성공:", result)
             } catch (error1) {
+                console.log("Places Text Search 실패:", error1)
                 // 방법 2: Geocoder (주소 검색)
                 try {
                     result = await searchWithGeocoder(query)
+                    console.log("Geocoder 성공:", result)
                 } catch (error2) {
+                    console.log("Geocoder 실패:", error2)
                     // 방법 3: Nearby Search (키워드 검색)
                     try {
                         result = await searchWithNearbySearch(query)
+                        console.log("Nearby Search 성공:", result)
                     } catch (error3) {
+                        console.log("모든 검색 방법 실패")
                         throw new Error(`"${query}"를 찾을 수 없습니다`)
                     }
                 }
@@ -223,30 +265,68 @@ export default function NaverPlaceSearchMap({
             if (result) {
                 setCurrentPosition({ lat: result.lat, lng: result.lng })
                 updateMapAndMarker(result.lat, result.lng)
+                setSearchSuccess(true)
+                setSearchAttempted(true)
+                searchRetryCount.current = 0 // 성공 시 재시도 카운트 리셋
+                console.log("검색 성공, 위치 업데이트:", result)
             }
         } catch (err: any) {
-            setError(err.message || "장소 검색에 실패했습니다")
+            console.log(
+                `검색 실패 (${retryCount + 1}/${maxRetries + 1}):`,
+                err.message
+            )
+
+            // 재시도 로직
+            if (retryCount < maxRetries) {
+                console.log(`${retryDelay}ms 후 재시도...`)
+                setTimeout(() => {
+                    searchPlaceWithRetry(query, retryCount + 1)
+                }, retryDelay)
+                return // 여기서 return하여 아래 finally 블록을 실행하지 않음
+            } else {
+                // 모든 재시도 실패
+                console.log(
+                    "모든 재시도 실패:",
+                    err.message || "장소 검색에 실패했습니다"
+                )
+                setSearchAttempted(true)
+                setSearchSuccess(false)
+                console.log("모든 재시도 실패, 기본 위치 유지")
+            }
         } finally {
-            setIsLoading(false)
+            // 재시도 중이 아닐 때만 로딩 상태 해제
+            if (retryCount >= maxRetries || searchSuccess) {
+                setIsLoading(false)
+            }
         }
     }
 
-    // 지도와 마커 위치 업데이트
+    // 기존 searchPlace 함수를 새로운 재시도 함수로 교체
+    const searchPlace = (query: string) => {
+        searchRetryCount.current = 0
+        searchPlaceWithRetry(query, 0)
+    }
+
+    // 지도와 마커 위치 업데이트 - morph 효과 제거
     const updateMapAndMarker = (lat: number, lng: number) => {
         if (!mapInstance.current || !window.naver) return
 
         const position = new window.naver.maps.LatLng(lat, lng)
-        mapInstance.current.morph(position, 15) // 고정된 줌 레벨
+        // morph 대신 setCenter 사용으로 즉시 이동
+        mapInstance.current.setCenter(position)
+        mapInstance.current.setZoom(15)
 
         if (markerInstance.current) {
             markerInstance.current.setPosition(position)
+            markerInstance.current.setVisible(true)
         }
     }
 
-    // 네이버 지도 초기화
+    // 네이버 지도 초기화 - 검색 완료 후에만 지도 표시
     const initNaverMap = () => {
         if (!window.naver || !mapRef.current) return
 
+        // 검색이 완료된 위치로 바로 초기화
         const position = new window.naver.maps.LatLng(
             currentPosition.lat,
             currentPosition.lng
@@ -255,7 +335,6 @@ export default function NaverPlaceSearchMap({
         mapInstance.current = new window.naver.maps.Map(mapRef.current, {
             center: position,
             zoom: 15,
-            // UI 컨트롤 모두 제거
             mapTypeControl: false,
             zoomControl: false,
             logoControl: false,
@@ -272,13 +351,14 @@ export default function NaverPlaceSearchMap({
             map: mapInstance.current,
             position,
             icon: {
-                url: markerImage,
+                url: defaultMarkerSvg,
                 size: originalSize,
                 scaledSize: displaySize,
                 origin: new window.naver.maps.Point(0, 0),
                 anchor: iconAnchor,
             },
             clickable: true,
+            visible: true,
         })
 
         window.naver.maps.Event.addListener(
@@ -312,11 +392,17 @@ export default function NaverPlaceSearchMap({
             placesServiceInstance.current =
                 new window.google.maps.places.PlacesService(tempDiv)
 
+            console.log("구글 서비스 초기화 완료")
+
+            // 서비스 초기화 후 대기 시간을 더 길게
             if (venueName.trim()) {
-                setTimeout(() => searchPlace(venueName), 500)
+                setTimeout(() => {
+                    console.log("구글 서비스 초기화 후 검색 시작:", venueName)
+                    searchPlace(venueName)
+                }, 1000) // 1초로 증가
             }
         } catch (err) {
-            setError("구글 Maps 서비스 초기화에 실패했습니다")
+            console.log("구글 Maps 서비스 초기화 실패:", err)
         }
     }
 
@@ -324,47 +410,54 @@ export default function NaverPlaceSearchMap({
     useEffect(() => {
         const fetchConfigAndVenue = async () => {
             try {
-                // 임시: placeName prop 직접 사용
                 setVenueName(placeName || "")
-                
-                // API에서 인증키만 가져오기 (실패해도 계속 진행)
+
+                // API 키 로딩 시간을 더 여유롭게
                 try {
-                    const configRes = await fetch('https://wedding-admin-proxy.vercel.app/api/map-config')
+                    const configRes = await fetch(
+                        "https://wedding-admin-proxy.vercel.app/api/map-config"
+                    )
                     if (configRes.ok) {
                         const configJson = await configRes.json()
                         if (configJson.success) {
-                            setNaverClientId(configJson.data.naverClientId || "3cxftuac0e")
-                            setGoogleMapsApiKey(configJson.data.googleMapsApiKey || "")
+                            setNaverClientId(
+                                configJson.data.naverClientId || "3cxftuac0e"
+                            )
+                            setNaverKeyId(configJson.data.naverKeyId || "")
+                            setGoogleMapsApiKey(
+                                configJson.data.googleMapsApiKey || ""
+                            )
                             setTmapApiKey(configJson.data.tmapApiKey || "")
                         } else {
-                            // API 응답은 성공했지만 데이터가 없는 경우
                             setNaverClientId("3cxftuac0e")
+                            setNaverKeyId("")
                             setGoogleMapsApiKey("")
                         }
                     } else {
-                        // API 호출 실패
                         setNaverClientId("3cxftuac0e")
+                        setNaverKeyId("")
                         setGoogleMapsApiKey("")
                     }
                 } catch (err) {
-                    // API 호출 자체가 실패한 경우
                     setNaverClientId("3cxftuac0e")
+                    setNaverKeyId("")
                     setGoogleMapsApiKey("")
                     console.log("API config 로드 실패, 기본값 사용:", err)
                 }
-                
-                // API 키 로딩 완료 표시
-                setApiKeysLoaded(true)
 
+                // API 키 로딩 완료를 약간 지연시켜 안정성 확보
+                setTimeout(() => {
+                    setApiKeysLoaded(true)
+                }, 500)
             } catch (err) {
-                setError("지도 설정 정보를 불러오지 못했습니다")
+                console.log("지도 설정 정보를 불러오지 못했습니다:", err)
                 setApiKeysLoaded(true)
             }
         }
         fetchConfigAndVenue()
 
         return () => {
-            if (window.initGoogleMaps) delete window.initGoogleMaps
+            // cleanup
         }
     }, [pageId, placeName])
 
@@ -372,88 +465,111 @@ export default function NaverPlaceSearchMap({
     useEffect(() => {
         if (!apiKeysLoaded) return
 
-        // 네이버 지도는 항상 로드 (기본 클라이언트 ID 사용)
-        if (!window.naver || !window.naver.maps) {
-            const currentNaverClientId = naverClientId || "3cxftuac0e"
-            const naverScript = document.createElement("script")
-            naverScript.src = `https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${currentNaverClientId}`
-            naverScript.async = true
-            naverScript.onload = () => {
-                setTimeout(() => {
-                    initNaverMap()
-                    // 네이버 지도 초기화 후, 장소명이 있으면 구글 서비스도 초기화
-                    if (googleMapsApiKey && venueName.trim()) {
-                        initGoogleServicesAndSearch()
-                    }
-                }, 200)
-            }
-            naverScript.onerror = () => setError("네이버 지도 API 로드 실패")
-            document.head.appendChild(naverScript)
-        } else {
-            initNaverMap()
-            // 네이버 지도가 이미 있고, 구글 키가 있으면서 장소명이 있으면 구글 서비스 초기화
-            if (googleMapsApiKey && venueName.trim()) {
-                initGoogleServicesAndSearch()
-            }
+        // 네이버 지도 API 인증 실패 처리
+        window.navermap_authFailure = function () {
+            console.log("네이버 지도 API 인증 실패")
+            setError("네이버 지도 API 인증에 실패했습니다")
         }
 
-        // 구글 Maps는 API 키가 있을 때만 로드
+        // 구글 Maps 먼저 로드하여 검색 완료 후 네이버 지도 초기화
         if (googleMapsApiKey && (!window.google || !window.google.maps)) {
             window.initGoogleMaps = () => {
                 initGoogleServices()
-                // 구글 서비스 초기화 후 바로 검색 실행
-                if (venueName.trim()) {
-                    setTimeout(() => searchPlace(venueName), 500)
-                }
             }
 
             const googleScript = document.createElement("script")
             googleScript.src = `https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}&libraries=places&callback=initGoogleMaps`
             googleScript.async = true
             googleScript.defer = true
-            googleScript.onerror = () => setError("구글 Maps API 로드 실패")
+            googleScript.onerror = () => console.log("구글 Maps API 로드 실패")
             document.head.appendChild(googleScript)
-        } else if (window.google && window.google.maps && googleMapsApiKey && venueName.trim()) {
-            // 구글 Maps가 이미 로드되어 있고, 키와 장소명이 있으면 바로 서비스 초기화 및 검색
+        } else if (
+            window.google &&
+            window.google.maps &&
+            googleMapsApiKey &&
+            venueName.trim()
+        ) {
             initGoogleServicesAndSearch()
         }
-    }, [apiKeysLoaded, naverClientId, googleMapsApiKey, venueName])
+
+        // 네이버 지도는 검색 완료 후에만 초기화하도록 수정하지 않고,
+        // 검색이 없는 경우를 위해 여전히 로드하되 마커만 숨김
+        if (!window.naver || !window.naver.maps) {
+            const currentNaverKeyId = naverKeyId || naverClientId || "3cxftuac0e"
+            const naverScript = document.createElement("script")
+            naverScript.src = `https://openapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${currentNaverKeyId}`
+            naverScript.async = true
+            naverScript.onload = () => {
+                // 네이버 지도 로드 후 대기 시간 단축
+                setTimeout(() => {
+                    // 검색이 이미 완료된 경우에만 지도 초기화
+                    if (
+                        searchSuccess ||
+                        !venueName.trim() ||
+                        !googleMapsApiKey
+                    ) {
+                        initNaverMap()
+                    }
+                }, 100)
+            }
+            naverScript.onerror = () => console.log("네이버 지도 API 로드 실패")
+            document.head.appendChild(naverScript)
+        }
+    }, [apiKeysLoaded, naverClientId, naverKeyId, googleMapsApiKey, venueName])
 
     // 구글 서비스 초기화 후 바로 검색하는 헬퍼 함수
     const initGoogleServicesAndSearch = () => {
         if (window.google && window.google.maps) {
             initGoogleServices()
-            if (venueName.trim()) {
-                setTimeout(() => searchPlace(venueName), 500)
-            }
         }
     }
 
-    // 장소명만 변경되었을 때의 검색 (지도와 서비스가 이미 준비된 상태)
+    // 장소명만 변경되었을 때의 검색
     useEffect(() => {
-        console.log('venueName 상태 변경:', venueName)
+        console.log("venueName 상태 변경:", venueName)
         if (
             venueName.trim() &&
             mapInstance.current &&
             geocoderInstance.current &&
             placesServiceInstance.current &&
             apiKeysLoaded &&
-            googleMapsApiKey
+            googleMapsApiKey &&
+            !isLoading && // 현재 로딩 중이 아닐 때만
+            searchRetryCount.current === 0 // 재시도 중이 아닐 때만
         ) {
-            console.log('모든 조건 만족, 검색 실행:', venueName)
+            console.log("조건 만족, 검색 실행:", venueName)
             searchPlace(venueName)
         }
     }, [venueName])
 
-    // 이제 불필요한 useEffect 제거 (기존의 venueName, naverClientId 의존성)
-    // useEffect(() => {
-    //     if (!venueName || !naverClientId) return
-    //     // 네이버/구글 지도 스크립트 로드 및 검색 등
-    // }, [venueName, naverClientId])
+    // 검색 성공 시 지도 초기화 및 마커 표시 업데이트
+    useEffect(() => {
+        if (searchSuccess && window.naver && window.naver.maps) {
+            // 검색 성공 후 지도가 없다면 초기화
+            if (!mapInstance.current) {
+                initNaverMap()
+            } else {
+                // 이미 지도가 있다면 위치만 업데이트
+                updateMapAndMarker(currentPosition.lat, currentPosition.lng)
+            }
+        }
+    }, [searchSuccess, currentPosition])
 
     // venueName 없으면 안내 메시지
     if (!venueName || !venueName.trim()) {
-        return <div style={{ padding: 24, color: "#f00", background: "#fffbe6", borderRadius: 8 }}>장소명이 입력되지 않았습니다. Property Controls에서 장소명을 입력하세요.</div>
+        return (
+            <div
+                style={{
+                    padding: 24,
+                    color: "#f00",
+                    background: "#fffbe6",
+                    borderRadius: 8,
+                }}
+            >
+                장소명이 입력되지 않았습니다. Property Controls에서 장소명을
+                입력하세요.
+            </div>
+        )
     }
 
     return (
@@ -467,93 +583,7 @@ export default function NaverPlaceSearchMap({
         >
             <div ref={mapRef} style={{ width: "100%", height: "100%" }} />
 
-            {/* API 키 로딩 중 */}
-            {!apiKeysLoaded && (
-                <div
-                    style={{
-                        position: "absolute",
-                        top: "10px",
-                        left: "10px",
-                        right: "10px",
-                        padding: "8px 12px",
-                        backgroundColor: "#007aff",
-                        color: "white",
-                        borderRadius: "4px",
-                        fontSize: "14px",
-                        textAlign: "center",
-                        zIndex: 1000,
-                        boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
-                    }}
-                >
-                    API 키 로딩 중...
-                </div>
-            )}
-
-            {/* API 키 필수 안내 */}
-            {apiKeysLoaded && !googleMapsApiKey && venueName && (
-                <div
-                    style={{
-                        position: "absolute",
-                        top: "10px",
-                        left: "10px",
-                        right: "10px",
-                        padding: "8px 12px",
-                        backgroundColor: "#ff9500",
-                        color: "white",
-                        borderRadius: "4px",
-                        fontSize: "14px",
-                        textAlign: "center",
-                        zIndex: 1000,
-                        boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
-                    }}
-                >
-                    정확한 장소 검색을 위해 구글 Maps API 키가 필요합니다
-                </div>
-            )}
-
-            {/* 로딩 */}
-            {isLoading && (
-                <div
-                    style={{
-                        position: "absolute",
-                        top: "10px",
-                        left: "10px",
-                        right: "10px",
-                        padding: "8px 12px",
-                        backgroundColor: "#007aff",
-                        color: "white",
-                        borderRadius: "4px",
-                        fontSize: "14px",
-                        textAlign: "center",
-                        zIndex: 1000,
-                        boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
-                    }}
-                >
-                    검색 중...
-                </div>
-            )}
-
-            {/* 에러 */}
-            {error && (
-                <div
-                    style={{
-                        position: "absolute",
-                        top: "10px",
-                        left: "10px",
-                        right: "10px",
-                        padding: "8px 12px",
-                        backgroundColor: "#ff3b30",
-                        color: "white",
-                        borderRadius: "4px",
-                        fontSize: "14px",
-                        textAlign: "center",
-                        zIndex: 1000,
-                        boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
-                    }}
-                >
-                    {error}
-                </div>
-            )}
+            {/* 모든 상태 메시지 제거 - 고객용 컴포넌트 */}
         </div>
     )
 }
@@ -561,7 +591,6 @@ export default function NaverPlaceSearchMap({
 NaverPlaceSearchMap.defaultProps = {
     pageId: "default",
     placeName: "",
-    markerImage: "https://via.placeholder.com/100x104.png?text=Marker",
     retina: true,
 }
 
@@ -577,11 +606,6 @@ addPropertyControls(NaverPlaceSearchMap, {
         title: "장소명",
         defaultValue: "",
         placeholder: "검색할 장소의 이름",
-    },
-    markerImage: {
-        type: ControlType.File,
-        title: "마커 이미지",
-        allowedFileTypes: ["image/*"],
     },
     retina: {
         type: ControlType.Boolean,

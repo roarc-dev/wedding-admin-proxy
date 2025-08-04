@@ -282,21 +282,48 @@ async function handleImageOperation(req, res) {
 async function handleUpdateImageOrder(req, res) {
   const { imageId, newOrder, action, pageId, imageOrders } = req.body
 
-  console.log('UpdateImageOrder 요청:', { action, pageId, imageOrders, imageId, newOrder })
+  console.log('UpdateImageOrder 요청:', { 
+    action, 
+    pageId, 
+    imageOrders: imageOrders ? imageOrders.length : 'undefined', 
+    imageId, 
+    newOrder,
+    bodyKeys: Object.keys(req.body)
+  })
 
   // 새로운 bulk update 액션 처리
   if (action === "updateAllOrders") {
+    console.log('Bulk update 액션 처리 시작')
+    
     if (!pageId || !imageOrders || !Array.isArray(imageOrders)) {
-      console.error('Bulk update 유효성 검사 실패:', { pageId, imageOrders })
+      console.error('Bulk update 유효성 검사 실패:', { 
+        pageId: !!pageId, 
+        imageOrders: !!imageOrders, 
+        isArray: Array.isArray(imageOrders),
+        imageOrdersType: typeof imageOrders
+      })
       return res.status(400).json({ 
         success: false, 
         error: 'pageId와 imageOrders 배열이 필요합니다' 
       })
     }
 
+    if (imageOrders.length === 0) {
+      console.error('imageOrders 배열이 비어있습니다')
+      return res.status(400).json({ 
+        success: false, 
+        error: 'imageOrders 배열이 비어있습니다' 
+      })
+    }
+
     try {
+      console.log('Supabase upsert 데이터 준비:', imageOrders.map(({ id, order }) => ({
+        id,
+        display_order: order
+      })))
+
       // 트랜잭션으로 모든 순서를 한 번에 업데이트
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('images')
         .upsert(
           imageOrders.map(({ id, order }) => ({
@@ -306,8 +333,14 @@ async function handleUpdateImageOrder(req, res) {
           { onConflict: 'id' }
         )
 
-      if (error) throw error
+      console.log('Supabase upsert 결과:', { data, error })
 
+      if (error) {
+        console.error('Supabase upsert 오류:', error)
+        throw error
+      }
+
+      console.log('Bulk update 성공')
       return res.json({ 
         success: true, 
         message: '모든 이미지 순서가 업데이트되었습니다' 
@@ -316,7 +349,7 @@ async function handleUpdateImageOrder(req, res) {
       console.error('Bulk update image order error:', error)
       return res.status(500).json({ 
         success: false, 
-        error: '이미지 순서 업데이트 중 오류가 발생했습니다' 
+        error: `이미지 순서 업데이트 중 오류가 발생했습니다: ${error.message || error}` 
       })
     }
   }
