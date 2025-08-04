@@ -317,33 +317,34 @@ async function handleUpdateImageOrder(req, res) {
     }
 
     try {
-      console.log('Supabase upsert 데이터 준비:', imageOrders.map(({ id, order }) => ({
+      console.log('Supabase update 데이터 준비:', imageOrders.map(({ id, order }) => ({
         id,
         display_order: order
       })))
 
-      // 트랜잭션으로 모든 순서를 한 번에 업데이트
-      const { data, error } = await supabase
-        .from('images')
-        .upsert(
-          imageOrders.map(({ id, order }) => ({
-            id,
-            display_order: order
-          })),
-          { onConflict: 'id' }
-        )
+      // upsert 대신 개별 update 사용 (page_id 제약조건 때문에)
+      const updatePromises = imageOrders.map(async ({ id, order }) => {
+        const { data, error } = await supabase
+          .from('images')
+          .update({ display_order: order })
+          .eq('id', id)
+          .eq('page_id', pageId) // 안전을 위해 page_id도 확인
+        
+        return { id, order, data, error }
+      })
 
-      console.log('Supabase upsert 결과:', { data, error })
-
-      if (error) {
-        console.error('Supabase upsert 오류:', error)
-        throw error
+      const results = await Promise.all(updatePromises)
+      const errors = results.filter(result => result.error)
+      
+      if (errors.length > 0) {
+        console.error('일부 업데이트 실패:', errors)
+        throw new Error(`${errors.length}개 이미지 업데이트 실패`)
       }
 
-      console.log('Bulk update 성공')
+      console.log('Bulk update 성공:', results.length, '개 이미지 업데이트 완료')
       return res.json({ 
         success: true, 
-        message: '모든 이미지 순서가 업데이트되었습니다' 
+        message: `${results.length}개 이미지 순서가 업데이트되었습니다` 
       })
     } catch (error) {
       console.error('Bulk update image order error:', error)
