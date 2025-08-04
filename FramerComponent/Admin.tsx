@@ -599,6 +599,46 @@ export default function UnifiedWeddingAdmin2(props) {
         bride_mother_phone: "",
     }
 
+    // 임시 테스트 함수 (디버깅용)
+    const testBulkUpdateAPI = async () => {
+        if (!currentPageId || existingImages.length === 0) {
+            alert("페이지나 이미지가 없습니다.")
+            return
+        }
+
+        const testRequestBody = {
+            action: "updateAllOrders",
+            pageId: currentPageId,
+            imageOrders: existingImages.slice(0, 2).map((img, idx) => ({
+                id: img.id,
+                order: idx + 1
+            }))
+        }
+
+        console.log("테스트 API 요청:", testRequestBody)
+
+        try {
+            const response = await fetch(`${PROXY_BASE_URL}/api/images`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${getAuthToken()}`,
+                },
+                body: JSON.stringify(testRequestBody),
+            })
+
+            console.log("테스트 API 응답 상태:", response.status, response.statusText)
+            
+            const result = await response.json()
+            console.log("테스트 API 응답:", result)
+            
+            alert(`테스트 결과: ${result.success ? '성공' : '실패'} - ${result.message || result.error}`)
+        } catch (err) {
+            console.error("테스트 실패:", err)
+            alert("테스트 실패: " + (err instanceof Error ? err.message : "알 수 없는 오류"))
+        }
+    }
+
     // 이미지 순서 변경 관련 함수들 (컴포넌트 내부로 이동)
     const handleReorderImages = async (fromIndex: number, toIndex: number) => {
         try {
@@ -2721,6 +2761,21 @@ export default function UnifiedWeddingAdmin2(props) {
                                             }}
                                         >
                                             새로고침
+                                        </button>
+                                        <button
+                                            onClick={testBulkUpdateAPI}
+                                            style={{
+                                                padding: "4px 8px",
+                                                backgroundColor: "#ffc107",
+                                                color: "black",
+                                                border: "none",
+                                                borderRadius: "4px",
+                                                cursor: "pointer",
+                                                fontSize: "12px",
+                                                touchAction: "manipulation",
+                                            }}
+                                        >
+                                            API 테스트
                                         </button>
                                     </div>
                                 </div>
