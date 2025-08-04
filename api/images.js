@@ -280,8 +280,48 @@ async function handleImageOperation(req, res) {
 }
 
 async function handleUpdateImageOrder(req, res) {
-  const { imageId, newOrder } = req.body
+  const { imageId, newOrder, action, pageId, imageOrders } = req.body
 
+  console.log('UpdateImageOrder 요청:', { action, pageId, imageOrders, imageId, newOrder })
+
+  // 새로운 bulk update 액션 처리
+  if (action === "updateAllOrders") {
+    if (!pageId || !imageOrders || !Array.isArray(imageOrders)) {
+      console.error('Bulk update 유효성 검사 실패:', { pageId, imageOrders })
+      return res.status(400).json({ 
+        success: false, 
+        error: 'pageId와 imageOrders 배열이 필요합니다' 
+      })
+    }
+
+    try {
+      // 트랜잭션으로 모든 순서를 한 번에 업데이트
+      const { error } = await supabase
+        .from('images')
+        .upsert(
+          imageOrders.map(({ id, order }) => ({
+            id,
+            display_order: order
+          })),
+          { onConflict: 'id' }
+        )
+
+      if (error) throw error
+
+      return res.json({ 
+        success: true, 
+        message: '모든 이미지 순서가 업데이트되었습니다' 
+      })
+    } catch (error) {
+      console.error('Bulk update image order error:', error)
+      return res.status(500).json({ 
+        success: false, 
+        error: '이미지 순서 업데이트 중 오류가 발생했습니다' 
+      })
+    }
+  }
+
+  // 기존 단일 업데이트 처리
   if (!imageId || newOrder === undefined) {
     return res.status(400).json({ 
       success: false, 
