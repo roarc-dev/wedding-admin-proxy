@@ -72,19 +72,21 @@ interface AccountBtnProps {
     style?: React.CSSProperties
 }
 
-type ViewState = "closed" | "groom" | "bride"
+type ViewState = "closed" | "open"
+type SideType = "groom" | "bride"
 
 /**
  * @framerDisableUnlink
  * @framerSupportedLayoutWidth fixed
  * @framerSupportedLayoutHeight auto
  * @framerIntrinsicWidth 378
- * @framerIntrinsicHeight 54
+ * @framerIntrinsicHeight 118
  */
 export default function AccountBtn(props: AccountBtnProps) {
     const { pageId = "default", style } = props
 
-    const [viewState, setViewState] = useState<ViewState>("closed")
+    const [groomViewState, setGroomViewState] = useState<ViewState>("closed")
+    const [brideViewState, setBrideViewState] = useState<ViewState>("closed")
     const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
@@ -179,18 +181,21 @@ export default function AccountBtn(props: AccountBtnProps) {
         }
     }
 
-    // 토글 함수
-    const toggleView = () => {
-        setViewState(viewState === "closed" ? "groom" : "closed")
+    // 토글 함수들
+    const toggleGroomView = () => {
+        setGroomViewState(groomViewState === "closed" ? "open" : "closed")
+        // 신부측이 열려있으면 닫기
+        if (brideViewState === "open") {
+            setBrideViewState("closed")
+        }
     }
 
-    // 신랑측/신부측 전환
-    const showGroomAccounts = () => {
-        setViewState("groom")
-    }
-
-    const showBrideAccounts = () => {
-        setViewState("bride")
+    const toggleBrideView = () => {
+        setBrideViewState(brideViewState === "closed" ? "open" : "closed")
+        // 신랑측이 열려있으면 닫기
+        if (groomViewState === "open") {
+            setGroomViewState("closed")
+        }
     }
 
     // 로딩 상태
@@ -265,193 +270,33 @@ export default function AccountBtn(props: AccountBtnProps) {
         )
     }
 
-    // 닫힌 상태
-    if (viewState === "closed") {
-        return (
-            <div style={{
-                width: 378,
-                background: '#EBEBEB',
-                overflow: 'hidden',
-                justifyContent: 'center',
-                alignItems: 'flex-start',
-                gap: 10,
-                display: 'inline-flex',
-                cursor: 'pointer',
-                ...style
-            }} onClick={toggleView}>
-                <div style={{
-                    flex: '1 1 0',
-                    height: 54,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    gap: 10,
-                    display: 'flex'
-                }}>
-                    <div style={{
-                        color: 'black',
-                        fontSize: 14,
-                        fontFamily: 'Pretendard',
-                        fontWeight: '600',
-                        wordWrap: 'break-word'
-                    }}>
-                        신랑측에게
-                    </div>
-                    <div style={{ width: 14, height: 8 }} />
-                    <div style={{
-                        width: 12,
-                        height: 5.50,
-                        outline: '1.50px black solid',
-                        outlineOffset: '-0.75px'
-                    }} />
-                </div>
-            </div>
-        )
-    }
-
-    // 열린 상태
     return (
         <div style={{
             width: 378,
-            background: 'white',
-            overflow: 'hidden',
+            display: 'flex',
             flexDirection: 'column',
-            justifyContent: 'flex-start',
-            alignItems: 'center',
-            display: 'inline-flex',
+            gap: 10,
             ...style
         }}>
-            {/* 헤더 */}
-            <div style={{
-                alignSelf: 'stretch',
-                height: 54,
-                background: '#EBEBEB',
-                justifyContent: 'center',
-                alignItems: 'center',
-                gap: 10,
-                display: 'inline-flex',
-                cursor: 'pointer'
-            }} onClick={toggleView}>
-                <div style={{
-                    color: 'black',
-                    fontSize: 14,
-                    fontFamily: 'Pretendard',
-                    fontWeight: '600',
-                    wordWrap: 'break-word'
-                }}>
-                    {viewState === "groom" ? "신랑측에게" : "신부측에게"}
-                </div>
-                <div style={{ width: 14, height: 8 }} />
-                <div style={{
-                    width: 12,
-                    height: 5.50,
-                    outline: '1.50px black solid',
-                    outlineOffset: '-0.75px',
-                    transform: 'rotate(180deg)'
-                }} />
-            </div>
+            {/* 신랑측에게 버튼 */}
+            <GroomAccountButton
+                accountInfo={accountInfo}
+                viewState={groomViewState}
+                onToggle={toggleGroomView}
+                onCopyGroom={copyGroomAccount}
+                onCopyGroomFather={copyGroomFatherAccount}
+                onCopyGroomMother={copyGroomMotherAccount}
+            />
 
-            {/* 탭 버튼 */}
-            <div style={{
-                alignSelf: 'stretch',
-                display: 'flex',
-                borderBottom: '1px solid #F5F5F5'
-            }}>
-                <div style={{
-                    flex: 1,
-                    padding: '12px',
-                    textAlign: 'center',
-                    cursor: 'pointer',
-                    background: viewState === "groom" ? '#F0F0F0' : 'transparent',
-                    color: viewState === "groom" ? 'black' : '#707070',
-                    fontSize: 14,
-                    fontFamily: 'Pretendard',
-                    fontWeight: '600'
-                }} onClick={showGroomAccounts}>
-                    신랑측
-                </div>
-                <div style={{
-                    flex: 1,
-                    padding: '12px',
-                    textAlign: 'center',
-                    cursor: 'pointer',
-                    background: viewState === "bride" ? '#F0F0F0' : 'transparent',
-                    color: viewState === "bride" ? 'black' : '#707070',
-                    fontSize: 14,
-                    fontFamily: 'Pretendard',
-                    fontWeight: '600'
-                }} onClick={showBrideAccounts}>
-                    신부측
-                </div>
-            </div>
-
-            {/* 계좌 정보 목록 */}
-            <div style={{
-                alignSelf: 'stretch',
-                paddingTop: 20,
-                paddingLeft: 20,
-                paddingRight: 20,
-                flexDirection: 'column',
-                justifyContent: 'flex-start',
-                alignItems: 'flex-start',
-                gap: 16,
-                display: 'flex'
-            }}>
-                {viewState === "groom" ? (
-                    <>
-                        {/* 신랑 */}
-                        <AccountItem
-                            label="신랑"
-                            name={accountInfo.groom_name}
-                            account={accountInfo.groom_account}
-                            bank={accountInfo.groom_bank}
-                            onCopy={copyGroomAccount}
-                        />
-                        {/* 신랑 아버지 */}
-                        <AccountItem
-                            label="혼주"
-                            name={accountInfo.groom_father_name}
-                            account={accountInfo.groom_father_account}
-                            bank={accountInfo.groom_father_bank}
-                            onCopy={copyGroomFatherAccount}
-                        />
-                        {/* 신랑 어머니 */}
-                        <AccountItem
-                            label="혼주"
-                            name={accountInfo.groom_mother_name}
-                            account={accountInfo.groom_mother_account}
-                            bank={accountInfo.groom_mother_bank}
-                            onCopy={copyGroomMotherAccount}
-                        />
-                    </>
-                ) : (
-                    <>
-                        {/* 신부 */}
-                        <AccountItem
-                            label="신부"
-                            name={accountInfo.bride_name}
-                            account={accountInfo.bride_account}
-                            bank={accountInfo.bride_bank}
-                            onCopy={copyBrideAccount}
-                        />
-                        {/* 신부 아버지 */}
-                        <AccountItem
-                            label="혼주"
-                            name={accountInfo.bride_father_name}
-                            account={accountInfo.bride_father_account}
-                            bank={accountInfo.bride_father_bank}
-                            onCopy={copyBrideFatherAccount}
-                        />
-                        {/* 신부 어머니 */}
-                        <AccountItem
-                            label="혼주"
-                            name={accountInfo.bride_mother_name}
-                            account={accountInfo.bride_mother_account}
-                            bank={accountInfo.bride_mother_bank}
-                            onCopy={copyBrideMotherAccount}
-                        />
-                    </>
-                )}
-            </div>
+            {/* 신부측에게 버튼 */}
+            <BrideAccountButton
+                accountInfo={accountInfo}
+                viewState={brideViewState}
+                onToggle={toggleBrideView}
+                onCopyBride={copyBrideAccount}
+                onCopyBrideFather={copyBrideFatherAccount}
+                onCopyBrideMother={copyBrideMotherAccount}
+            />
 
             {/* 복사 메시지 */}
             <AnimatePresence>
@@ -492,6 +337,270 @@ export default function AccountBtn(props: AccountBtnProps) {
         </div>
     )
 }
+
+// 신랑측 계좌 버튼 컴포넌트
+interface GroomAccountButtonProps {
+    accountInfo: AccountInfo
+    viewState: ViewState
+    onToggle: () => void
+    onCopyGroom: () => void
+    onCopyGroomFather: () => void
+    onCopyGroomMother: () => void
+}
+
+const GroomAccountButton = React.memo(function GroomAccountButton({
+    accountInfo,
+    viewState,
+    onToggle,
+    onCopyGroom,
+    onCopyGroomFather,
+    onCopyGroomMother
+}: GroomAccountButtonProps) {
+    if (viewState === "closed") {
+        return (
+            <div style={{
+                width: 378,
+                background: '#EBEBEB',
+                overflow: 'hidden',
+                justifyContent: 'center',
+                alignItems: 'flex-start',
+                gap: 10,
+                display: 'inline-flex',
+                cursor: 'pointer'
+            }} onClick={onToggle}>
+                <div style={{
+                    flex: '1 1 0',
+                    height: 54,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    gap: 10,
+                    display: 'flex'
+                }}>
+                    <div style={{
+                        color: 'black',
+                        fontSize: 14,
+                        fontFamily: 'Pretendard',
+                        fontWeight: '600',
+                        wordWrap: 'break-word'
+                    }}>
+                        신랑측에게
+                    </div>
+                    <svg width="15" height="8" viewBox="0 0 15 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <g id="Group 2117912660">
+                            <path id="Vector 1121" d="M1.5 1L7.5 6.5L13.5 1" stroke="black" strokeWidth="1.5"/>
+                        </g>
+                    </svg>
+                </div>
+            </div>
+        )
+    }
+
+    return (
+        <div style={{
+            width: 378,
+            background: 'white',
+            overflow: 'hidden',
+            flexDirection: 'column',
+            justifyContent: 'flex-start',
+            alignItems: 'center',
+            display: 'inline-flex'
+        }}>
+            {/* 헤더 */}
+            <div style={{
+                alignSelf: 'stretch',
+                height: 54,
+                background: '#EBEBEB',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: 10,
+                display: 'inline-flex',
+                cursor: 'pointer'
+            }} onClick={onToggle}>
+                <div style={{
+                    color: 'black',
+                    fontSize: 14,
+                    fontFamily: 'Pretendard',
+                    fontWeight: '600',
+                    wordWrap: 'break-word'
+                }}>
+                    신랑측에게
+                </div>
+                <svg width="15" height="8" viewBox="0 0 15 8" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ transform: 'rotate(180deg)' }}>
+                    <g id="Group 2117912660">
+                        <path id="Vector 1121" d="M1.5 1L7.5 6.5L13.5 1" stroke="black" strokeWidth="1.5"/>
+                    </g>
+                </svg>
+            </div>
+
+            {/* 계좌 정보 목록 */}
+            <div style={{
+                alignSelf: 'stretch',
+                paddingTop: 20,
+                paddingLeft: 20,
+                paddingRight: 20,
+                flexDirection: 'column',
+                justifyContent: 'flex-start',
+                alignItems: 'flex-start',
+                gap: 16,
+                display: 'flex'
+            }}>
+                <AccountItem
+                    label="신랑"
+                    name={accountInfo.groom_name}
+                    account={accountInfo.groom_account}
+                    bank={accountInfo.groom_bank}
+                    onCopy={onCopyGroom}
+                />
+                <AccountItem
+                    label="혼주"
+                    name={accountInfo.groom_father_name}
+                    account={accountInfo.groom_father_account}
+                    bank={accountInfo.groom_father_bank}
+                    onCopy={onCopyGroomFather}
+                />
+                <AccountItem
+                    label="혼주"
+                    name={accountInfo.groom_mother_name}
+                    account={accountInfo.groom_mother_account}
+                    bank={accountInfo.groom_mother_bank}
+                    onCopy={onCopyGroomMother}
+                />
+            </div>
+        </div>
+    )
+})
+
+// 신부측 계좌 버튼 컴포넌트
+interface BrideAccountButtonProps {
+    accountInfo: AccountInfo
+    viewState: ViewState
+    onToggle: () => void
+    onCopyBride: () => void
+    onCopyBrideFather: () => void
+    onCopyBrideMother: () => void
+}
+
+const BrideAccountButton = React.memo(function BrideAccountButton({
+    accountInfo,
+    viewState,
+    onToggle,
+    onCopyBride,
+    onCopyBrideFather,
+    onCopyBrideMother
+}: BrideAccountButtonProps) {
+    if (viewState === "closed") {
+        return (
+            <div style={{
+                width: 378,
+                background: '#EBEBEB',
+                overflow: 'hidden',
+                justifyContent: 'center',
+                alignItems: 'flex-start',
+                gap: 10,
+                display: 'inline-flex',
+                cursor: 'pointer'
+            }} onClick={onToggle}>
+                <div style={{
+                    flex: '1 1 0',
+                    height: 54,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    gap: 10,
+                    display: 'flex'
+                }}>
+                    <div style={{
+                        color: 'black',
+                        fontSize: 14,
+                        fontFamily: 'Pretendard',
+                        fontWeight: '600',
+                        wordWrap: 'break-word'
+                    }}>
+                        신부측에게
+                    </div>
+                    <svg width="15" height="8" viewBox="0 0 15 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <g id="Group 2117912660">
+                            <path id="Vector 1121" d="M1.5 1L7.5 6.5L13.5 1" stroke="black" strokeWidth="1.5"/>
+                        </g>
+                    </svg>
+                </div>
+            </div>
+        )
+    }
+
+    return (
+        <div style={{
+            width: 378,
+            background: 'white',
+            overflow: 'hidden',
+            flexDirection: 'column',
+            justifyContent: 'flex-start',
+            alignItems: 'center',
+            display: 'inline-flex'
+        }}>
+            {/* 헤더 */}
+            <div style={{
+                alignSelf: 'stretch',
+                height: 54,
+                background: '#EBEBEB',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: 10,
+                display: 'inline-flex',
+                cursor: 'pointer'
+            }} onClick={onToggle}>
+                <div style={{
+                    color: 'black',
+                    fontSize: 14,
+                    fontFamily: 'Pretendard',
+                    fontWeight: '600',
+                    wordWrap: 'break-word'
+                }}>
+                    신부측에게
+                </div>
+                <svg width="15" height="8" viewBox="0 0 15 8" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ transform: 'rotate(180deg)' }}>
+                    <g id="Group 2117912660">
+                        <path id="Vector 1121" d="M1.5 1L7.5 6.5L13.5 1" stroke="black" strokeWidth="1.5"/>
+                    </g>
+                </svg>
+            </div>
+
+            {/* 계좌 정보 목록 */}
+            <div style={{
+                alignSelf: 'stretch',
+                paddingTop: 20,
+                paddingLeft: 20,
+                paddingRight: 20,
+                flexDirection: 'column',
+                justifyContent: 'flex-start',
+                alignItems: 'flex-start',
+                gap: 16,
+                display: 'flex'
+            }}>
+                <AccountItem
+                    label="신부"
+                    name={accountInfo.bride_name}
+                    account={accountInfo.bride_account}
+                    bank={accountInfo.bride_bank}
+                    onCopy={onCopyBride}
+                />
+                <AccountItem
+                    label="혼주"
+                    name={accountInfo.bride_father_name}
+                    account={accountInfo.bride_father_account}
+                    bank={accountInfo.bride_father_bank}
+                    onCopy={onCopyBrideFather}
+                />
+                <AccountItem
+                    label="혼주"
+                    name={accountInfo.bride_mother_name}
+                    account={accountInfo.bride_mother_account}
+                    bank={accountInfo.bride_mother_bank}
+                    onCopy={onCopyBrideMother}
+                />
+            </div>
+        </div>
+    )
+})
 
 // 계좌 아이템 컴포넌트
 interface AccountItemProps {
@@ -577,18 +686,10 @@ const AccountItem = React.memo(function AccountItem({
                     display: 'flex',
                     cursor: 'pointer'
                 }} onClick={onCopy}>
-                    <div style={{
-                        width: 7.36,
-                        height: 9.42,
-                        outline: '1px #7F7F7F solid',
-                        outlineOffset: '-0.50px'
-                    }} />
-                    <div style={{
-                        width: 7.20,
-                        height: 9.27,
-                        outline: '1px #7F7F7F solid',
-                        outlineOffset: '-0.50px'
-                    }} />
+                    <svg width="12" height="14" viewBox="0 0 12 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="1" y="1" width="7.35989" height="9.41763" stroke="#7F7F7F"/>
+                        <path d="M3.7998 13.0001H10.9997V3.73438" stroke="#7F7F7F"/>
+                    </svg>
                     <div style={{
                         color: '#8C8C8C',
                         fontSize: 14,
