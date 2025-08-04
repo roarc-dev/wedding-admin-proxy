@@ -642,20 +642,34 @@ export default function UnifiedWeddingAdmin2(props) {
     }
 
     // 이미지 순서 변경 관련 함수들 (컴포넌트 내부로 이동)
-    const handleReorderImages = async (fromIndex: number, toIndex: number) => {
+    // 이미지 순서 변경 (로컬 상태만 변경)
+    const handleReorderImages = (fromIndex: number, toIndex: number) => {
+        const newImages = [...existingImages]
+        const [movedImage] = newImages.splice(fromIndex, 1)
+        newImages.splice(toIndex, 0, movedImage)
+
+        // 로컬 상태만 업데이트 (서버 저장은 별도)
+        setExistingImages(newImages)
+        setHasUnsavedChanges(true)
+
+        console.log("로컬 순서 변경:", { fromIndex, toIndex, newLength: newImages.length })
+    }
+
+    // 서버에 순서 변경사항 저장
+    const saveImageOrder = async () => {
+        if (!hasUnsavedChanges) {
+            alert("변경사항이 없습니다.")
+            return
+        }
+
         try {
-            const newImages = [...existingImages]
-            const [movedImage] = newImages.splice(fromIndex, 1)
-            newImages.splice(toIndex, 0, movedImage)
+            setIsSavingOrder(true)
 
-            // 낙관적 업데이트 - 즉시 UI 반영
-            setExistingImages(newImages)
-
-            // 단일 API 호출로 전체 순서 업데이트
+            // 순서 변경 API 호출
             const requestBody = {
                 action: "updateAllOrders",
                 pageId: currentPageId,
-                imageOrders: newImages.map((img, idx) => ({
+                imageOrders: existingImages.map((img, idx) => ({
                     id: img.id,
                     order: idx + 1
                 })).filter(item => item.id) // id가 있는 것만 필터링
@@ -665,9 +679,9 @@ export default function UnifiedWeddingAdmin2(props) {
             if (requestBody.imageOrders.length === 0) {
                 throw new Error("유효한 이미지 ID가 없습니다")
             }
-            
-            console.log("순서 변경 API 요청:", requestBody)
-            
+
+            console.log("순서 저장 API 요청:", requestBody)
+
             const response = await fetch(`${PROXY_BASE_URL}/api/images`, {
                 method: "PUT",
                 headers: {
@@ -686,30 +700,46 @@ export default function UnifiedWeddingAdmin2(props) {
             }
 
             const result = await response.json()
-            console.log("순서 변경 API 응답:", result)
+            console.log("순서 저장 API 응답:", result)
 
             if (!result.success) {
-                // 실패 시 원래 상태로 복원
-                setExistingImages(existingImages)
-                console.error("순서 변경 실패 응답:", result)
-                throw new Error(result.error || "순서 변경에 실패했습니다")
+                throw new Error(result.error || "순서 저장에 실패했습니다")
             }
+
+            // 성공 시 상태 초기화
+            setHasUnsavedChanges(false)
+            setOriginalOrder([...existingImages])
+            
+            alert("이미지 순서가 성공적으로 저장되었습니다!")
+
         } catch (err) {
-            console.error("순서 변경 실패:", err)
-            alert("순서 변경에 실패했습니다: " + (err instanceof Error ? err.message : "알 수 없는 오류"))
+            console.error("순서 저장 실패:", err)
+            alert("순서 저장에 실패했습니다: " + (err instanceof Error ? err.message : "알 수 없는 오류"))
+        } finally {
+            setIsSavingOrder(false)
         }
     }
 
-    const moveImageUp = (index) => {
+    // 변경사항 취소 (원래 순서로 복원)
+    const cancelOrderChanges = () => {
+        if (!hasUnsavedChanges) return
+
+        if (confirm("변경사항을 취소하고 원래 순서로 되돌리시겠습니까?")) {
+            setExistingImages([...originalOrder])
+            setHasUnsavedChanges(false)
+        }
+    }
+
+    const moveImageUp = (index: number) => {
         if (index > 0) handleReorderImages(index, index - 1)
     }
 
-    const moveImageDown = (index) => {
+    const moveImageDown = (index: number) => {
         if (index < existingImages.length - 1)
             handleReorderImages(index, index + 1)
     }
 
-    const moveImageToPosition = (fromIndex, toPosition) => {
+    const moveImageToPosition = (fromIndex: number, toPosition: number) => {
         if (
             toPosition >= 1 &&
             toPosition <= existingImages.length &&
@@ -721,6 +751,11 @@ export default function UnifiedWeddingAdmin2(props) {
 
     // 선택된 이미지들 상태 추가
     const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set())
+    
+    // 순서 변경 관련 상태
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+    const [isSavingOrder, setIsSavingOrder] = useState(false)
+    const [originalOrder, setOriginalOrder] = useState([])
 
     const handleDeleteImage = async (imageId: string, fileName: string) => {
         if (!confirm("정말로 이 이미지를 삭제하시겠습니까?")) return
@@ -885,6 +920,9 @@ export default function UnifiedWeddingAdmin2(props) {
             try {
                 const images = await getImagesByPageId(currentPageId)
                 setExistingImages(images)
+                setOriginalOrder([...images]) // 원본 순서 저장
+                setHasUnsavedChanges(false) // 변경사항 초기화
+                setSelectedImages(new Set()) // 선택된 이미지 초기화
             } catch (error) {
                 console.error("이미지 로딩 실패:", error)
                 // 에러 시 기존 이미지 유지
@@ -2718,8 +2756,23 @@ export default function UnifiedWeddingAdmin2(props) {
                                         marginBottom: "15px",
                                     }}
                                 >
-                                    <h3 style={{ margin: 0 }}>
+                                    <h3 style={{ margin: 0, display: "flex", alignItems: "center" }}>
                                         이미지 순서 관리
+                                        {hasUnsavedChanges && (
+                                            <span 
+                                                style={{
+                                                    marginLeft: "10px",
+                                                    padding: "2px 8px",
+                                                    backgroundColor: "#ffc107",
+                                                    color: "#000",
+                                                    fontSize: "10px",
+                                                    borderRadius: "12px",
+                                                    fontWeight: "normal"
+                                                }}
+                                            >
+                                                변경사항 있음
+                                            </span>
+                                        )}
                                     </h3>
                                     <div style={{ display: "flex", gap: "8px" }}>
                                         {selectedImages.size > 0 && (
@@ -2784,6 +2837,45 @@ export default function UnifiedWeddingAdmin2(props) {
                                         >
                                             API 테스트
                                         </button>
+                                        
+                                        {/* 순서 변경 저장/취소 버튼 */}
+                                        {hasUnsavedChanges && (
+                                            <>
+                                                <button
+                                                    onClick={saveImageOrder}
+                                                    disabled={isSavingOrder}
+                                                    style={{
+                                                        padding: "6px 12px",
+                                                        backgroundColor: isSavingOrder ? "#6c757d" : "#28a745",
+                                                        color: "white",
+                                                        border: "none",
+                                                        borderRadius: "4px",
+                                                        cursor: isSavingOrder ? "not-allowed" : "pointer",
+                                                        fontSize: "12px",
+                                                        fontWeight: "bold",
+                                                        touchAction: "manipulation",
+                                                    }}
+                                                >
+                                                    {isSavingOrder ? "저장 중..." : "순서 저장"}
+                                                </button>
+                                                <button
+                                                    onClick={cancelOrderChanges}
+                                                    disabled={isSavingOrder}
+                                                    style={{
+                                                        padding: "6px 12px",
+                                                        backgroundColor: "#dc3545",
+                                                        color: "white",
+                                                        border: "none",
+                                                        borderRadius: "4px",
+                                                        cursor: isSavingOrder ? "not-allowed" : "pointer",
+                                                        fontSize: "12px",
+                                                        touchAction: "manipulation",
+                                                    }}
+                                                >
+                                                    취소
+                                                </button>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
 
