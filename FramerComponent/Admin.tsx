@@ -1162,16 +1162,30 @@ export default function UnifiedWeddingAdmin2(props) {
         if (!confirm("정말로 이 연락처를 삭제하시겠습니까?")) return
 
         setLoading(true)
+        
+        // 낙관적 업데이트 - 즉시 UI에서 제거
+        const contactToDelete = contactList.find(contact => contact.id === id)
+        setContactList(prev => prev.filter(contact => contact.id !== id))
+
         try {
             const result = await deleteContact(id)
 
             if (result.success) {
-                setSuccess("연락처가 성공적으로 삭제되었습니다.")
-                loadContactList()
+                setSuccess("연락처가 성공적으로 삭제되었습니다!")
+                // 3초 후 성공 메시지 자동 제거
+                setTimeout(() => setSuccess(null), 3000)
             } else {
+                // 실패 시 원래 상태로 복원
+                if (contactToDelete) {
+                    setContactList(prev => [...prev, contactToDelete])
+                }
                 setError("삭제에 실패했습니다: " + result.error)
             }
         } catch (err) {
+            // 실패 시 원래 상태로 복원
+            if (contactToDelete) {
+                setContactList(prev => [...prev, contactToDelete])
+            }
             setError("삭제에 실패했습니다.")
         } finally {
             setLoading(false)
@@ -1191,23 +1205,99 @@ export default function UnifiedWeddingAdmin2(props) {
         }
 
         setLoading(true)
+        
+        // 낙관적 업데이트 - 즉시 UI 반영
+        const isUpdate = !!selectedContact.id
+        const updatedContact = { ...selectedContact }
+        
+        if (isUpdate) {
+            // 수정: 기존 연락처를 업데이트된 정보로 교체
+            setContactList(prev => 
+                prev.map(contact => 
+                    contact.id === selectedContact.id ? updatedContact : contact
+                )
+            )
+        } else {
+            // 추가: 새 연락처를 목록에 추가
+            const newContact = { 
+                ...updatedContact, 
+                id: `temp_${Date.now()}` // 임시 ID
+            }
+            setContactList(prev => [...prev, newContact])
+        }
+
         try {
             const result = await saveContact(selectedContact)
 
             if (result.success) {
+                // 성공 시 실제 서버 데이터로 교체
+                if (isUpdate) {
+                    setContactList(prev => 
+                        prev.map(contact => 
+                            contact.id === selectedContact.id 
+                                ? { ...contact, ...result.data } // 서버에서 반환된 실제 데이터
+                                : contact
+                        )
+                    )
+                } else {
+                    // 새로 추가된 경우 임시 ID를 실제 ID로 교체
+                    setContactList(prev => 
+                        prev.map(contact => 
+                            contact.id === `temp_${Date.now() - 1000}` // 임시 ID
+                                ? { ...contact, id: result.data.id } // 실제 ID
+                                : contact
+                        )
+                    )
+                }
+
                 setSuccess(
-                    selectedContact.id
-                        ? "연락처가 성공적으로 수정되었습니다."
-                        : "연락처가 성공적으로 추가되었습니다."
+                    isUpdate
+                        ? "연락처가 성공적으로 수정되었습니다!"
+                        : "연락처가 성공적으로 추가되었습니다!"
                 )
                 setIsEditingContact(false)
                 setSelectedContact(null)
-                loadContactList()
+
+                // 3초 후 성공 메시지 자동 제거
+                setTimeout(() => setSuccess(null), 3000)
+
             } else {
+                // 실패 시 원래 상태로 복원
+                if (isUpdate) {
+                    setContactList(prev => 
+                        prev.map(contact => 
+                            contact.id === selectedContact.id 
+                                ? contact // 원래 상태 유지
+                                : contact
+                        )
+                    )
+                } else {
+                    // 새로 추가된 경우 제거
+                    setContactList(prev => 
+                        prev.filter(contact => contact.id !== `temp_${Date.now() - 1000}`)
+                    )
+                }
+                
                 setError(`저장에 실패했습니다: ${result.error}`)
             }
         } catch (err) {
-            setError(`저장에 실패했습니다: ${err?.message || err}`)
+            // 실패 시 원래 상태로 복원
+            if (isUpdate) {
+                setContactList(prev => 
+                    prev.map(contact => 
+                        contact.id === selectedContact.id 
+                            ? contact // 원래 상태 유지
+                            : contact
+                        )
+                    )
+                } else {
+                    // 새로 추가된 경우 제거
+                    setContactList(prev => 
+                        prev.filter(contact => contact.id !== `temp_${Date.now() - 1000}`)
+                    )
+                }
+                
+                setError(`저장에 실패했습니다: ${err instanceof Error ? err.message : "알 수 없는 오류"}`)
         } finally {
             setLoading(false)
         }
@@ -1407,6 +1497,49 @@ export default function UnifiedWeddingAdmin2(props) {
                 touchAction: "manipulation",
             }}
         >
+            {/* 성공/에러 메시지 표시 */}
+            <AnimatePresence>
+                {success && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        style={{
+                            padding: "12px 16px",
+                            backgroundColor: "#d4edda",
+                            color: "#155724",
+                            borderRadius: "8px",
+                            border: "1px solid #c3e6cb",
+                            fontSize: "14px",
+                            fontWeight: "500",
+                            textAlign: "center",
+                            boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                        }}
+                    >
+                        ✅ {success}
+                    </motion.div>
+                )}
+                {error && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        style={{
+                            padding: "12px 16px",
+                            backgroundColor: "#f8d7da",
+                            color: "#721c24",
+                            borderRadius: "8px",
+                            border: "1px solid #f5c6cb",
+                            fontSize: "14px",
+                            fontWeight: "500",
+                            textAlign: "center",
+                            boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                        }}
+                    >
+                        ❌ {error}
+                    </motion.div>
+                )}
+            </AnimatePresence>
             {/* 헤더 */}
             <div
                 style={{
