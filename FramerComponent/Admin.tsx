@@ -612,8 +612,10 @@ export default function UnifiedWeddingAdmin2(props) {
             imageOrders: existingImages.slice(0, 2).map((img, idx) => ({
                 id: img.id,
                 order: idx + 1
-            }))
+            })).filter(item => item.id) // id가 있는 것만 필터링
         }
+
+        console.log("테스트용 이미지 데이터:", existingImages.slice(0, 2))
 
         console.log("테스트 API 요청:", testRequestBody)
 
@@ -656,7 +658,12 @@ export default function UnifiedWeddingAdmin2(props) {
                 imageOrders: newImages.map((img, idx) => ({
                     id: img.id,
                     order: idx + 1
-                }))
+                })).filter(item => item.id) // id가 있는 것만 필터링
+            }
+
+            // 안전 검사
+            if (requestBody.imageOrders.length === 0) {
+                throw new Error("유효한 이미지 ID가 없습니다")
             }
             
             console.log("순서 변경 API 요청:", requestBody)

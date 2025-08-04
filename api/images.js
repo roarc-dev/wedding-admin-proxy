@@ -316,6 +316,17 @@ async function handleUpdateImageOrder(req, res) {
       })
     }
 
+    // imageOrders 배열 유효성 검사
+    for (const item of imageOrders) {
+      if (!item.id || typeof item.order !== 'number') {
+        console.error('잘못된 imageOrder 항목:', item)
+        return res.status(400).json({ 
+          success: false, 
+          error: '모든 imageOrder 항목에는 id와 order가 필요합니다' 
+        })
+      }
+    }
+
     try {
       console.log('Supabase update 데이터 준비:', imageOrders.map(({ id, order }) => ({
         id,
