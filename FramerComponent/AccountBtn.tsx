@@ -121,7 +121,7 @@ export default function AccountBtn(props: AccountBtnProps) {
     const copyToClipboard = async (text: string, type: string) => {
         try {
             await navigator.clipboard.writeText(text)
-            setCopyMessage(`${type} 계좌 정보가 복사되었습니다`)
+            setCopyMessage(`${type}`)
             setShowCopyMessage(true)
             
             setTimeout(() => {
@@ -268,7 +268,6 @@ export default function AccountBtn(props: AccountBtnProps) {
             display: 'flex',
             flexDirection: 'column',
             gap: 10,
-            position: 'relative',
             ...style
         }}>
             {/* 신랑측에게 버튼 */}
@@ -296,7 +295,7 @@ export default function AccountBtn(props: AccountBtnProps) {
                 {showCopyMessage && (
                     <motion.div
                         style={{
-                            position: 'absolute',
+                            position: 'fixed',
                             top: '50%',
                             left: '50%',
                             transform: 'translate(-50%, -50%)',
@@ -308,7 +307,8 @@ export default function AccountBtn(props: AccountBtnProps) {
                             justifyContent: 'center',
                             alignItems: 'center',
                             boxShadow: '0px 10px 20px rgba(0, 0, 0, 0.05)',
-                            zIndex: 1000
+                            zIndex: 1000,
+                            pointerEvents: 'none'
                         }}
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
@@ -406,18 +406,23 @@ const GroomAccountButton = React.memo(function GroomAccountButton({
                 duration: 0.3,
                 ease: "easeInOut"
             }}
+            layout
         >
             {/* 헤더 */}
-            <div style={{
-                alignSelf: 'stretch',
-                height: 54,
-                background: '#EBEBEB',
-                justifyContent: 'center',
-                alignItems: 'center',
-                gap: 10,
-                display: 'inline-flex',
-                cursor: 'pointer'
-            }} onClick={onToggle}>
+            <motion.div 
+                style={{
+                    alignSelf: 'stretch',
+                    height: 54,
+                    background: '#EBEBEB',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    gap: 10,
+                    display: 'inline-flex',
+                    cursor: 'pointer'
+                }} 
+                onClick={onToggle}
+                layout
+            >
                 <div style={{
                     color: 'black',
                     fontSize: 14,
@@ -439,30 +444,31 @@ const GroomAccountButton = React.memo(function GroomAccountButton({
                         <path id="Vector 1121" d="M1.5 1L7.5 6.5L13.5 1" stroke="black" strokeWidth="1.5"/>
                     </g>
                 </svg>
-            </div>
+            </motion.div>
 
             {/* 계좌 정보 목록 */}
-            <motion.div 
-                style={{
-                    alignSelf: 'stretch',
-                    paddingTop: 20,
-                    paddingLeft: 20,
-                    paddingRight: 20,
-                    flexDirection: 'column',
-                    justifyContent: 'flex-start',
-                    alignItems: 'flex-start',
-                    gap: 16,
-                    display: 'flex'
-                }}
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ 
-                    duration: 0.3,
-                    delay: 0.1,
-                    ease: "easeOut"
-                }}
-            >
+            <AnimatePresence>
+                <motion.div 
+                    style={{
+                        alignSelf: 'stretch',
+                        paddingTop: 20,
+                        paddingLeft: 20,
+                        paddingRight: 20,
+                        flexDirection: 'column',
+                        justifyContent: 'flex-start',
+                        alignItems: 'flex-start',
+                        gap: 16,
+                        display: 'flex'
+                    }}
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ 
+                        duration: 0.3,
+                        delay: 0.1,
+                        ease: "easeOut"
+                    }}
+                >
                 <AccountItem
                     label="신랑"
                     name={accountInfo.groom_name}
@@ -484,7 +490,8 @@ const GroomAccountButton = React.memo(function GroomAccountButton({
                     bank={accountInfo.groom_mother_bank}
                     onCopy={onCopyGroomMother}
                 />
-            </motion.div>
+                </motion.div>
+            </AnimatePresence>
         </motion.div>
     )
 })
@@ -564,18 +571,23 @@ const BrideAccountButton = React.memo(function BrideAccountButton({
                 duration: 0.3,
                 ease: "easeInOut"
             }}
+            layout
         >
             {/* 헤더 */}
-            <div style={{
-                alignSelf: 'stretch',
-                height: 54,
-                background: '#EBEBEB',
-                justifyContent: 'center',
-                alignItems: 'center',
-                gap: 10,
-                display: 'inline-flex',
-                cursor: 'pointer'
-            }} onClick={onToggle}>
+            <motion.div 
+                style={{
+                    alignSelf: 'stretch',
+                    height: 54,
+                    background: '#EBEBEB',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    gap: 10,
+                    display: 'inline-flex',
+                    cursor: 'pointer'
+                }} 
+                onClick={onToggle}
+                layout
+            >
                 <div style={{
                     color: 'black',
                     fontSize: 14,
@@ -597,30 +609,31 @@ const BrideAccountButton = React.memo(function BrideAccountButton({
                         <path id="Vector 1121" d="M1.5 1L7.5 6.5L13.5 1" stroke="black" strokeWidth="1.5"/>
                     </g>
                 </svg>
-            </div>
+            </motion.div>
 
             {/* 계좌 정보 목록 */}
-            <motion.div 
-                style={{
-                    alignSelf: 'stretch',
-                    paddingTop: 20,
-                    paddingLeft: 20,
-                    paddingRight: 20,
-                    flexDirection: 'column',
-                    justifyContent: 'flex-start',
-                    alignItems: 'flex-start',
-                    gap: 16,
-                    display: 'flex'
-                }}
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ 
-                    duration: 0.3,
-                    delay: 0.1,
-                    ease: "easeOut"
-                }}
-            >
+            <AnimatePresence>
+                <motion.div 
+                    style={{
+                        alignSelf: 'stretch',
+                        paddingTop: 20,
+                        paddingLeft: 20,
+                        paddingRight: 20,
+                        flexDirection: 'column',
+                        justifyContent: 'flex-start',
+                        alignItems: 'flex-start',
+                        gap: 16,
+                        display: 'flex'
+                    }}
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ 
+                        duration: 0.3,
+                        delay: 0.1,
+                        ease: "easeOut"
+                    }}
+                >
                 <AccountItem
                     label="신부"
                     name={accountInfo.bride_name}
@@ -642,7 +655,8 @@ const BrideAccountButton = React.memo(function BrideAccountButton({
                     bank={accountInfo.bride_mother_bank}
                     onCopy={onCopyBrideMother}
                 />
-            </motion.div>
+                </motion.div>
+            </AnimatePresence>
         </motion.div>
     )
 })
