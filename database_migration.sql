@@ -40,7 +40,7 @@ SET
 WHERE wedding_time IS NOT NULL;
 
 -- wedding_contacts 테이블에 계좌 정보 필드 추가
-ALTER TABLE wedding_contacts 
+ALTER TABLE wedding_contacts
 ADD COLUMN IF NOT EXISTS groom_account TEXT DEFAULT '',
 ADD COLUMN IF NOT EXISTS groom_bank TEXT DEFAULT '',
 ADD COLUMN IF NOT EXISTS groom_father_account TEXT DEFAULT '',
@@ -53,3 +53,10 @@ ADD COLUMN IF NOT EXISTS bride_father_account TEXT DEFAULT '',
 ADD COLUMN IF NOT EXISTS bride_father_bank TEXT DEFAULT '',
 ADD COLUMN IF NOT EXISTS bride_mother_account TEXT DEFAULT '',
 ADD COLUMN IF NOT EXISTS bride_mother_bank TEXT DEFAULT '';
+
+-- page_settings 테이블에 하이라이트 설정 필드 추가
+ALTER TABLE page_settings
+ADD COLUMN IF NOT EXISTS highlight_shape TEXT DEFAULT 'circle' CHECK (highlight_shape IN ('circle', 'heart')),
+ADD COLUMN IF NOT EXISTS highlight_color TEXT DEFAULT '#e0e0e0',
+ADD COLUMN IF NOT EXISTS highlight_text_color TEXT DEFAULT 'black' CHECK (highlight_text_color IN ('black', 'white')),
+ADD COLUMN IF NOT EXISTS gallery_type TEXT DEFAULT 'thumbnail' CHECK (gallery_type IN ('thumbnail', 'slide'));
