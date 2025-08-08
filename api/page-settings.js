@@ -48,7 +48,7 @@ export default async function handler(req, res) {
       
       case 'POST':
       case 'PUT':
-        return await handleUpdateSettings(req, res)
+        return await handleUpdateSettings(req, res, validatedUser)
       
       default:
         return res.status(405).json({ 
@@ -136,17 +136,38 @@ async function handleGetSettings(req, res) {
   }
 }
 
-async function handleUpdateSettings(req, res) {
-  const { pageId, settings } = req.body
+async function handleUpdateSettings(req, res, validatedUser) {
+  const { settings } = req.body
 
-  if (!pageId || !settings) {
+  if (!settings) {
     return res.status(400).json({
       success: false,
-      error: 'pageId and settings are required'
+      error: 'settings is required'
     })
   }
 
   try {
+    // 1) 로그인 사용자 기준으로 page_id 결정
+    const userId = validatedUser?.userId
+    if (!userId) {
+      return res.status(401).json({ success: false, error: '인증 사용자 정보를 찾을 수 없습니다' })
+    }
+
+    const { data: adminUser, error: adminErr } = await supabase
+      .from('admin_users')
+      .select('id, page_id')
+      .eq('id', userId)
+      .single()
+
+    if (adminErr) {
+      throw adminErr
+    }
+
+    const effectivePageId = adminUser?.page_id
+    if (!effectivePageId) {
+      return res.status(400).json({ success: false, error: '이 사용자에게 page_id가 부여되지 않았습니다' })
+    }
+
     // 허용된 컬럼만 저장 (알 수 없는 키로 인한 에러 방지)
     const allowedKeys = [
       'groom_name_kr',
@@ -179,13 +200,13 @@ async function handleUpdateSettings(req, res) {
       }
     }
 
-    console.log('Saving page settings:', { pageId, sanitized })
+    console.log('Saving page settings:', { pageId: effectivePageId, sanitized })
 
     const { data, error } = await supabase
       .from('page_settings')
       .upsert(
         {
-          page_id: pageId,
+          page_id: effectivePageId,
           ...sanitized,
           updated_at: new Date().toISOString()
         },
