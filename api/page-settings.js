@@ -203,7 +203,11 @@ async function handleUpdateSettings(req, res) {
     console.error('Update settings error:', error)
     return res.status(500).json({
       success: false,
-      error: '설정 업데이트 중 오류가 발생했습니다'
+      error: '설정 업데이트 중 오류가 발생했습니다',
+      message: error && error.message ? error.message : String(error),
+      details: error && error.details ? error.details : undefined,
+      hint: error && error.hint ? error.hint : undefined,
+      code: error && error.code ? error.code : undefined
     })
   }
 }
