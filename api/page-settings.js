@@ -101,7 +101,11 @@ async function handleGetSettings(req, res) {
         venue_address: '',
         photo_section_image_url: '',
         photo_section_overlay_position: 'bottom',
-        photo_section_overlay_color: '#ffffff'
+        photo_section_overlay_color: '#ffffff',
+        highlight_shape: 'circle',
+        highlight_color: '#e0e0e0',
+        highlight_text_color: 'black',
+        gallery_type: 'thumbnail'
       }
 
       const { data: newData, error: insertError } = await supabase
@@ -142,11 +146,42 @@ async function handleUpdateSettings(req, res) {
   }
 
   try {
+    // 허용된 컬럼만 저장 (알 수 없는 키로 인한 에러 방지)
+    const allowedKeys = [
+      'groom_name_kr',
+      'groom_name_en',
+      'bride_name_kr',
+      'bride_name_en',
+      'wedding_date',
+      'wedding_hour',
+      'wedding_minute',
+      'venue_name',
+      'venue_address',
+      'photo_section_image_url',
+      'photo_section_overlay_position',
+      'photo_section_overlay_color',
+      'highlight_shape',
+      'highlight_color',
+      'highlight_text_color',
+      'gallery_type',
+    ]
+
+    let sanitized = Object.fromEntries(
+      Object.entries(settings || {}).filter(([key]) => allowedKeys.includes(key))
+    )
+
+    // 빈 문자열 날짜는 NULL로 저장 (Postgres date 타입 호환)
+    if (Object.prototype.hasOwnProperty.call(sanitized, 'wedding_date')) {
+      if (sanitized.wedding_date === '') {
+        sanitized.wedding_date = null
+      }
+    }
+
     const { data, error } = await supabase
       .from('page_settings')
       .upsert({
         page_id: pageId,
-        ...settings,
+        ...sanitized,
         updated_at: new Date().toISOString()
       })
       .select()
