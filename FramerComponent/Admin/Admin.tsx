@@ -1409,6 +1409,8 @@ export default function UnifiedWeddingAdmin2(props: any) {
 
         setSettingsLoading(true)
         try {
+            console.log("Saving page settings:", { currentPageId, pageSettings })
+            
             const response = await fetch(
                 `${PROXY_BASE_URL}/api/page-settings`,
                 {
@@ -1424,14 +1426,28 @@ export default function UnifiedWeddingAdmin2(props: any) {
                 }
             )
 
+            console.log("Save response status:", response.status)
+            
+            if (!response.ok) {
+                const errorText = await response.text()
+                console.error("Save response error:", errorText)
+                throw new Error(`HTTP ${response.status}: ${errorText}`)
+            }
+
             const result = await response.json()
+            console.log("Save response result:", result)
+            
             if (result.success) {
                 setSuccess("설정이 저장되었습니다.")
+                // 저장 후 다시 로드해서 동기화
+                setTimeout(() => loadPageSettings(), 500)
             } else {
-                setError("설정 저장에 실패했습니다.")
+                setError(`설정 저장에 실패했습니다: ${result.error || "알 수 없는 오류"}`)
             }
         } catch (err) {
-            setError("설정 저장 중 오류가 발생했습니다.")
+            console.error("Save page settings error:", err)
+            const message = err instanceof Error ? err.message : String(err)
+            setError(`설정 저장 중 오류가 발생했습니다: ${message}`)
         } finally {
             setSettingsLoading(false)
         }

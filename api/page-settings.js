@@ -102,6 +102,7 @@ async function handleGetSettings(req, res) {
         photo_section_image_url: '',
         photo_section_overlay_position: 'bottom',
         photo_section_overlay_color: '#ffffff',
+        photo_section_locale: 'en',
         highlight_shape: 'circle',
         highlight_color: '#e0e0e0',
         highlight_text_color: 'black',
@@ -160,6 +161,7 @@ async function handleUpdateSettings(req, res) {
       'photo_section_image_url',
       'photo_section_overlay_position',
       'photo_section_overlay_color',
+      'photo_section_locale',
       'highlight_shape',
       'highlight_color',
       'highlight_text_color',
@@ -177,6 +179,8 @@ async function handleUpdateSettings(req, res) {
       }
     }
 
+    console.log('Saving page settings:', { pageId, sanitized })
+
     const { data, error } = await supabase
       .from('page_settings')
       .upsert({
@@ -186,6 +190,8 @@ async function handleUpdateSettings(req, res) {
       })
       .select()
       .single()
+
+    console.log('Supabase upsert result:', { data, error })
 
     if (error) throw error
 
