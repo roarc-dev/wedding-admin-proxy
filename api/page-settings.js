@@ -180,6 +180,7 @@ async function handleUpdateSettings(req, res, validatedUser) {
       'venue_name',
       'venue_address',
       'photo_section_image_url',
+      'photo_section_image_path',
       'photo_section_overlay_position',
       'photo_section_overlay_color',
       'photo_section_locale',

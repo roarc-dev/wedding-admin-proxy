@@ -947,6 +947,7 @@ export default function UnifiedWeddingAdmin2(props: any) {
         venue_name: "",
         venue_address: "",
         photo_section_image_url: "",
+        photo_section_image_path: "",
         photo_section_overlay_position: "bottom",
         photo_section_overlay_color: "#ffffff",
         photo_section_locale: "en",
@@ -994,7 +995,11 @@ export default function UnifiedWeddingAdmin2(props: any) {
     })
 
     const buildPhotoSectionProps = () => ({
-        imageUrl: pageSettings.photo_section_image_url || undefined,
+        imageUrl:
+            pageSettings.photo_section_image_url ||
+            (pageSettings.photo_section_image_path
+                ? `https://yjlzizakdjghpfduxcki.supabase.co/storage/v1/object/public/images/${pageSettings.photo_section_image_path}`
+                : undefined),
         displayDateTime: formatPhotoDisplayDateTime(),
         location: pageSettings.venue_name || undefined,
         overlayPosition: (pageSettings.photo_section_overlay_position as "top" | "bottom") || "bottom",
@@ -1493,12 +1498,12 @@ export default function UnifiedWeddingAdmin2(props: any) {
             await uploadToPresignedUrl(signedUrl, processedFile)
 
             // 5. 공개 URL 생성 (Supabase Storage 공개 URL 패턴)
-            const publicUrl = `https://yjlzizakdjghpfduxcki.supabase.co/storage/v1/object/public/images/${path}`
+            const imagePath = path
 
-            // 6. 페이지 설정에 URL 저장
+            // 6. 페이지 설정에 경로 저장 (서버 저장 시 path 컬럼 사용)
             setPageSettings({
                 ...pageSettings,
-                photo_section_image_url: publicUrl,
+                photo_section_image_path: imagePath,
             })
 
             setSuccess("메인 사진이 업로드되었습니다.")
