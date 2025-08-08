@@ -183,11 +183,14 @@ async function handleUpdateSettings(req, res) {
 
     const { data, error } = await supabase
       .from('page_settings')
-      .upsert({
-        page_id: pageId,
-        ...sanitized,
-        updated_at: new Date().toISOString()
-      })
+      .upsert(
+        {
+          page_id: pageId,
+          ...sanitized,
+          updated_at: new Date().toISOString()
+        },
+        { onConflict: 'page_id' }
+      )
       .select()
       .single()
 
