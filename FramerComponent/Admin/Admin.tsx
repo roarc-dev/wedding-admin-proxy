@@ -1409,12 +1409,13 @@ export default function UnifiedWeddingAdmin2(props: any) {
         }
     }
 
-    const savePageSettings = async () => {
+    const savePageSettings = async (overrideSettings?: any) => {
         if (!currentPageId) return
 
         setSettingsLoading(true)
         try {
-            console.log("Saving page settings:", { currentPageId, pageSettings })
+            const settingsToSave = overrideSettings ?? pageSettings
+            console.log("Saving page settings:", { currentPageId, settings: settingsToSave })
             
             const response = await fetch(
                 `${PROXY_BASE_URL}/api/page-settings`,
@@ -1426,7 +1427,7 @@ export default function UnifiedWeddingAdmin2(props: any) {
                     },
                     body: JSON.stringify({
                         pageId: currentPageId,
-                        settings: pageSettings,
+                        settings: settingsToSave,
                     }),
                 }
             )
@@ -1475,8 +1476,15 @@ export default function UnifiedWeddingAdmin2(props: any) {
                     // 경로에서 파일명 추출 (path 방식이 우선)
                     let oldFileName = existingImagePath
                     if (!oldFileName && existingImageUrl) {
-                        // URL에서 파일명 추출
-                        oldFileName = existingImageUrl.split('/').pop() || ''
+                        // URL -> 스토리지 경로 추출
+                        const marker = '/storage/v1/object/public/images/'
+                        const idx = existingImageUrl.indexOf(marker)
+                        if (idx !== -1) {
+                            oldFileName = existingImageUrl.substring(idx + marker.length)
+                        } else {
+                            // fallback: 마지막 세그먼트만 있는 경우는 삭제 정확도가 떨어질 수 있음
+                            oldFileName = existingImageUrl.split('/').slice(-2).join('/')
+                        }
                     }
                     
                     if (oldFileName) {
@@ -1538,13 +1546,21 @@ export default function UnifiedWeddingAdmin2(props: any) {
             // 4. 파일을 직접 Storage에 업로드
             await uploadToPresignedUrl(signedUrl, processedFile)
 
-            // 5. 공개 URL 생성 (Supabase Storage 공개 URL 패턴)
+            // 5. 경로 저장 및 서버 저장
             const imagePath = path
 
-            // 6. 페이지 설정에 경로 저장 (서버 저장 시 path 컬럼 사용)
-            setPageSettings({
+            // 로컬 상태 선반영
+            setPageSettings((prev: any) => ({
+                ...prev,
+                photo_section_image_path: imagePath,
+                photo_section_image_url: "",
+            }))
+
+            // 즉시 서버 저장 (override)
+            await savePageSettings({
                 ...pageSettings,
                 photo_section_image_path: imagePath,
+                photo_section_image_url: "",
             })
 
             setSuccess("메인 사진이 업로드되었습니다.")
@@ -3131,15 +3147,7 @@ export default function UnifiedWeddingAdmin2(props: any) {
                                                         height="21"
                                                         viewBox="0 0 16 14"
                                                         fill="none"
-                                                        style={{
-                                                            position:
-                                                                "absolute",
-                                                            top: "50%",
-                                                            left: "50%",
-                                                            transform:
-                                                                "translate(-50%, -40%)",
-                                                            zIndex: 0,
-                                                        }}
+                                                        style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -40%)", zIndex: 0 }}
                                                     >
                                                         <g clipPath="url(#clip0_preview)">
                                                             <g
