@@ -1467,6 +1467,47 @@ export default function UnifiedWeddingAdmin2(props: any) {
 
         setSettingsLoading(true)
         try {
+            // 0. 기존 이미지가 있다면 먼저 삭제
+            const existingImagePath = pageSettings.photo_section_image_path
+            const existingImageUrl = pageSettings.photo_section_image_url
+            if (existingImagePath || existingImageUrl) {
+                try {
+                    // 경로에서 파일명 추출 (path 방식이 우선)
+                    let oldFileName = existingImagePath
+                    if (!oldFileName && existingImageUrl) {
+                        // URL에서 파일명 추출
+                        oldFileName = existingImageUrl.split('/').pop() || ''
+                    }
+                    
+                    if (oldFileName) {
+                        console.log(`기존 포토섹션 이미지 삭제 시도: ${oldFileName}`)
+                        
+                        // Storage에서 기존 파일 삭제
+                        const response = await fetch(`${PROXY_BASE_URL}/api/images`, {
+                            method: "DELETE",
+                            headers: {
+                                "Content-Type": "application/json",
+                                Authorization: `Bearer ${getAuthToken()}`,
+                            },
+                            body: JSON.stringify({
+                                imageId: null, // 포토섹션은 images 테이블에 저장되지 않음
+                                fileName: oldFileName,
+                                storageOnly: true, // 스토리지에서만 삭제
+                            }),
+                        })
+                        
+                        if (response.ok) {
+                            console.log(`기존 포토섹션 이미지 삭제 완료: ${oldFileName}`)
+                        } else {
+                            console.warn(`기존 포토섹션 이미지 삭제 실패: ${oldFileName}`)
+                        }
+                    }
+                } catch (deleteError) {
+                    console.warn("기존 포토섹션 이미지 삭제 중 오류:", deleteError)
+                    // 삭제 실패해도 새 이미지 업로드는 계속 진행
+                }
+            }
+
             // 1. 파일 유효성 검사
             validateImageFileSize(file)
 

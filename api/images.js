@@ -397,12 +397,12 @@ async function handleUpdateImageOrder(req, res) {
 }
 
 async function handleDeleteImage(req, res) {
-  const { imageId, fileName } = req.body
+  const { imageId, fileName, storageOnly } = req.body
 
-  if (!imageId || !fileName) {
+  if (!fileName) {
     return res.status(400).json({ 
       success: false, 
-      error: 'imageId와 fileName이 필요합니다' 
+      error: 'fileName이 필요합니다' 
     })
   }
 
@@ -412,21 +412,24 @@ async function handleDeleteImage(req, res) {
       .from('images')
       .remove([fileName])
 
-    // 데이터베이스에서 레코드 삭제
-    const { error: dbError } = await supabase
-      .from('images')
-      .delete()
-      .eq('id', imageId)
-
     if (storageError) {
       console.warn('Storage delete warning:', storageError)
     }
-    
-    if (dbError) throw dbError
+
+    // storageOnly가 true이면 스토리지에서만 삭제하고 DB는 건드리지 않음
+    if (!storageOnly && imageId) {
+      // 데이터베이스에서 레코드 삭제
+      const { error: dbError } = await supabase
+        .from('images')
+        .delete()
+        .eq('id', imageId)
+      
+      if (dbError) throw dbError
+    }
 
     return res.json({ 
       success: true, 
-      message: '이미지가 삭제되었습니다' 
+      message: storageOnly ? '스토리지에서 이미지가 삭제되었습니다' : '이미지가 삭제되었습니다' 
     })
 
   } catch (error) {
