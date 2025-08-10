@@ -1409,12 +1409,38 @@ export default function UnifiedWeddingAdmin2(props: any) {
         }
     }
 
+    const allowedSettingKeys = [
+        'groom_name_kr', 'groom_name_en', 'bride_name_kr', 'bride_name_en',
+        'wedding_date', 'wedding_hour', 'wedding_minute',
+        'venue_name', 'venue_address',
+        'photo_section_image_url', 'photo_section_image_path', 'photo_section_overlay_position', 'photo_section_overlay_color', 'photo_section_locale',
+        'highlight_shape', 'highlight_color', 'highlight_text_color', 'gallery_type',
+    ] as const
+
+    type AllowedSettingKey = typeof allowedSettingKeys[number]
+
+    function sanitizeSettingsForSave(input: any): Record<AllowedSettingKey, any> {
+        const out: Record<string, any> = {}
+        for (const key of allowedSettingKeys) {
+            if (Object.prototype.hasOwnProperty.call(input, key)) {
+                out[key] = input[key]
+            }
+        }
+        if (Object.prototype.hasOwnProperty.call(out, 'wedding_date')) {
+            if (out['wedding_date'] === '') {
+                out['wedding_date'] = null
+            }
+        }
+        return out as Record<AllowedSettingKey, any>
+    }
+
     const savePageSettings = async (overrideSettings?: any) => {
         if (!currentPageId) return
 
         setSettingsLoading(true)
         try {
-            const settingsToSave = overrideSettings ?? pageSettings
+            const merged = overrideSettings ? { ...pageSettings, ...overrideSettings } : pageSettings
+            const settingsToSave = sanitizeSettingsForSave(merged)
             console.log("Saving page settings:", { currentPageId, settings: settingsToSave })
             
             const response = await fetch(
@@ -1558,7 +1584,6 @@ export default function UnifiedWeddingAdmin2(props: any) {
 
             // 즉시 서버 저장 (override)
             await savePageSettings({
-                ...pageSettings,
                 photo_section_image_path: imagePath,
                 photo_section_image_url: "",
             })
