@@ -215,12 +215,22 @@ async function handleUpdateSettings(req, res, validatedUser) {
 
     console.log('Saving page settings:', { pageId: effectivePageId, sanitized })
 
+    // 포토섹션 경로가 오면 공개 URL도 함께 정규화하여 저장
+    const storageBase = process.env.SUPABASE_URL
+      ? `${process.env.SUPABASE_URL}/storage/v1/object/public/images/`
+      : 'https://yjlzizakdjghpfduxcki.supabase.co/storage/v1/object/public/images/'
+
+    const normalized = { ...sanitized }
+    if (normalized.photo_section_image_path && !normalized.photo_section_image_url) {
+      normalized.photo_section_image_url = `${storageBase}${normalized.photo_section_image_path}`
+    }
+
     const { data, error } = await supabase
       .from('page_settings')
       .upsert(
         {
           page_id: effectivePageId,
-          ...sanitized,
+          ...normalized,
           updated_at: new Date().toISOString()
         },
         { onConflict: 'page_id' }
