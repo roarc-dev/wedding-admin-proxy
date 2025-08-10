@@ -48,6 +48,8 @@ interface PhotoSectionProps {
     location?: string
     useOverrideDateTime?: boolean
     useOverrideLocation?: boolean
+    useOverrideOverlayTextColor?: boolean
+    useOverrideLocale?: boolean
     overlayPosition?: "top" | "bottom"
     overlayTextColor?: "#ffffff" | "#000000"
     locale?: "en" | "ko"
@@ -62,6 +64,8 @@ export default function PhotoSection(props: PhotoSectionProps) {
         location,
         useOverrideDateTime = false,
         useOverrideLocation = false,
+        useOverrideOverlayTextColor = false,
+        useOverrideLocale = false,
         overlayPosition,
         overlayTextColor,
         locale = "en",
@@ -92,7 +96,7 @@ export default function PhotoSection(props: PhotoSectionProps) {
     }, [pageId])
 
     // Admin.tsx와 동일 형식으로 날짜/시간 문자열 생성
-    const buildDisplayDateTimeFromSettings = (s: PageSettings | null): string => {
+    const buildDisplayDateTimeFromSettings = (s: PageSettings | null, effectiveLocale: 'en' | 'kr'): string => {
         if (!s || !s.wedding_date) return ""
         try {
             const [y, m, d] = s.wedding_date.split('-').map((v) => parseInt(v, 10))
@@ -108,7 +112,7 @@ export default function PhotoSection(props: PhotoSectionProps) {
             const periodEn = hour24 < 12 ? 'AM' : 'PM'
             const periodKr = hour24 < 12 ? '오전' : '오후'
             const hour12 = ((hour24 % 12) === 0 ? 12 : (hour24 % 12))
-            const isEn = (s.photo_section_locale || 'en') === 'en'
+            const isEn = effectiveLocale === 'en'
             if (isEn) {
                 return `${year}. ${mm}. ${dd}. ${weekdayEn}. ${hour12} ${periodEn}`
             }
@@ -134,14 +138,19 @@ export default function PhotoSection(props: PhotoSectionProps) {
     }
 
     const effectiveImageUrl = imageUrl ?? buildImageUrlFromSettings(settings)
+    const effectiveLocale: 'en' | 'kr' = useOverrideLocale
+        ? (locale === 'en' ? 'en' : 'kr')
+        : ((settings?.photo_section_locale === 'en') ? 'en' : 'kr')
     const effectiveDisplayDateTime = useOverrideDateTime
         ? (displayDateTime || "")
-        : buildDisplayDateTimeFromSettings(settings)
+        : buildDisplayDateTimeFromSettings(settings, effectiveLocale)
     const effectiveLocation = useOverrideLocation
         ? (location || undefined)
         : (settings?.venue_name || undefined)
     const effectiveOverlayPosition = overlayPosition ?? (settings?.photo_section_overlay_position || "bottom")
-    const effectiveOverlayTextColor = overlayTextColor ?? (settings?.photo_section_overlay_color || "#ffffff")
+    const effectiveOverlayTextColor = useOverrideOverlayTextColor
+        ? (overlayTextColor || "#ffffff")
+        : (settings?.photo_section_overlay_color || "#ffffff")
 
     return (
         <div
@@ -220,6 +229,8 @@ const defaultPhotoProps: PhotoSectionProps = {
     location: "LOCATION",
     useOverrideDateTime: false,
     useOverrideLocation: false,
+    useOverrideOverlayTextColor: false,
+    useOverrideLocale: false,
     overlayPosition: "bottom",
     overlayTextColor: "#ffffff",
     locale: "en",
@@ -280,6 +291,17 @@ addPropertyControls(PhotoSection, {
         optionTitles: ["흰색", "검정"],
         defaultValue: "#ffffff",
         displaySegmentedControl: true,
+        hidden: (props: any) => !props.useOverrideOverlayTextColor,
+    },
+    useOverrideOverlayTextColor: {
+        type: ControlType.Boolean,
+        title: "텍스트 색상 수동 입력(Override)",
+        defaultValue: false,
+    },
+    useOverrideLocale: {
+        type: ControlType.Boolean,
+        title: "언어 수동 입력(Override)",
+        defaultValue: false,
     },
     locale: {
         type: ControlType.Enum,
@@ -288,5 +310,6 @@ addPropertyControls(PhotoSection, {
         optionTitles: ["영문", "한글"],
         defaultValue: "en",
         displaySegmentedControl: true,
+        hidden: (props: any) => !props.useOverrideLocale,
     },
 })
