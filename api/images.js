@@ -429,7 +429,8 @@ async function handleDeleteImage(req, res) {
 
     return res.json({ 
       success: true, 
-      message: storageOnly ? '스토리지에서 이미지가 삭제되었습니다' : '이미지가 삭제되었습니다' 
+      message: storageOnly ? '스토리지에서 이미지가 삭제되었습니다' : '이미지가 삭제되었습니다',
+      deleted: fileName
     })
 
   } catch (error) {

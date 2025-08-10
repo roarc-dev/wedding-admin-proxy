@@ -957,36 +957,39 @@ export default function UnifiedWeddingAdmin2(props: any) {
         gallery_type: "thumbnail",
     })
     const [settingsLoading, setSettingsLoading] = useState(false)
+    const [compressProgress, setCompressProgress] = useState<number | null>(null)
 
     // 미리보기용 포맷터 및 프롭 빌더
     const formatPhotoDisplayDateTime = (): string => {
-        if (!pageSettings.wedding_date) return ""
-        const date = new Date(pageSettings.wedding_date)
-
-        // 한국어/영문 토글 지원 (기본: 영문)
-        const useKorean = pageSettings.photo_section_locale === "ko"
-
-        if (useKorean) {
-            const daysKo = ["일", "월", "화", "수", "목", "금", "토"]
-            const hour24 = parseInt(pageSettings.wedding_hour)
-            const isPM = hour24 >= 12
-            const displayHour = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24
-            const ampmKo = isPM ? "오후" : "오전"
-            const month = (date.getMonth() + 1).toString().padStart(2, "0")
-            const day = date.getDate().toString().padStart(2, "0")
-            return `${date.getFullYear()}. ${month}. ${day}. ${daysKo[date.getDay()]}요일 ${ampmKo} ${displayHour}시`
+        const locale = (pageSettings.photo_section_locale as 'en' | 'kr') || 'kr'
+        const dateStr = pageSettings.wedding_date
+        if (!dateStr) return ''
+        try {
+            const date = new Date(dateStr)
+            if (isNaN(date.getTime())) return ''
+            if (locale === 'en') {
+                const months = [
+                    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+                ]
+                const month = months[date.getMonth()]
+                const day = date.getDate().toString().padStart(2, '0')
+                const hour = (pageSettings.wedding_hour || '00').toString().padStart(2, '0')
+                const minute = (pageSettings.wedding_minute || '00').toString().padStart(2, '0')
+                return `${month}. ${day}. ${hour}:${minute}`
+            }
+            const monthsKr = [
+                '01', '02', '03', '04', '05', '06',
+                '07', '08', '09', '10', '11', '12'
+            ]
+            const m = monthsKr[date.getMonth()]
+            const d = date.getDate().toString().padStart(2, '0')
+            const hour = (pageSettings.wedding_hour || '00').toString().padStart(2, '0')
+            const minute = (pageSettings.wedding_minute || '00').toString().padStart(2, '0')
+            return `${m}. ${d}. ${hour}:${minute}`
+        } catch {
+            return ''
         }
-
-        const dayNames = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"]
-        const hour24 = parseInt(pageSettings.wedding_hour)
-        const ampm = hour24 >= 12 ? "PM" : "AM"
-        const displayHour = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24
-        return `${date.getFullYear()}. ${(date.getMonth() + 1)
-            .toString()
-            .padStart(2, "0")}. ${date
-            .getDate()
-            .toString()
-            .padStart(2, "0")}. ${dayNames[date.getDay()]}. ${displayHour} ${ampm}`
     }
 
     const buildNameSectionProps = () => ({
@@ -994,17 +997,31 @@ export default function UnifiedWeddingAdmin2(props: any) {
         brideName: pageSettings.bride_name_en || pageSettings.bride_name_kr || "BRIDE",
     })
 
-    const buildPhotoSectionProps = () => ({
-        imageUrl:
-            pageSettings.photo_section_image_url ||
-            (pageSettings.photo_section_image_path
-                ? `https://yjlzizakdjghpfduxcki.supabase.co/storage/v1/object/public/images/${pageSettings.photo_section_image_path}`
-                : undefined),
-        displayDateTime: formatPhotoDisplayDateTime(),
-        location: pageSettings.venue_name || undefined,
-        overlayPosition: (pageSettings.photo_section_overlay_position as "top" | "bottom") || "bottom",
-        overlayTextColor: (pageSettings.photo_section_overlay_color as "#ffffff" | "#000000") || "#ffffff",
-    })
+    const [photoSectionPreviewUrl, setPhotoSectionPreviewUrl] = React.useState<string | null>(null)
+    const [photoSectionImageVersion, setPhotoSectionImageVersion] = React.useState<number>(0)
+
+    const buildPhotoSectionProps = () => {
+        // 캐시 무효화 파라미터 생성
+        const addVersionParam = (url: string | undefined): string | undefined => {
+            if (!url) return url
+            const sep = url.includes("?") ? "&" : "?"
+            return `${url}${sep}v=${photoSectionImageVersion}`
+        }
+
+        const constructedUrl = pageSettings.photo_section_image_path
+            ? `https://yjlzizakdjghpfduxcki.supabase.co/storage/v1/object/public/images/${pageSettings.photo_section_image_path}`
+            : undefined
+
+        const serverUrl = pageSettings.photo_section_image_url || constructedUrl
+
+        return {
+            imageUrl: photoSectionPreviewUrl || addVersionParam(serverUrl),
+            displayDateTime: formatPhotoDisplayDateTime(),
+            location: pageSettings.venue_name || undefined,
+            overlayPosition: (pageSettings.photo_section_overlay_position as "top" | "bottom") || "bottom",
+            overlayTextColor: (pageSettings.photo_section_overlay_color as "#ffffff" | "#000000") || "#ffffff",
+        }
+    }
 
     const initialContactData = {
         page_id: "",
@@ -1494,6 +1511,13 @@ export default function UnifiedWeddingAdmin2(props: any) {
 
         setSettingsLoading(true)
         try {
+            // 로컬 미리보기 즉시 반영
+            try {
+                const nextUrl = URL.createObjectURL(file)
+                if (photoSectionPreviewUrl) URL.revokeObjectURL(photoSectionPreviewUrl)
+                setPhotoSectionPreviewUrl(nextUrl)
+            } catch {}
+
             // 0. 기존 이미지가 있다면 먼저 삭제
             const existingImagePath = pageSettings.photo_section_image_path
             const existingImageUrl = pageSettings.photo_section_image_url
@@ -1529,39 +1553,24 @@ export default function UnifiedWeddingAdmin2(props: any) {
                                 storageOnly: true, // 스토리지에서만 삭제
                             }),
                         })
-                        
-                        if (response.ok) {
-                            console.log(`기존 포토섹션 이미지 삭제 완료: ${oldFileName}`)
-                        } else {
-                            console.warn(`기존 포토섹션 이미지 삭제 실패: ${oldFileName}`)
+                        if (!response.ok) {
+                            const t = await response.text()
+                            console.warn("기존 포토섹션 이미지 삭제 실패:", t)
                         }
                     }
                 } catch (deleteError) {
                     console.warn("기존 포토섹션 이미지 삭제 중 오류:", deleteError)
-                    // 삭제 실패해도 새 이미지 업로드는 계속 진행
                 }
             }
 
-            // 1. 파일 유효성 검사
+            // 1. 파일 크기 검증
             validateImageFileSize(file)
 
-            // 2. 이미지 압축 (1024KB 이상인 경우)
-            let processedFile = file
-            if (file.size / 1024 > maxSizeKB) {
-                console.log(
-                    `포토섹션 이미지 압축 시작: ${file.name} (${(file.size / 1024).toFixed(2)}KB)`
-                )
-
-                const compressionResult = await progressiveCompress(
-                    file,
-                    maxSizeKB
-                )
-                processedFile = compressionResult.compressedFile
-
-                console.log(
-                    `포토섹션 이미지 압축 완료: ${file.name} (${(processedFile.size / 1024).toFixed(2)}KB)`
-                )
-            }
+            // 2. 이미지 압축 (점진적)
+            const processedFile = await progressiveCompress(file, 1024, (p) =>
+                setCompressProgress(p)
+            )
+            setCompressProgress(null)
 
             // 3. presigned URL 요청
             const { signedUrl, path } = await getPresignedUrl(
@@ -1581,6 +1590,8 @@ export default function UnifiedWeddingAdmin2(props: any) {
                 photo_section_image_path: imagePath,
                 photo_section_image_url: "",
             }))
+            // CDN 캐시 무효화를 위한 버전 업데이트
+            setPhotoSectionImageVersion((v) => v + 1)
 
             // 즉시 서버 저장 (override)
             await savePageSettings({
