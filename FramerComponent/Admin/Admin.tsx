@@ -98,28 +98,49 @@ function InlinePhotoSection({
     overlayTextColor?: "#ffffff" | "#000000"
     style?: React.CSSProperties
 }) {
-    return (
-        <div
-            style={{
-                width: "100%",
-                height: 640,
-                position: "relative",
-                overflow: "hidden",
-                ...style,
-            }}
-        >
-            {imageUrl && (
-                <img
-                    src={imageUrl}
-                    alt="Wedding couple"
+    const containerStyle: React.CSSProperties = {
+        width: "100%",
+        height: 640,
+        position: "relative",
+        overflow: "hidden",
+        ...style,
+    }
+
+    if (!imageUrl) {
+        return (
+            <div style={containerStyle}>
+                <div
                     style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "cover",
-                        objectPosition: "center",
+                        position: "absolute",
+                        inset: 0,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        background: "#f5f5f5",
+                        color: "#6b7280",
+                        fontFamily: "'Pretendard Regular', sans-serif",
+                        fontSize: 14,
+                        letterSpacing: 0.2,
                     }}
-                />
-            )}
+                >
+                    사진을 업로드 해주세요
+                </div>
+            </div>
+        )
+    }
+
+    return (
+        <div style={containerStyle}>
+            <img
+                src={imageUrl}
+                alt="Wedding couple"
+                style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    objectPosition: "center",
+                }}
+            />
             {(displayDateTime || location) && (
                 <div
                     style={{
