@@ -965,28 +965,29 @@ export default function UnifiedWeddingAdmin2(props: any) {
         const dateStr = pageSettings.wedding_date
         if (!dateStr) return ''
         try {
-            const date = new Date(dateStr)
-            if (isNaN(date.getTime())) return ''
+            // 안전한 날짜 파싱 (UTC 오프셋 문제 방지)
+            const [y, m, d] = dateStr.split('-').map((v) => parseInt(v, 10))
+            if (!y || !m || !d) return ''
+            const dt = new Date(y, m - 1, d)
+            const year = y.toString()
+            const mm = m.toString().padStart(2, '0')
+            const dd = d.toString().padStart(2, '0')
+
+            const weekdayIdx = dt.getDay()
+            const weekdayEn = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][weekdayIdx]
+            const weekdayKr = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'][weekdayIdx]
+
+            const hour24 = parseInt(pageSettings.wedding_hour || '0', 10)
+            const periodEn = hour24 < 12 ? 'AM' : 'PM'
+            const periodKr = hour24 < 12 ? '오전' : '오후'
+            const hour12 = ((hour24 % 12) === 0 ? 12 : (hour24 % 12))
+
             if (locale === 'en') {
-                const months = [
-                    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-                ]
-                const month = months[date.getMonth()]
-                const day = date.getDate().toString().padStart(2, '0')
-                const hour = (pageSettings.wedding_hour || '00').toString().padStart(2, '0')
-                const minute = (pageSettings.wedding_minute || '00').toString().padStart(2, '0')
-                return `${month}. ${day}. ${hour}:${minute}`
+                // 2025. 10. 25. SAT. 12 PM
+                return `${year}. ${mm}. ${dd}. ${weekdayEn}. ${hour12} ${periodEn}`
             }
-            const monthsKr = [
-                '01', '02', '03', '04', '05', '06',
-                '07', '08', '09', '10', '11', '12'
-            ]
-            const m = monthsKr[date.getMonth()]
-            const d = date.getDate().toString().padStart(2, '0')
-            const hour = (pageSettings.wedding_hour || '00').toString().padStart(2, '0')
-            const minute = (pageSettings.wedding_minute || '00').toString().padStart(2, '0')
-            return `${m}. ${d}. ${hour}:${minute}`
+            // 2025. 10. 25. 토요일 오후 12시
+            return `${year}. ${mm}. ${dd}. ${weekdayKr} ${periodKr} ${hour12}시`
         } catch {
             return ''
         }
@@ -2192,20 +2193,20 @@ export default function UnifiedWeddingAdmin2(props: any) {
                 </div>
                 <div style={{ display: "flex", gap: "8px" }}>
                     {canSelectPage && (
-                        <button
-                            onClick={() => setShowPageSelector(!showPageSelector)}
-                            style={{
-                                padding: "8px 12px",
-                                backgroundColor: "white",
-                                color: "#000000",
-                                border: "1px solid #e0e0e0",
-                                borderRadius: "0",
-                                fontSize: "12px",
-                                cursor: "pointer",
-                            }}
-                        >
-                            페이지 선택
-                        </button>
+                    <button
+                        onClick={() => setShowPageSelector(!showPageSelector)}
+                        style={{
+                            padding: "8px 12px",
+                            backgroundColor: "white",
+                            color: "#000000",
+                            border: "1px solid #e0e0e0",
+                            borderRadius: "0",
+                            fontSize: "12px",
+                            cursor: "pointer",
+                        }}
+                    >
+                        페이지 선택
+                    </button>
                     )}
                     <button
                         onClick={handleLogout}
@@ -2248,27 +2249,27 @@ export default function UnifiedWeddingAdmin2(props: any) {
                         >
                             <h3 style={{ margin: 0 }}>페이지 ID 관리</h3>
                             {canSelectPage && (
-                                <button
-                                    onClick={() => {
+                            <button
+                                onClick={() => {
                                         const newPageId = prompt("새 페이지 ID를 입력하세요:")
-                                        if (newPageId?.trim()) {
-                                            setCurrentPageId(newPageId.trim())
-                                            setShowPageSelector(false)
-                                        }
-                                    }}
-                                    style={{
-                                        padding: "6px 12px",
+                                    if (newPageId?.trim()) {
+                                        setCurrentPageId(newPageId.trim())
+                                        setShowPageSelector(false)
+                                    }
+                                }}
+                                style={{
+                                    padding: "6px 12px",
                                         backgroundColor: "#111827",
-                                        color: "white",
-                                        border: "none",
-                                        borderRadius: "4px",
-                                        cursor: "pointer",
-                                        fontSize: "12px",
-                                        touchAction: "manipulation",
-                                    }}
-                                >
-                                    + 새 페이지
-                                </button>
+                                    color: "white",
+                                    border: "none",
+                                    borderRadius: "4px",
+                                    cursor: "pointer",
+                                    fontSize: "12px",
+                                    touchAction: "manipulation",
+                                }}
+                            >
+                                + 새 페이지
+                            </button>
                             )}
                         </div>
 
@@ -2292,35 +2293,35 @@ export default function UnifiedWeddingAdmin2(props: any) {
                                 <strong>현재 페이지:</strong>
                                 {canSelectPage ? (
                                     <>
-                                        <input
-                                            type="text"
-                                            value={currentPageId}
+                                <input
+                                    type="text"
+                                    value={currentPageId}
                                             onChange={(e) => setCurrentPageId(e.target.value)}
-                                            placeholder="페이지 ID 입력"
-                                            style={{
-                                                flex: 1,
-                                                padding: "8px",
-                                                border: "1px solid #ddd",
-                                                borderRadius: "4px",
-                                                fontSize: "16px",
-                                                touchAction: "manipulation",
-                                            }}
-                                        />
-                                        <button
-                                            onClick={() => setCurrentPageId("")}
-                                            style={{
-                                                padding: "6px 10px",
-                                                backgroundColor: "#f44336",
-                                                color: "white",
-                                                border: "none",
-                                                borderRadius: "4px",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                touchAction: "manipulation",
-                                            }}
-                                        >
-                                            초기화
-                                        </button>
+                                    placeholder="페이지 ID 입력"
+                                    style={{
+                                        flex: 1,
+                                        padding: "8px",
+                                        border: "1px solid #ddd",
+                                        borderRadius: "4px",
+                                        fontSize: "16px",
+                                        touchAction: "manipulation",
+                                    }}
+                                />
+                                <button
+                                    onClick={() => setCurrentPageId("")}
+                                    style={{
+                                        padding: "6px 10px",
+                                        backgroundColor: "#f44336",
+                                        color: "white",
+                                        border: "none",
+                                        borderRadius: "4px",
+                                        cursor: "pointer",
+                                        fontSize: "12px",
+                                        touchAction: "manipulation",
+                                    }}
+                                >
+                                    초기화
+                                </button>
                                     </>
                                 ) : (
                                     <div style={{ fontSize: "14px", color: "#111827" }}>
@@ -2384,29 +2385,29 @@ export default function UnifiedWeddingAdmin2(props: any) {
                                         </div>
                                     </div>
                                     {canSelectPage && (
-                                        <button
-                                            onClick={() => {
-                                                setCurrentPageId(page.page_id)
-                                                setShowPageSelector(false)
-                                            }}
+                                    <button
+                                        onClick={() => {
+                                            setCurrentPageId(page.page_id)
+                                            setShowPageSelector(false)
+                                        }}
                                             disabled={currentPageId === page.page_id}
-                                            style={{
-                                                width: "100%",
-                                                padding: "6px",
-                                                backgroundColor:
-                                                    currentPageId === page.page_id
+                                        style={{
+                                            width: "100%",
+                                            padding: "6px",
+                                            backgroundColor:
+                                                currentPageId === page.page_id
                                                         ? "#111827"
                                                         : "#111827",
-                                                color: "white",
-                                                border: "none",
-                                                borderRadius: "4px",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                touchAction: "manipulation",
-                                            }}
-                                        >
+                                            color: "white",
+                                            border: "none",
+                                            borderRadius: "4px",
+                                            cursor: "pointer",
+                                            fontSize: "12px",
+                                            touchAction: "manipulation",
+                                        }}
+                                    >
                                             {currentPageId === page.page_id ? "선택됨" : "선택"}
-                                        </button>
+                                    </button>
                                     )}
                                 </div>
                             ))}
