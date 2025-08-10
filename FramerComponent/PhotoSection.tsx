@@ -46,6 +46,8 @@ interface PhotoSectionProps {
     imageUrl?: string | null
     displayDateTime?: string
     location?: string
+    useOverrideDateTime?: boolean
+    useOverrideLocation?: boolean
     overlayPosition?: "top" | "bottom"
     overlayTextColor?: "#ffffff" | "#000000"
     locale?: "en" | "ko"
@@ -58,6 +60,8 @@ export default function PhotoSection(props: PhotoSectionProps) {
         imageUrl,
         displayDateTime,
         location,
+        useOverrideDateTime = false,
+        useOverrideLocation = false,
         overlayPosition,
         overlayTextColor,
         locale = "en",
@@ -130,8 +134,12 @@ export default function PhotoSection(props: PhotoSectionProps) {
     }
 
     const effectiveImageUrl = imageUrl ?? buildImageUrlFromSettings(settings)
-    const effectiveDisplayDateTime = displayDateTime ?? buildDisplayDateTimeFromSettings(settings)
-    const effectiveLocation = location ?? (settings?.venue_name || undefined)
+    const effectiveDisplayDateTime = useOverrideDateTime
+        ? (displayDateTime || "")
+        : buildDisplayDateTimeFromSettings(settings)
+    const effectiveLocation = useOverrideLocation
+        ? (location || undefined)
+        : (settings?.venue_name || undefined)
     const effectiveOverlayPosition = overlayPosition ?? (settings?.photo_section_overlay_position || "bottom")
     const effectiveOverlayTextColor = overlayTextColor ?? (settings?.photo_section_overlay_color || "#ffffff")
 
@@ -210,6 +218,8 @@ const defaultPhotoProps: PhotoSectionProps = {
     imageUrl: null,
     displayDateTime: "2025. 0. 00. SUN. 0 PM",
     location: "LOCATION",
+    useOverrideDateTime: false,
+    useOverrideLocation: false,
     overlayPosition: "bottom",
     overlayTextColor: "#ffffff",
     locale: "en",
@@ -229,17 +239,31 @@ addPropertyControls(PhotoSection, {
         title: "이미지 업로드",
         allowedFileTypes: ["image/*"],
     },
+    useOverrideDateTime: {
+        type: ControlType.Boolean,
+        title: "일시 수동 입력(Override)",
+        defaultValue: false,
+        /** Note: Boolean control in Framer does not support segmented titles */
+    },
     displayDateTime: {
         type: ControlType.String,
         title: "예식 일시",
         defaultValue: "2025. 0. 00. SUN. 0 PM",
         placeholder: "예: 2025. 12. 25. SUN. 2 PM",
+        hidden: (props: any) => !props.useOverrideDateTime,
+    },
+    useOverrideLocation: {
+        type: ControlType.Boolean,
+        title: "장소 수동 입력(Override)",
+        defaultValue: false,
+        /** Note: Boolean control in Framer does not support segmented titles */
     },
     location: {
         type: ControlType.String,
         title: "예식 장소",
         defaultValue: "LOCATION",
         placeholder: "예식장 이름을 입력하세요",
+        hidden: (props: any) => !props.useOverrideLocation,
     },
     overlayPosition: {
         type: ControlType.Enum,
