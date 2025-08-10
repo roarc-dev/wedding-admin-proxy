@@ -10,6 +10,8 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+  // API 응답 캐시 방지 (프리뷰/실시간 반영 안정화)
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate')
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end()
@@ -123,9 +125,19 @@ async function handleGetSettings(req, res) {
       })
     }
 
+    // 파생 필드 계산: 포토섹션 공개 URL (path 우선), 캐시 버스팅 쿼리 포함
+    const resolved = { ...data }
+    const storageBase = process.env.SUPABASE_URL
+      ? `${process.env.SUPABASE_URL}/storage/v1/object/public/images/`
+      : 'https://yjlzizakdjghpfduxcki.supabase.co/storage/v1/object/public/images/'
+    const baseUrl = data.photo_section_image_url || (data.photo_section_image_path ? `${storageBase}${data.photo_section_image_path}` : '')
+    const cacheKey = data.updated_at ? new Date(data.updated_at).getTime() : Date.now()
+    const publicUrl = baseUrl ? `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}v=${cacheKey}` : ''
+    resolved.photo_section_image_public_url = publicUrl
+
     return res.json({
       success: true,
-      data
+      data: resolved
     })
   } catch (error) {
     console.error('Get settings error:', error)
