@@ -47,10 +47,10 @@ async function handleGetByPageId(req, res) {
   }
 
   try {
-    // total count
+    // total count (가벼운 컬럼으로 카운트)
     const { count, error: countError } = await supabase
       .from('comments')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .eq('page_id', pageId)
 
     if (countError) throw countError
@@ -72,7 +72,17 @@ async function handleGetByPageId(req, res) {
     return res.json({ success: true, data: data || [], count: count || 0 })
   } catch (error) {
     console.error('Get comments error:', error)
-    return res.status(500).json({ success: false, error: '댓글 조회 중 오류가 발생했습니다' })
+    // 테이블이 없는 경우(42P01)는 빈 목록으로 응답
+    if (error && (error.code === '42P01' || error.message?.includes('relation "comments" does not exist'))) {
+      return res.json({ success: true, data: [], count: 0 })
+    }
+    return res.status(500).json({ 
+      success: false, 
+      error: '댓글 조회 중 오류가 발생했습니다',
+      message: error?.message,
+      code: error?.code,
+      details: error?.details
+    })
   }
 }
 
@@ -103,7 +113,13 @@ async function handleInsert(req, res) {
     return res.json({ success: true, data: data && data[0] })
   } catch (error) {
     console.error('Insert comment error:', error)
-    return res.status(500).json({ success: false, error: '댓글 등록 중 오류가 발생했습니다' })
+    return res.status(500).json({ 
+      success: false, 
+      error: '댓글 등록 중 오류가 발생했습니다',
+      message: error?.message,
+      code: error?.code,
+      details: error?.details
+    })
   }
 }
 
@@ -144,7 +160,13 @@ async function handleDelete(req, res) {
     return res.json({ success: true })
   } catch (error) {
     console.error('Delete comment error:', error)
-    return res.status(500).json({ success: false, error: '댓글 삭제 중 오류가 발생했습니다' })
+    return res.status(500).json({ 
+      success: false, 
+      error: '댓글 삭제 중 오류가 발생했습니다',
+      message: error?.message,
+      code: error?.code,
+      details: error?.details
+    })
   }
 }
 
