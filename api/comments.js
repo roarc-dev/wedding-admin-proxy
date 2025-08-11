@@ -1,0 +1,162 @@
+import { createClient } from '@supabase/supabase-js'
+import crypto from 'crypto'
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY
+)
+
+export default async function handler(req, res) {
+  // CORS & no-cache
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate')
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end()
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ success: false, error: 'Method not allowed' })
+  }
+
+  try {
+    const { action } = req.body || {}
+
+    switch (action) {
+      case 'getByPageId':
+        return await handleGetByPageId(req, res)
+      case 'insert':
+        return await handleInsert(req, res)
+      case 'delete':
+        return await handleDelete(req, res)
+      default:
+        return res.status(400).json({ success: false, error: 'Invalid action' })
+    }
+  } catch (error) {
+    console.error('Comments API Error:', error)
+    return res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+}
+
+async function handleGetByPageId(req, res) {
+  const { pageId, page = 1, itemsPerPage = 5 } = req.body || {}
+  if (!pageId) {
+    return res.status(400).json({ success: false, error: 'pageId is required' })
+  }
+
+  try {
+    // total count
+    const { count, error: countError } = await supabase
+      .from('comments')
+      .select('*', { count: 'exact', head: true })
+      .eq('page_id', pageId)
+
+    if (countError) throw countError
+
+    const p = Math.max(parseInt(page, 10) || 1, 1)
+    const size = Math.max(parseInt(itemsPerPage, 10) || 5, 1)
+    const from = (p - 1) * size
+    const to = from + size - 1
+
+    const { data, error } = await supabase
+      .from('comments')
+      .select('*')
+      .eq('page_id', pageId)
+      .order('created_at', { ascending: false })
+      .range(from, to)
+
+    if (error) throw error
+
+    return res.json({ success: true, data: data || [], count: count || 0 })
+  } catch (error) {
+    console.error('Get comments error:', error)
+    return res.status(500).json({ success: false, error: '댓글 조회 중 오류가 발생했습니다' })
+  }
+}
+
+async function handleInsert(req, res) {
+  const { name, password, comment, page_id } = req.body || {}
+  if (!name || !password || !comment || !page_id) {
+    return res.status(400).json({ success: false, error: 'name, password, comment, page_id are required' })
+  }
+
+  try {
+    // 비밀번호 해시 저장
+    const salt = crypto.randomBytes(16).toString('hex')
+    const hash = crypto.createHash('sha256').update(salt + password).digest('hex')
+
+    const { data, error } = await supabase
+      .from('comments')
+      .insert({
+        page_id,
+        name,
+        comment,
+        password_salt: salt,
+        password_hash: hash,
+      })
+      .select()
+
+    if (error) throw error
+
+    return res.json({ success: true, data: data && data[0] })
+  } catch (error) {
+    console.error('Insert comment error:', error)
+    return res.status(500).json({ success: false, error: '댓글 등록 중 오류가 발생했습니다' })
+  }
+}
+
+async function handleDelete(req, res) {
+  const { id, password, page_id } = req.body || {}
+  if (!id || !password || !page_id) {
+    return res.status(400).json({ success: false, error: 'id, password, page_id are required' })
+  }
+
+  try {
+    // 기존 댓글 조회
+    const { data: rows, error: fetchError } = await supabase
+      .from('comments')
+      .select('id, page_id, password_salt, password_hash')
+      .eq('id', id)
+      .eq('page_id', page_id)
+      .limit(1)
+
+    if (fetchError) throw fetchError
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ success: false, error: '댓글을 찾을 수 없습니다' })
+    }
+
+    const row = rows[0]
+    const expectedHash = crypto.createHash('sha256').update((row.password_salt || '') + password).digest('hex')
+    if (expectedHash !== row.password_hash) {
+      return res.status(403).json({ success: false, error: '비밀번호가 일치하지 않습니다' })
+    }
+
+    const { error: deleteError } = await supabase
+      .from('comments')
+      .delete()
+      .eq('id', id)
+      .eq('page_id', page_id)
+
+    if (deleteError) throw deleteError
+
+    return res.json({ success: true })
+  } catch (error) {
+    console.error('Delete comment error:', error)
+    return res.status(500).json({ success: false, error: '댓글 삭제 중 오류가 발생했습니다' })
+  }
+}
+
+// 필요한 테이블 스키마 (참고용)
+// CREATE TABLE IF NOT EXISTS public.comments (
+//   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+//   page_id text NOT NULL,
+//   name text NOT NULL,
+//   comment text NOT NULL,
+//   password_salt text,
+//   password_hash text,
+//   created_at timestamptz NOT NULL DEFAULT now()
+// );
+// CREATE INDEX IF NOT EXISTS comments_page_id_idx ON public.comments(page_id);
+
