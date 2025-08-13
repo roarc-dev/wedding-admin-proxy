@@ -96,7 +96,16 @@ async function handleUpsert(req, res) {
     return res.json({ success: true, data })
   } catch (error) {
     console.error('Invite UPSERT error:', error)
-    return res.status(500).json({ success: false, error: '초대장 저장 중 오류가 발생했습니다', message: error?.message })
+    if (error && (error.code === '42P01' || String(error.message || '').includes('invite_cards'))) {
+      return res.status(400).json({
+        success: false,
+        error: '초대장 저장 중 오류가 발생했습니다',
+        message: 'invite_cards 테이블이 없습니다. 제공된 SQL을 적용해 주세요.',
+        code: error.code || '42P01',
+        requiresMigration: true
+      })
+    }
+    return res.status(500).json({ success: false, error: '초대장 저장 중 오류가 발생했습니다', message: error?.message, code: error?.code })
   }
 }
 
