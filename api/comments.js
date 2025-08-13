@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js'
-import crypto from 'crypto'
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -49,7 +48,7 @@ async function handleGetByPageId(req, res) {
   try {
     // total count (가벼운 컬럼으로 카운트)
     const { count, error: countError } = await supabase
-      .from('comments')
+      .from('comments_framer')
       .select('id', { count: 'exact', head: true })
       .eq('page_id', pageId)
 
@@ -61,7 +60,7 @@ async function handleGetByPageId(req, res) {
     const to = from + size - 1
 
     const { data, error } = await supabase
-      .from('comments')
+      .from('comments_framer')
       .select('*')
       .eq('page_id', pageId)
       .order('created_at', { ascending: false })
@@ -93,18 +92,14 @@ async function handleInsert(req, res) {
   }
 
   try {
-    // 비밀번호 해시 저장
-    const salt = crypto.randomBytes(16).toString('hex')
-    const hash = crypto.createHash('sha256').update(salt + password).digest('hex')
-
+    // comments_framer 스키마에 맞춰 평문 패스워드 저장
     const { data, error } = await supabase
-      .from('comments')
+      .from('comments_framer')
       .insert({
         page_id,
         name,
         comment,
-        password_salt: salt,
-        password_hash: hash,
+        password,
       })
       .select()
 
@@ -130,10 +125,10 @@ async function handleDelete(req, res) {
   }
 
   try {
-    // 기존 댓글 조회
+    // 기존 댓글 조회 (평문 비밀번호)
     const { data: rows, error: fetchError } = await supabase
-      .from('comments')
-      .select('id, page_id, password_salt, password_hash')
+      .from('comments_framer')
+      .select('id, page_id, password')
       .eq('id', id)
       .eq('page_id', page_id)
       .limit(1)
@@ -144,13 +139,12 @@ async function handleDelete(req, res) {
     }
 
     const row = rows[0]
-    const expectedHash = crypto.createHash('sha256').update((row.password_salt || '') + password).digest('hex')
-    if (expectedHash !== row.password_hash) {
+    if (row.password !== password) {
       return res.status(403).json({ success: false, error: '비밀번호가 일치하지 않습니다' })
     }
 
     const { error: deleteError } = await supabase
-      .from('comments')
+      .from('comments_framer')
       .delete()
       .eq('id', id)
       .eq('page_id', page_id)
