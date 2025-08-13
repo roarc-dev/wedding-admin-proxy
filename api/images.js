@@ -10,6 +10,8 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+  // 캐시 방지 (관리 화면에서 즉시 반영)
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate')
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end()
@@ -116,9 +118,18 @@ async function handleGetImages(req, res) {
 
       if (error) throw error
 
+      // 즉시 반영을 위해 public_url에 캐시 버스팅 쿼리 추가 (응답 시점 기준)
+      const versionTs = Date.now()
+      const versioned = (data || []).map((row) => {
+        const url = row.public_url || ''
+        if (!url) return row
+        const sep = url.includes('?') ? '&' : '?'
+        return { ...row, public_url: `${url}${sep}v=${versionTs}` }
+      })
+
       return res.json({ 
         success: true, 
-        data: data || [] 
+        data: versioned 
       })
 
     } else {
