@@ -932,7 +932,7 @@ export default function UnifiedWeddingAdmin2(props: any) {
     const [loginForm, setLoginForm] = useState({ username: "", password: "" })
     const [loginError, setLoginError] = useState("")
     const [isLoggingIn, setIsLoggingIn] = useState(false)
-    const [currentTab, setCurrentTab] = useState("name") // "name", "photo", "calendar", "images", "contacts"
+    const [currentTab, setCurrentTab] = useState("name") // "name", "photo", "invite", "calendar", "images", "contacts"
     const [currentPageId, setCurrentPageId] = useState("")
     const [assignedPageId, setAssignedPageId] = useState<string | null>(null)
     const [allPages, setAllPages] = useState<PageInfo[]>([])
@@ -945,6 +945,121 @@ export default function UnifiedWeddingAdmin2(props: any) {
     const [uploading, setUploading] = useState(false)
     const [progress, setProgress] = useState(0)
     const [uploadSuccess, setUploadSuccess] = useState(0)
+    const [imagesVersion, setImagesVersion] = useState<number>(0)
+
+    // 청첩장 상태 및 업데이트 함수
+    const [inviteData, setInviteData] = useState({
+        invitationText: "저희 두 사람이 하나 되는 약속의 시간에\n마음을 담아 소중한 분들을 모십니다.\n\n귀한 걸음으로 축복해 주시면 감사하겠습니다.",
+        groomFatherName: "",
+        groomMotherName: "",
+        groomName: "",
+        brideFatherName: "",
+        brideMotherName: "",
+        brideName: "",
+        showGroomFatherChrysanthemum: false,
+        showGroomMotherChrysanthemum: false,
+        showBrideFatherChrysanthemum: false,
+        showBrideMotherChrysanthemum: false,
+        sonLabel: "아들",
+        daughterLabel: "딸",
+    })
+
+    const updateInviteField = (field: keyof typeof inviteData, value: string | boolean) => {
+        setInviteData((prev) => ({ ...prev, [field]: value }))
+    }
+
+    // 청첩장 API 연동 상태/함수
+    const [inviteSaving, setInviteSaving] = useState(false)
+
+    const loadInviteData = async (): Promise<void> => {
+        if (!currentPageId) return
+        try {
+            const res = await fetch(`${PROXY_BASE_URL}/api/invite?pageId=${encodeURIComponent(currentPageId)}`, {
+                method: "GET",
+                headers: { "Content-Type": "application/json" },
+            })
+            if (!res.ok) return
+            const result = await res.json()
+            if (result?.success && result?.data) {
+                const d = result.data
+                setInviteData((prev) => ({
+                    invitationText: d.invitation_text ?? prev.invitationText,
+                    groomFatherName: d.groom_father_name ?? prev.groomFatherName,
+                    groomMotherName: d.groom_mother_name ?? prev.groomMotherName,
+                    groomName: pageSettings.groom_name_kr || prev.groomName,
+                    brideFatherName: d.bride_father_name ?? prev.brideFatherName,
+                    brideMotherName: d.bride_mother_name ?? prev.brideMotherName,
+                    brideName: pageSettings.bride_name_kr || prev.brideName,
+                    showGroomFatherChrysanthemum: !!d.show_groom_father_chrysanthemum,
+                    showGroomMotherChrysanthemum: !!d.show_groom_mother_chrysanthemum,
+                    showBrideFatherChrysanthemum: !!d.show_bride_father_chrysanthemum,
+                    showBrideMotherChrysanthemum: !!d.show_bride_mother_chrysanthemum,
+                    sonLabel: d.son_label ?? prev.sonLabel,
+                    daughterLabel: d.daughter_label ?? prev.daughterLabel,
+                }))
+            } else {
+                setInviteData((prev) => ({
+                    ...prev,
+                    groomName: pageSettings.groom_name_kr || prev.groomName,
+                    brideName: pageSettings.bride_name_kr || prev.brideName,
+                }))
+            }
+        } catch (_err) {
+            // noop
+        }
+    }
+
+    const saveInviteData = async (): Promise<void> => {
+        try {
+            setInviteSaving(true)
+            const body = {
+                invite: {
+                    invitation_text: inviteData.invitationText,
+                    groom_father_name: inviteData.groomFatherName,
+                    groom_mother_name: inviteData.groomMotherName,
+                    groom_name: pageSettings.groom_name_kr || inviteData.groomName,
+                    bride_father_name: inviteData.brideFatherName,
+                    bride_mother_name: inviteData.brideMotherName,
+                    bride_name: pageSettings.bride_name_kr || inviteData.brideName,
+                    show_groom_father_chrysanthemum: inviteData.showGroomFatherChrysanthemum,
+                    show_groom_mother_chrysanthemum: inviteData.showGroomMotherChrysanthemum,
+                    show_bride_father_chrysanthemum: inviteData.showBrideFatherChrysanthemum,
+                    show_bride_mother_chrysanthemum: inviteData.showBrideMotherChrysanthemum,
+                    son_label: inviteData.sonLabel,
+                    daughter_label: inviteData.daughterLabel,
+                },
+            }
+            const res = await fetch(`${PROXY_BASE_URL}/api/invite`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${getAuthToken()}`,
+                },
+                body: JSON.stringify(body),
+            })
+            const text = await res.text()
+            let result: any = {}
+            try { result = JSON.parse(text) } catch { result = { raw: text } }
+            if (!res.ok || !result?.success) {
+                const msg = result?.message || result?.error || text || "초대장 저장 실패"
+                const code = result?.code ? ` (code: ${result.code})` : ""
+                setError(`청첩장 저장 중 오류: ${msg}${code}`)
+            } else {
+                setSuccess("청첩장 정보가 저장되었습니다.")
+                // 저장 후 재로드로 동기화
+                await loadInviteData()
+            }
+        } catch (_e) {
+            setError("청첩장 저장 중 오류가 발생했습니다.")
+        } finally {
+            setInviteSaving(false)
+        }
+    }
+
+    useEffect(() => {
+        if (currentTab === "invite") loadInviteData()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentTab, currentPageId])
 
     // 연락처 관련 상태
     const [contactList, setContactList] = useState<ContactInfo[]>([])
@@ -1022,22 +1137,27 @@ export default function UnifiedWeddingAdmin2(props: any) {
     const [photoSectionPreviewUrl, setPhotoSectionPreviewUrl] = React.useState<string | null>(null)
     const [photoSectionImageVersion, setPhotoSectionImageVersion] = React.useState<number>(0)
 
-    const buildPhotoSectionProps = () => {
-        // 캐시 무효화 파라미터 생성
-        const addVersionParam = (url: string | undefined): string | undefined => {
-            if (!url) return url
-            const sep = url.includes("?") ? "&" : "?"
-            return `${url}${sep}v=${photoSectionImageVersion}`
-        }
+    const addPhotoVersionParam = (url?: string): string | undefined => {
+        if (!url) return url
+        const sep = url.includes("?") ? "&" : "?"
+        return `${url}${sep}v=${photoSectionImageVersion}`
+    }
 
+    const getPhotoSectionDisplayUrl = (): string | undefined => {
         const constructedUrl = pageSettings.photo_section_image_path
             ? `https://yjlzizakdjghpfduxcki.supabase.co/storage/v1/object/public/images/${pageSettings.photo_section_image_path}`
             : undefined
+        const derivedPublicUrl = (pageSettings as any).photo_section_image_public_url as string | undefined
+        const serverUrl = derivedPublicUrl || pageSettings.photo_section_image_url || constructedUrl
+        // objectURL 최우선, 그 다음 파생 URL, 그 외는 버전 파라미터 부여
+        if (photoSectionPreviewUrl) return photoSectionPreviewUrl
+        if (derivedPublicUrl) return derivedPublicUrl
+        return addPhotoVersionParam(serverUrl)
+    }
 
-        const serverUrl = pageSettings.photo_section_image_url || constructedUrl
-
+    const buildPhotoSectionProps = () => {
         return {
-            imageUrl: photoSectionPreviewUrl || addVersionParam(serverUrl),
+            imageUrl: getPhotoSectionDisplayUrl(),
             displayDateTime: formatPhotoDisplayDateTime(),
             location: pageSettings.venue_name || undefined,
             overlayPosition: (pageSettings.photo_section_overlay_position as "top" | "bottom") || "bottom",
@@ -1400,13 +1520,15 @@ export default function UnifiedWeddingAdmin2(props: any) {
         if (currentPageId) {
             try {
                 const images = await getImagesByPageId(currentPageId)
-                setExistingImages(images)
+                const ts = Date.now() + imagesVersion
+                const withVersion = images.map((img: any) => ({
+                    ...img,
+                    public_url: img.public_url ? `${img.public_url}${img.public_url.includes('?') ? '&' : '?'}v=${ts}` : img.public_url,
+                }))
+                setExistingImages(withVersion)
                 setOriginalOrder([...images]) // 원본 순서 저장
-                setHasUnsavedChanges(false) // 변경사항 초기화
-                setSelectedImages(new Set()) // 선택된 이미지 초기화
-            } catch (error) {
-                console.error("이미지 로딩 실패:", error)
-                // 에러 시 기존 이미지 유지
+            } catch (err) {
+                console.error("이미지 목록 로드 실패:", err)
             }
         }
     }
@@ -1589,19 +1711,20 @@ export default function UnifiedWeddingAdmin2(props: any) {
             validateImageFileSize(file)
 
             // 2. 이미지 압축 (점진적)
-            const processedFile = await progressiveCompress(file, 1024, (p) =>
+            const compressionResult = await progressiveCompress(file, 1024, (p) =>
                 setCompressProgress(p)
             )
+            const finalFile: File = (compressionResult && compressionResult.compressedFile) ? compressionResult.compressedFile : file
             setCompressProgress(null)
 
-            // 3. presigned URL 요청
+            // 3. presigned URL 요청 (원본 파일명으로 확장자 보존)
             const { signedUrl, path } = await getPresignedUrl(
-                `photosection_${processedFile.name}`,
+                `photosection_${file.name}`,
                 currentPageId
             )
 
-            // 4. 파일을 직접 Storage에 업로드
-            await uploadToPresignedUrl(signedUrl, processedFile)
+            // 4. 파일을 직접 Storage에 업로드 (압축된 파일 사용)
+            await uploadToPresignedUrl(signedUrl, finalFile)
 
             // 5. 경로 저장 및 서버 저장
             const imagePath = path
@@ -1693,7 +1816,7 @@ export default function UnifiedWeddingAdmin2(props: any) {
                     await uploadToPresignedUrl(signedUrl, processedFile)
 
                     // 5. DB에 메타데이터 저장
-                    await saveImageMeta(
+                    const saved = await saveImageMeta(
                         currentPageId,
                         originalName,
                         existingImages.length + i + 1,
@@ -1703,6 +1826,21 @@ export default function UnifiedWeddingAdmin2(props: any) {
 
                     completed++
                     setProgress(Math.round((completed / totalFiles) * 100))
+
+                    // 낙관적 반영: 방금 업로드한 이미지 그리드에 즉시 추가 (캐시 무효화 파라미터 포함)
+                    const newImg: ImageInfo = {
+                        id: saved.id || saved?.id || `${Date.now()}_${i}`,
+                        filename: saved.filename || path,
+                        public_url: ((): string => {
+                            const base = saved.public_url || (saved.storage_path ? saved.storage_path : '')
+                            const url = base || ''
+                            const sep = url.includes('?') ? '&' : '?'
+                            return url ? `${url}${sep}v=${Date.now()}` : url
+                        })(),
+                        original_name: saved.original_name || originalName,
+                    }
+                    setExistingImages((prev) => [...prev, newImg])
+                    setImagesVersion((v) => v + 1)
                 } catch (error) {
                     console.error(`파일 ${file.name} 처리 실패:`, error)
                     completed++
@@ -1714,7 +1852,10 @@ export default function UnifiedWeddingAdmin2(props: any) {
             setUploading(false)
             setProgress(100)
             setUploadSuccess(files.length)
+            // 최종 동기화 (짧은 지연 후 최신 정렬/데이터 일치)
+            setTimeout(() => {
             loadExistingImages()
+            }, 200)
             loadAllPages()
             setTimeout(() => setUploadSuccess(0), 3000)
         } catch (error: unknown) {
@@ -2488,6 +2629,27 @@ export default function UnifiedWeddingAdmin2(props: any) {
                     }}
                 >
                     포토섹션
+                </button>
+                <button
+                    onClick={() => setCurrentTab("invite")}
+                    style={{
+                        flex: "1",
+                        padding: "16px 12px",
+                        backgroundColor:
+                            currentTab === "invite" ? "#000000" : "white",
+                        color: currentTab === "invite" ? "white" : "#666666",
+                        border: "none",
+                        borderRadius: "0",
+                        cursor: "pointer",
+                        fontSize: "12px",
+                        fontWeight: "500",
+                        borderBottom:
+                            currentTab === "invite"
+                                ? "2px solid #000000"
+                                : "none",
+                    }}
+                >
+                    청첩장
                 </button>
                 <button
                     onClick={() => setCurrentTab("calendar")}
@@ -3535,12 +3697,10 @@ export default function UnifiedWeddingAdmin2(props: any) {
                                     style={{ display: "none" }}
                                 />
 
-                                {pageSettings.photo_section_image_url ? (
+                                {getPhotoSectionDisplayUrl() ? (
                                     <div>
                                         <img
-                                            src={
-                                                pageSettings.photo_section_image_url
-                                            }
+                                            src={getPhotoSectionDisplayUrl()}
                                             alt="메인 사진 미리보기"
                                             style={{
                                                 maxWidth: "200px",
@@ -3572,22 +3732,11 @@ export default function UnifiedWeddingAdmin2(props: any) {
                                 <div style={{ height: 10 }} />
                                         <div
                                             style={{
-                                                fontSize: "16px",
-                                                fontWeight: "500",
-                                                color: "#374151",
-                                                marginBottom: "5px",
-                                            }}
-                                        >
-                                            메인 사진을 업로드하세요
-                                        </div>
-                                        <div
-                                            style={{
-                                                fontSize: "14px",
+                                                fontSize: "12px",
                                                 color: "#6b7280",
                                             }}
                                         >
-                                            PhotoSection 컴포넌트에 표시될
-                                            사진입니다
+                                            이미지를 업로드하려면 클릭하세요
                                         </div>
                                     </div>
                                 )}
@@ -3803,6 +3952,151 @@ export default function UnifiedWeddingAdmin2(props: any) {
                             {settingsLoading
                                 ? "저장 중..."
                                 : "포토섹션 설정 저장"}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* 청첩장 탭 */}
+            {currentTab === "invite" && (
+                <div style={{ flex: 1, paddingBottom: 24 }}>
+                    {/* 초대글 */}
+                    <div style={{ marginBottom: 24 }}>
+                        <h3 style={{ fontSize: 16, fontWeight: 600, color: "#1f2937", margin: "0 0 12px 0" }}>초대글</h3>
+                        <textarea
+                            value={inviteData.invitationText}
+                            onChange={(e) => updateInviteField("invitationText", e.target.value)}
+                            rows={4}
+                            style={{
+                                width: "100%",
+                                border: "1px solid #e5e7eb",
+                                padding: 12,
+                                fontFamily: "'Pretendard Regular', sans-serif",
+                                fontSize: 14,
+                                color: "#111827",
+                                background: "#fafafa",
+                            }}
+                        />
+                    </div>
+
+                    {/* 신랑 정보 */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
+                        <div>
+                            <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>신랑 아버지 이름</div>
+                            <input
+                                value={inviteData.groomFatherName}
+                                onChange={(e) => updateInviteField("groomFatherName", e.target.value)}
+                                style={{ width: "100%", border: "1px solid #e5e7eb", padding: 10, background: "#fafafa" }}
+                            />
+                            <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, fontSize: 12, color: "#374151" }}>
+                                <input
+                                    type="checkbox"
+                                    checked={inviteData.showGroomFatherChrysanthemum}
+                                    onChange={(e) => updateInviteField("showGroomFatherChrysanthemum", e.target.checked)}
+                                />
+                                국화꽃 표시
+                            </label>
+                        </div>
+                        <div>
+                            <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>신랑 어머니 이름</div>
+                            <input
+                                value={inviteData.groomMotherName}
+                                onChange={(e) => updateInviteField("groomMotherName", e.target.value)}
+                                style={{ width: "100%", border: "1px solid #e5e7eb", padding: 10, background: "#fafafa" }}
+                            />
+                            <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, fontSize: 12, color: "#374151" }}>
+                                <input
+                                    type="checkbox"
+                                    checked={inviteData.showGroomMotherChrysanthemum}
+                                    onChange={(e) => updateInviteField("showGroomMotherChrysanthemum", e.target.checked)}
+                                />
+                                국화꽃 표시
+                            </label>
+                        </div>
+                        <div>
+                            <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>신랑 이름</div>
+                            <div style={{ width: "100%", padding: 10, background: "#fafafa", border: "1px solid #e5e7eb" }}>
+                                {pageSettings.groom_name_kr || ""}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 신부 정보 */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                        <div>
+                            <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>호칭(신랑측)</div>
+                            <input
+                                value={inviteData.sonLabel}
+                                onChange={(e) => updateInviteField("sonLabel", e.target.value)}
+                                placeholder="아들 / 장남 등"
+                                style={{ width: "100%", border: "1px solid #e5e7eb", padding: 10, background: "#fafafa" }}
+                            />
+                        </div>
+                        <div>
+                            <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>호칭(신부측)</div>
+                            <input
+                                value={inviteData.daughterLabel}
+                                onChange={(e) => updateInviteField("daughterLabel", e.target.value)}
+                                placeholder="딸 / 장녀 등"
+                                style={{ width: "100%", border: "1px solid #e5e7eb", padding: 10, background: "#fafafa" }}
+                            />
+                        </div>
+                        <div>
+                            <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>신부 아버지 이름</div>
+                            <input
+                                value={inviteData.brideFatherName}
+                                onChange={(e) => updateInviteField("brideFatherName", e.target.value)}
+                                style={{ width: "100%", border: "1px solid #e5e7eb", padding: 10, background: "#fafafa" }}
+                            />
+                            <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, fontSize: 12, color: "#374151" }}>
+                                <input
+                                    type="checkbox"
+                                    checked={inviteData.showBrideFatherChrysanthemum}
+                                    onChange={(e) => updateInviteField("showBrideFatherChrysanthemum", e.target.checked)}
+                                />
+                                국화꽃 표시
+                            </label>
+                        </div>
+                        <div>
+                            <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>신부 어머니 이름</div>
+                            <input
+                                value={inviteData.brideMotherName}
+                                onChange={(e) => updateInviteField("brideMotherName", e.target.value)}
+                                style={{ width: "100%", border: "1px solid #e5e7eb", padding: 10, background: "#fafafa" }}
+                            />
+                            <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, fontSize: 12, color: "#374151" }}>
+                                <input
+                                    type="checkbox"
+                                    checked={inviteData.showBrideMotherChrysanthemum}
+                                    onChange={(e) => updateInviteField("showBrideMotherChrysanthemum", e.target.checked)}
+                                />
+                                국화꽃 표시
+                            </label>
+                        </div>
+                        <div>
+                            <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>신부 이름</div>
+                            <div style={{ width: "100%", padding: 10, background: "#fafafa", border: "1px solid #e5e7eb" }}>
+                                {pageSettings.bride_name_kr || ""}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 저장 버튼 */}
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+                        <button
+                            onClick={saveInviteData}
+                            disabled={inviteSaving}
+                            style={{
+                                padding: "10px 16px",
+                                backgroundColor: inviteSaving ? "#9ca3af" : "#111827",
+                                color: "#fff",
+                                border: "none",
+                                borderRadius: 0,
+                                fontSize: 12,
+                                cursor: inviteSaving ? "not-allowed" : "pointer",
+                            }}
+                        >
+                            {inviteSaving ? "저장 중..." : "청첩장 저장"}
                         </button>
                     </div>
                 </div>
