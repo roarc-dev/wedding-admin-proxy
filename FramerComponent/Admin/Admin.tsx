@@ -3448,6 +3448,27 @@ export default function UnifiedWeddingAdmin2(props: any) {
                         >
                             {settingsLoading ? "저장 중..." : "기본 정보 저장"}
                         </button>
+                <button
+                    onClick={() => setCurrentTab("transport")}
+                    style={{
+                        flex: "1",
+                        padding: "16px 12px",
+                        backgroundColor:
+                            currentTab === "transport" ? "#000000" : "white",
+                        color: currentTab === "transport" ? "white" : "#666666",
+                        border: "none",
+                        borderRadius: "0",
+                        cursor: "pointer",
+                        fontSize: "12px",
+                        fontWeight: "500",
+                        borderBottom:
+                            currentTab === "transport"
+                                ? "2px solid #000000"
+                                : "none",
+                    }}
+                >
+                    교통안내
+                        </button>
                     </div>
                         )}</div>
                 </div>
@@ -3977,6 +3998,9 @@ export default function UnifiedWeddingAdmin2(props: any) {
                                 background: "#fafafa",
                             }}
                         />
+                        <div style={{ marginTop: 8, fontSize: 12, color: "#6b7280" }}>
+                            작은 회색 글씨로 인용 표시를 하고 싶다면 {"{대괄호}"} 안에 글씨를 넣어주세요
+                        </div>
                     </div>
 
                     {/* 신랑 정보 */}
@@ -5288,7 +5312,21 @@ export default function UnifiedWeddingAdmin2(props: any) {
                                 초기화
                             </button>
                                             </div>
-                    </div>
+                                            </div>
+                            </div>
+                        )}
+
+            {/* 교통안내 탭 */}
+            {currentTab === "transport" && (
+                                            <div
+                                                style={{
+                        flex: 1,
+                        overflowY: "auto",
+                        padding: "20px",
+                        backgroundColor: "#f5f5f5",
+                    }}
+                >
+                    <TransportEditorImpl pageId={currentPageId} />
                 </div>
             )}
 
@@ -5819,3 +5857,83 @@ addPropertyControls(UnifiedWeddingAdmin2, {
         defaultValue: 1024,
     },
 })
+
+// 교통안내 편집기 (간단 구현)
+function TransportEditorImpl({ pageId }: { pageId: string }) {
+    const [items, setItems] = React.useState<{ title: string; description: string; display_order: number }[]>([
+        { title: "버스", description: "버스 번호와 정류장을 입력해주세요", display_order: 1 },
+        { title: "지하철", description: "지하철 호선과 하차역을 입력해주세요", display_order: 2 },
+    ])
+    const [saving, setSaving] = React.useState(false)
+
+    const addItem = () => {
+        setItems((prev) => [
+            ...prev,
+            { title: "교통편", description: "상세 항목", display_order: prev.length + 1 },
+        ])
+    }
+
+    const move = (idx: number, dir: -1 | 1) => {
+        const ni = idx + dir
+        if (ni < 0 || ni >= items.length) return
+        const next = [...items]
+        const tmp = next[idx]
+        next[idx] = next[ni]
+        next[ni] = tmp
+        // 재정렬된 display_order 반영
+        const normalized = next.map((it, i) => ({ ...it, display_order: i + 1 }))
+        setItems(normalized)
+    }
+
+    const change = (idx: number, field: 'title' | 'description', value: string) => {
+        setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, [field]: value } : it)))
+    }
+
+    const save = async () => {
+        if (!pageId) return alert('페이지 ID를 설정하세요')
+        setSaving(true)
+        try {
+            const res = await fetch(`${PROXY_BASE_URL}/api/transport`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getAuthToken()}` },
+                body: JSON.stringify({ items }),
+            })
+            const result = await res.json()
+            if (!res.ok || !result?.success) {
+                throw new Error(result?.message || result?.error || '저장 실패')
+            }
+            alert('교통안내가 저장되었습니다.')
+        } catch (e: any) {
+            alert('저장 중 오류: ' + (e?.message || '알 수 없는 오류'))
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    return (
+        <div style={{ backgroundColor: 'white', padding: 20 }}>
+            <h2 style={{ fontSize: 18, fontWeight: 600, color: '#000', margin: '0 0 16px 0' }}>교통안내</h2>
+            {items.map((it, idx) => (
+                <div key={idx} style={{ border: '1px solid #e5e7eb', padding: 12, marginBottom: 10 }}>
+                    <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
+                        <div style={{ width: 60, color: '#6b7280', fontSize: 12 }}>교통편</div>
+                        <input value={it.title} onChange={(e) => change(idx, 'title', e.target.value)} style={{ flex: 1, border: '1px solid #e5e7eb', padding: 8 }} />
+                    </div>
+                    <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
+                        <div style={{ width: 60, color: '#6b7280', fontSize: 12 }}>상세 항목</div>
+                        <input value={it.description} onChange={(e) => change(idx, 'description', e.target.value)} style={{ flex: 1, border: '1px solid #e5e7eb', padding: 8 }} />
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <button onClick={() => move(idx, -1)} style={{ padding: '6px 10px', border: '1px solid #e5e7eb', background: 'white' }}>위로</button>
+                        <button onClick={() => move(idx, 1)} style={{ padding: '6px 10px', border: '1px solid #e5e7eb', background: 'white' }}>아래로</button>
+                    </div>
+                </div>
+            ))}
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button onClick={addItem} style={{ padding: '10px 14px', border: '1px solid #e5e7eb', background: 'white' }}>+ 항목 추가</button>
+                <button onClick={save} disabled={saving} style={{ padding: '10px 14px', background: saving ? '#9ca3af' : '#111827', color: 'white', border: 'none' }}>{saving ? '저장 중...' : '저장'}</button>
+            </div>
+        </div>
+    )
+}
+
