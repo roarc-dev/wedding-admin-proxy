@@ -466,7 +466,7 @@ export default function NaverMapFix({
                 // 페이지 설정과 API 설정을 병렬로 로드
                 const [settings, configRes] = await Promise.all([
                     getPageSettings(pageId),
-                    fetch("https://wedding-admin-proxy.vercel.app/api/map-config")
+                    fetch("https://wedding-admin-proxy.vercel.app/api/router?map-config")
                 ])
                 
                 setPageSettings(settings)

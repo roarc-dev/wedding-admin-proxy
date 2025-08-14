@@ -53,7 +53,7 @@ export default function MapLinkButtonGroup({
     useEffect(() => {
         const fetchConfig = async () => {
             try {
-                const res = await fetch("https://wedding-admin-proxy.vercel.app/api/map-config")
+                const res = await fetch("https://wedding-admin-proxy.vercel.app/api/router?map-config")
                 const json = await res.json()
                 if (json.success) {
                     setNaverClientId(json.data.naverClientId || "3cxftuac0e")
