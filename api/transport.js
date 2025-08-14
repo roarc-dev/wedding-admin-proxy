@@ -42,7 +42,7 @@ export default async function handler(req, res) {
 
       const { data, error } = await supabase
         .from('transport_infos')
-        .select('id, page_id, title, description, display_order, created_at, updated_at')
+        .select('id, page_id, title, description, display_order, updated_at')
         .eq('page_id', pageId)
         .order('display_order', { ascending: true })
 

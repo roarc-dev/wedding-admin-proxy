@@ -5797,12 +5797,38 @@ function TransportTab({
 
     React.useEffect(() => {
         let mounted = true
+        const getApiBases = () => {
+            const bases: string[] = []
+            try {
+                if (typeof window !== "undefined" && window.location?.origin) {
+                    bases.push(window.location.origin)
+                }
+            } catch {}
+            bases.push(PROXY_BASE_URL)
+            return Array.from(new Set(bases.filter(Boolean)))
+        }
+        const request = async (path: string, init?: RequestInit) => {
+            const bases = getApiBases()
+            let lastRes: Response | null = null
+            let lastErr: any = null
+            for (const base of bases) {
+                try {
+                    const res = await fetch(`${base}${path}`, init)
+                    if (res.ok) return res
+                    lastRes = res
+                } catch (e) {
+                    lastErr = e
+                }
+            }
+            if (lastRes) return lastRes
+            throw lastErr || new Error("Network error")
+        }
         async function load() {
             if (!pageId) return
             setLoading(true)
             setErrorMsg("")
             try {
-                const res = await fetch(`${PROXY_BASE_URL}/api/transport?pageId=${encodeURIComponent(pageId)}`)
+                const res = await request(`/api/transport?pageId=${encodeURIComponent(pageId)}`)
                 if (!res.ok) throw new Error(`load failed: ${res.status}`)
                 const result = await res.json()
                 if (mounted && result?.success && Array.isArray(result.data)) {
@@ -5861,15 +5887,37 @@ function TransportTab({
         setSuccessMsg("")
         try {
             const token = tokenGetter?.() || ""
-            const res = await fetch(`${PROXY_BASE_URL}/api/transport`, {
+            const getApiBases = () => {
+                const bases: string[] = []
+                try {
+                    if (typeof window !== "undefined" && window.location?.origin) {
+                        bases.push(window.location.origin)
+                    }
+                } catch {}
+                bases.push(PROXY_BASE_URL)
+                return Array.from(new Set(bases.filter(Boolean)))
+            }
+            const bases = getApiBases()
+            let res: Response | null = null
+            let text = ""
+            for (const base of bases) {
+                try {
+                    const tryRes = await fetch(`${base}/api/transport`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                     ...(token ? { Authorization: `Bearer ${token}` } : {}),
                 },
-                body: JSON.stringify({ pageId, items }),
-            })
-            const text = await res.text()
+                        body: JSON.stringify({ pageId, items }),
+                    })
+                    res = tryRes
+                    text = await tryRes.text()
+                    if (tryRes.ok) break
+                } catch (e) {
+                    // continue to next base
+                }
+            }
+            if (!res) throw new Error("network error")
             let result: any = {}
             try { result = JSON.parse(text) } catch { result = { raw: text } }
             if (!res.ok || !result?.success) {
