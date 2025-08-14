@@ -3,6 +3,50 @@ import { addPropertyControls, ControlType } from "framer"
 
 const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app"
 
+function renderInvitationSegments(text: string): JSX.Element[] {
+    const lines = (text || "").split("\n")
+    const rendered: JSX.Element[] = []
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i]
+        const parts: JSX.Element[] = []
+        let lastIndex = 0
+        let keySeq = 0
+        const regex = /\{([^}]*)\}/g
+        let match: RegExpExecArray | null
+        while ((match = regex.exec(line)) !== null) {
+            const start = match.index
+            const end = start + match[0].length
+            if (start > lastIndex) {
+                const chunk = line.slice(lastIndex, start)
+                if (chunk) parts.push(
+                    <span key={`t-${i}-${keySeq++}`}>{chunk}</span>
+                )
+            }
+            const inner = match[1]
+            if (inner) parts.push(
+                <span
+                    key={`q-${i}-${keySeq++}`}
+                    style={{ fontSize: 14, lineHeight: "1em", color: "#6e6e6e" }}
+                >
+                    {inner}
+                </span>
+            )
+            lastIndex = end
+        }
+        if (lastIndex < line.length) {
+            const rest = line.slice(lastIndex)
+            if (rest) parts.push(<span key={`t-${i}-${keySeq++}`}>{rest}</span>)
+        }
+        rendered.push(
+            <span key={`line-${i}`}>
+                {parts}
+                {i !== lines.length - 1 && <br />}
+            </span>
+        )
+    }
+    return rendered
+}
+
 function ChrysanthemumIcon() {
     return (
         <div
@@ -166,14 +210,7 @@ export default function WeddingInvitation(props: InviteNameProps) {
                         wordWrap: "break-word",
                     }}
                 >
-                    {weddingData.invitationText.split("\n").map((line, idx) => (
-                        <span key={idx}>
-                            {line}
-                            {idx !==
-                                weddingData.invitationText.split("\n").length -
-                                    1 && <br />}
-                        </span>
-                    ))}
+                    {renderInvitationSegments(weddingData.invitationText)}
                 </div>
 
                 {/* 이름 영역 */}

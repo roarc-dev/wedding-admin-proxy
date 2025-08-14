@@ -2,13 +2,9 @@ import { addPropertyControls, ControlType } from "framer"
 import { motion } from "framer-motion"
 import { useState, useEffect } from "react"
 
-// 프록시 서버 URL (고정된 Production URL)
-const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app"
-
 interface CalendarComponentProps {
     pageId: string
     highlightColor: string
-    testDates: string
     useTestData: boolean
     displayDate: string
     displayTime: string
@@ -123,31 +119,27 @@ export default function CalendarComponent({
             return
         }
 
-        // 프록시를 통한 안전한 데이터 조회
+        // 실제 Supabase 데이터 조회
         try {
-            const response = await fetch(`${PROXY_BASE_URL}/api/calendar?pageId=${pageId}`, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                }
-            })
+            const { data, error } = await supabase
+                .from("wedding_calendar")
+                .select("*")
+                .eq("page_id", pageId)
 
-            if (!response.ok) {
-                console.error("Calendar data fetch error:", response.status)
+            if (error) {
+                console.error("Error fetching data:", error)
                 return
             }
 
-            const result = await response.json()
-            
-            if (result.success && result.data && result.data.length > 0) {
-                setCalendarData(result.data)
+            if (data && data.length > 0) {
+                setCalendarData(data)
                 // 첫 번째 데이터로 월 설정
-                const firstDate = new Date(result.data[0].date)
+                const firstDate = new Date(data[0].date)
                 setCurrentMonth((firstDate.getMonth() + 1).toString())
                 setCurrentYear(firstDate.getFullYear())
             }
         } catch (error) {
-            console.error("Calendar API connection error:", error)
+            console.error("Supabase connection error:", error)
         }
     }
 

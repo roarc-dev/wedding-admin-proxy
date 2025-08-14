@@ -11,6 +11,16 @@
         "env": {
           "SUPABASE_ACCESS_TOKEN": "sbp_a8025c1f2d0d480b9bb4481bcade824495440143"
         }
+      },
+      "notion": {
+        "command": "npx",
+        "args": [
+          "-y",
+          "@modelcontextprotocol/server-notion@latest"
+        ],
+        "env": {
+          "NOTION_TOKEN": "ntn_t73493868708Mnzt4jWFDtkuocY0Yhyv5UtUt17Pa2d07b"
+        }
       }
     }
   }

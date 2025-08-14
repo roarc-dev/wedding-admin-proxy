@@ -2579,142 +2579,130 @@ export default function UnifiedWeddingAdmin2(props: any) {
             </AnimatePresence>
 
             {/* 탭 메뉴 */}
-            <div
-                style={{
-                    display: "flex",
-                    backgroundColor: "white",
-                    borderBottom: "1px solid #e0e0e0",
-                    overflowX: "auto",
-                    padding: "0",
-                }}
-            >
-                <button
-                    onClick={() => setCurrentTab("name")}
-                    style={{
-                        flex: "1",
-                        padding: "16px 12px",
-                        backgroundColor:
-                            currentTab === "name" ? "#000000" : "white",
-                        color: currentTab === "name" ? "white" : "#666666",
-                        border: "none",
-                        borderRadius: "0",
-                        cursor: "pointer",
-                        fontSize: "12px",
-                        fontWeight: "500",
-                        borderBottom:
-                            currentTab === "name"
-                                ? "2px solid #000000"
-                                : "none",
-                    }}
-                >
-                    이름
-                </button>
-                <button
-                    onClick={() => setCurrentTab("photo")}
-                    style={{
-                        flex: "1",
-                        padding: "16px 12px",
-                        backgroundColor:
-                            currentTab === "photo" ? "#000000" : "white",
-                        color: currentTab === "photo" ? "white" : "#666666",
-                        border: "none",
-                        borderRadius: "0",
-                        cursor: "pointer",
-                        fontSize: "12px",
-                        fontWeight: "500",
-                        borderBottom:
-                            currentTab === "photo"
-                                ? "2px solid #000000"
-                                : "none",
-                    }}
-                >
-                    포토섹션
-                </button>
-                <button
-                    onClick={() => setCurrentTab("invite")}
-                    style={{
-                        flex: "1",
-                        padding: "16px 12px",
-                        backgroundColor:
-                            currentTab === "invite" ? "#000000" : "white",
-                        color: currentTab === "invite" ? "white" : "#666666",
-                        border: "none",
-                        borderRadius: "0",
-                        cursor: "pointer",
-                        fontSize: "12px",
-                        fontWeight: "500",
-                        borderBottom:
-                            currentTab === "invite"
-                                ? "2px solid #000000"
-                                : "none",
-                    }}
-                >
-                    청첩장
-                </button>
-                <button
-                    onClick={() => setCurrentTab("calendar")}
-                    style={{
-                        flex: "1",
-                        padding: "16px 12px",
-                        backgroundColor:
-                            currentTab === "calendar" ? "#000000" : "white",
-                        color: currentTab === "calendar" ? "white" : "#666666",
-                        border: "none",
-                        borderRadius: "0",
-                        cursor: "pointer",
-                        fontSize: "12px",
-                        fontWeight: "500",
-                        borderBottom:
-                            currentTab === "calendar"
-                                ? "2px solid #000000"
-                                : "none",
-                    }}
-                >
-                    캘린더
-                </button>
-                <button
-                    onClick={() => setCurrentTab("images")}
-                    style={{
-                        flex: "1",
-                        padding: "16px 12px",
-                        backgroundColor:
-                            currentTab === "images" ? "#000000" : "white",
-                        color: currentTab === "images" ? "white" : "#666666",
-                        border: "none",
-                        borderRadius: "0",
-                        cursor: "pointer",
-                        fontSize: "12px",
-                        fontWeight: "500",
-                        borderBottom:
-                            currentTab === "images"
-                                ? "2px solid #000000"
-                                : "none",
-                    }}
-                >
-                    갤러리
-                </button>
-                <button
-                    onClick={() => setCurrentTab("contacts")}
-                    style={{
-                        flex: "1",
-                        padding: "16px 12px",
-                        backgroundColor:
-                            currentTab === "contacts" ? "#000000" : "white",
-                        color: currentTab === "contacts" ? "white" : "#666666",
-                        border: "none",
-                        borderRadius: "0",
-                        cursor: "pointer",
-                        fontSize: "12px",
-                        fontWeight: "500",
-                        borderBottom:
-                            currentTab === "contacts"
-                                ? "2px solid #000000"
-                                : "none",
-                    }}
-                >
-                    연락처
-                </button>
-                {null}
+            <div style={{ backgroundColor: "white", borderBottom: "1px solid #e0e0e0" }}>
+                <div style={{ display: "flex", padding: 0 }}>
+                    <button
+                        onClick={() => setCurrentTab("name")}
+                        style={{
+                            flex: "1",
+                            padding: "16px 12px",
+                            backgroundColor: currentTab === "name" ? "#000000" : "white",
+                            color: currentTab === "name" ? "white" : "#666666",
+                            border: "none",
+                            borderRadius: "0",
+                            cursor: "pointer",
+                            fontSize: "12px",
+                            fontWeight: "500",
+                            borderBottom: currentTab === "name" ? "2px solid #000000" : "none",
+                        }}
+                    >
+                        이름
+                    </button>
+                    <button
+                        onClick={() => setCurrentTab("photo")}
+                        style={{
+                            flex: "1",
+                            padding: "16px 12px",
+                            backgroundColor: currentTab === "photo" ? "#000000" : "white",
+                            color: currentTab === "photo" ? "white" : "#666666",
+                            border: "none",
+                            borderRadius: "0",
+                            cursor: "pointer",
+                            fontSize: "12px",
+                            fontWeight: "500",
+                            borderBottom: currentTab === "photo" ? "2px solid #000000" : "none",
+                        }}
+                    >
+                        포토섹션
+                    </button>
+                    <button
+                        onClick={() => setCurrentTab("invite")}
+                        style={{
+                            flex: "1",
+                            padding: "16px 12px",
+                            backgroundColor: currentTab === "invite" ? "#000000" : "white",
+                            color: currentTab === "invite" ? "white" : "#666666",
+                            border: "none",
+                            borderRadius: "0",
+                            cursor: "pointer",
+                            fontSize: "12px",
+                            fontWeight: "500",
+                            borderBottom: currentTab === "invite" ? "2px solid #000000" : "none",
+                        }}
+                    >
+                        청첩장
+                    </button>
+                </div>
+                <div style={{ display: "flex", padding: 0 }}>
+                    <button
+                        onClick={() => setCurrentTab("transport")}
+                        style={{
+                            flex: "1",
+                            padding: "16px 12px",
+                            backgroundColor: currentTab === "transport" ? "#000000" : "white",
+                            color: currentTab === "transport" ? "white" : "#666666",
+                            border: "none",
+                            borderRadius: "0",
+                            cursor: "pointer",
+                            fontSize: "12px",
+                            fontWeight: "500",
+                            borderBottom: currentTab === "transport" ? "2px solid #000000" : "none",
+                        }}
+                    >
+                        교통안내
+                    </button>
+                    <button
+                        onClick={() => setCurrentTab("calendar")}
+                        style={{
+                            flex: "1",
+                            padding: "16px 12px",
+                            backgroundColor: currentTab === "calendar" ? "#000000" : "white",
+                            color: currentTab === "calendar" ? "white" : "#666666",
+                            border: "none",
+                            borderRadius: "0",
+                            cursor: "pointer",
+                            fontSize: "12px",
+                            fontWeight: "500",
+                            borderBottom: currentTab === "calendar" ? "2px solid #000000" : "none",
+                        }}
+                    >
+                        캘린더
+                    </button>
+                    <button
+                        onClick={() => setCurrentTab("images")}
+                        style={{
+                            flex: "1",
+                            padding: "16px 12px",
+                            backgroundColor: currentTab === "images" ? "#000000" : "white",
+                            color: currentTab === "images" ? "white" : "#666666",
+                            border: "none",
+                            borderRadius: "0",
+                            cursor: "pointer",
+                            fontSize: "12px",
+                            fontWeight: "500",
+                            borderBottom: currentTab === "images" ? "2px solid #000000" : "none",
+                        }}
+                    >
+                        갤러리
+                    </button>
+                    <button
+                        onClick={() => setCurrentTab("contacts")}
+                        style={{
+                            flex: "1",
+                            padding: "16px 12px",
+                            backgroundColor: currentTab === "contacts" ? "#000000" : "white",
+                            color: currentTab === "contacts" ? "white" : "#666666",
+                            border: "none",
+                            borderRadius: "0",
+                            cursor: "pointer",
+                            fontSize: "12px",
+                            fontWeight: "500",
+                            borderBottom: currentTab === "contacts" ? "2px solid #000000" : "none",
+                        }}
+                    >
+                        연락처
+                    </button>
+                </div>
             </div>
 
             {/* 알림 메시지 */}
@@ -5318,16 +5306,10 @@ export default function UnifiedWeddingAdmin2(props: any) {
 
             {/* 교통안내 탭 */}
             {currentTab === "transport" && (
-                                            <div
-                                                style={{
-                        flex: 1,
-                        overflowY: "auto",
-                        padding: "20px",
-                        backgroundColor: "#f5f5f5",
-                    }}
-                >
-                    <TransportEditorImpl pageId={currentPageId} />
-                </div>
+                <TransportTab
+                    pageId={currentPageId}
+                    tokenGetter={getAuthToken}
+                />
             )}
 
             {/* 연락처 편집 모달 */}
@@ -5792,6 +5774,174 @@ export default function UnifiedWeddingAdmin2(props: any) {
     )
 }
 
+// 교통안내 입력 탭 컴포넌트
+function TransportTab({
+    pageId,
+    tokenGetter,
+}: {
+    pageId: string
+    tokenGetter: () => string | null
+}): JSX.Element {
+    type TransportItem = { id?: string; title: string; description: string; display_order: number }
+
+    const DEFAULT_ITEMS: TransportItem[] = [
+        { title: "버스", description: "버스 번호와 정류장을 입력해주세요", display_order: 1 },
+        { title: "지하철", description: "지하철 호선과 하차역을 입력해주세요", display_order: 2 },
+    ]
+
+    const [items, setItems] = React.useState<TransportItem[]>(DEFAULT_ITEMS)
+    const [loading, setLoading] = React.useState(false)
+    const [saving, setSaving] = React.useState(false)
+    const [errorMsg, setErrorMsg] = React.useState<string>("")
+    const [successMsg, setSuccessMsg] = React.useState<string>("")
+
+    React.useEffect(() => {
+        let mounted = true
+        async function load() {
+            if (!pageId) return
+            setLoading(true)
+            setErrorMsg("")
+            try {
+                const res = await fetch(`${PROXY_BASE_URL}/api/transport?pageId=${encodeURIComponent(pageId)}`)
+                if (!res.ok) throw new Error(`load failed: ${res.status}`)
+                const result = await res.json()
+                if (mounted && result?.success && Array.isArray(result.data)) {
+                    const loaded: TransportItem[] = result.data.map((it: any, idx: number) => ({
+                        id: it.id,
+                        title: String(it.title ?? ""),
+                        description: String(it.description ?? ""),
+                        display_order: Number(it.display_order ?? idx + 1),
+                    }))
+                    setItems(loaded.length > 0 ? loaded : DEFAULT_ITEMS)
+                } else if (mounted) {
+                    setItems(DEFAULT_ITEMS)
+                }
+            } catch (_e) {
+                if (mounted) setItems(DEFAULT_ITEMS)
+            } finally {
+                if (mounted) setLoading(false)
+            }
+        }
+        load()
+        return () => {
+            mounted = false
+        }
+    }, [pageId])
+
+    const addItem = () => {
+        setItems((prev) => [
+            ...prev,
+            { title: "교통편", description: "상세 항목", display_order: prev.length + 1 },
+        ])
+    }
+
+    const move = (index: number, dir: -1 | 1) => {
+        setItems((prev) => {
+            const next = [...prev]
+            const ni = index + dir
+            if (ni < 0 || ni >= next.length) return prev
+            const temp = next[index]
+            next[index] = next[ni]
+            next[ni] = temp
+            return next.map((it, i) => ({ ...it, display_order: i + 1 }))
+        })
+    }
+
+    const change = (index: number, field: "title" | "description", value: string) => {
+        setItems((prev) => prev.map((it, i) => (i === index ? { ...it, [field]: value } : it)))
+    }
+
+    const save = async () => {
+        if (!pageId) {
+            setErrorMsg("페이지 ID가 필요합니다")
+            return
+        }
+        setSaving(true)
+        setErrorMsg("")
+        setSuccessMsg("")
+        try {
+            const token = tokenGetter?.() || ""
+            const res = await fetch(`${PROXY_BASE_URL}/api/transport`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+                body: JSON.stringify({ pageId, items }),
+            })
+            const text = await res.text()
+            let result: any = {}
+            try { result = JSON.parse(text) } catch { result = { raw: text } }
+            if (!res.ok || !result?.success) {
+                throw new Error(result?.message || result?.error || text || "저장 실패")
+            }
+            setSuccessMsg("교통안내가 저장되었습니다.")
+        } catch (e: any) {
+            setErrorMsg(e?.message || "저장 중 오류가 발생했습니다")
+        } finally {
+            setSaving(false)
+            setTimeout(() => {
+                setErrorMsg("")
+                setSuccessMsg("")
+            }, 3000)
+        }
+    }
+
+    return (
+        <div style={{ flex: 1, overflowY: "auto", padding: 20, background: "#f5f5f5" }}>
+            <div style={{ background: "white", padding: 20, maxWidth: 430, margin: "0 auto" }}>
+                <h2 style={{ margin: 0, marginBottom: 12, fontSize: 18, fontWeight: 600, color: "#111827" }}>교통안내</h2>
+
+                <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>페이지 ID</div>
+                <div style={{ padding: 12, border: "1px solid #e5e7eb", background: "#f9fafb", color: "#111827", fontSize: 14, marginBottom: 16 }}>
+                    {pageId || "(미지정)"}
+                </div>
+
+                {loading ? (
+                    <div style={{ padding: 12, color: "#6b7280" }}>불러오는 중...</div>
+                ) : (
+                    <div>
+                        {items.map((it, idx) => (
+                            <div key={idx} style={{ border: "1px solid #e5e7eb", padding: 12, marginBottom: 12 }}>
+                                <div style={{ display: "flex", gap: 10, marginBottom: 8 }}>
+                                    <div style={{ width: 60, color: "#6b7280", fontSize: 12 }}>교통편</div>
+                                    <input
+                                        value={it.title}
+                                        onChange={(e) => change(idx, "title", e.target.value)}
+                                        style={{ flex: 1, border: "1px solid #e5e7eb", padding: 8 }}
+                                        placeholder="예: 버스, 지하철, 자차"
+                                    />
+                                </div>
+                                <div style={{ display: "flex", gap: 10, marginBottom: 8 }}>
+                                    <div style={{ width: 60, color: "#6b7280", fontSize: 12 }}>상세 항목</div>
+                                    <input
+                                        value={it.description}
+                                        onChange={(e) => change(idx, "description", e.target.value)}
+                                        style={{ flex: 1, border: "1px solid #e5e7eb", padding: 8 }}
+                                        placeholder="예: 버스 번호와 정류장"
+                                    />
+                                </div>
+                                <div style={{ display: "flex", gap: 8 }}>
+                                    <button onClick={() => move(idx, -1)} style={{ padding: "6px 10px", border: "1px solid #e5e7eb", background: "white" }}>위로</button>
+                                    <button onClick={() => move(idx, 1)} style={{ padding: "6px 10px", border: "1px solid #e5e7eb", background: "white" }}>아래로</button>
+                                </div>
+                            </div>
+                        ))}
+
+                        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                            <button onClick={addItem} style={{ padding: "10px 14px", border: "1px solid #e5e7eb", background: "white" }}>+ 항목 추가</button>
+                            <button onClick={save} disabled={saving} style={{ padding: "10px 14px", background: saving ? "#9ca3af" : "#111827", color: "white", border: "none" }}>{saving ? "저장 중..." : "저장"}</button>
+                        </div>
+
+                        {errorMsg && <div style={{ marginTop: 10, color: "#b91c1c", fontSize: 13 }}>{errorMsg}</div>}
+                        {successMsg && <div style={{ marginTop: 10, color: "#065f46", fontSize: 13 }}>{successMsg}</div>}
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}
+
 // 입력 필드 컴포넌트
 function InputField({
     label,
@@ -5857,83 +6007,3 @@ addPropertyControls(UnifiedWeddingAdmin2, {
         defaultValue: 1024,
     },
 })
-
-// 교통안내 편집기 (간단 구현)
-function TransportEditorImpl({ pageId }: { pageId: string }) {
-    const [items, setItems] = React.useState<{ title: string; description: string; display_order: number }[]>([
-        { title: "버스", description: "버스 번호와 정류장을 입력해주세요", display_order: 1 },
-        { title: "지하철", description: "지하철 호선과 하차역을 입력해주세요", display_order: 2 },
-    ])
-    const [saving, setSaving] = React.useState(false)
-
-    const addItem = () => {
-        setItems((prev) => [
-            ...prev,
-            { title: "교통편", description: "상세 항목", display_order: prev.length + 1 },
-        ])
-    }
-
-    const move = (idx: number, dir: -1 | 1) => {
-        const ni = idx + dir
-        if (ni < 0 || ni >= items.length) return
-        const next = [...items]
-        const tmp = next[idx]
-        next[idx] = next[ni]
-        next[ni] = tmp
-        // 재정렬된 display_order 반영
-        const normalized = next.map((it, i) => ({ ...it, display_order: i + 1 }))
-        setItems(normalized)
-    }
-
-    const change = (idx: number, field: 'title' | 'description', value: string) => {
-        setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, [field]: value } : it)))
-    }
-
-    const save = async () => {
-        if (!pageId) return alert('페이지 ID를 설정하세요')
-        setSaving(true)
-        try {
-            const res = await fetch(`${PROXY_BASE_URL}/api/transport`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getAuthToken()}` },
-                body: JSON.stringify({ items }),
-            })
-            const result = await res.json()
-            if (!res.ok || !result?.success) {
-                throw new Error(result?.message || result?.error || '저장 실패')
-            }
-            alert('교통안내가 저장되었습니다.')
-        } catch (e: any) {
-            alert('저장 중 오류: ' + (e?.message || '알 수 없는 오류'))
-        } finally {
-            setSaving(false)
-        }
-    }
-
-    return (
-        <div style={{ backgroundColor: 'white', padding: 20 }}>
-            <h2 style={{ fontSize: 18, fontWeight: 600, color: '#000', margin: '0 0 16px 0' }}>교통안내</h2>
-            {items.map((it, idx) => (
-                <div key={idx} style={{ border: '1px solid #e5e7eb', padding: 12, marginBottom: 10 }}>
-                    <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
-                        <div style={{ width: 60, color: '#6b7280', fontSize: 12 }}>교통편</div>
-                        <input value={it.title} onChange={(e) => change(idx, 'title', e.target.value)} style={{ flex: 1, border: '1px solid #e5e7eb', padding: 8 }} />
-                    </div>
-                    <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
-                        <div style={{ width: 60, color: '#6b7280', fontSize: 12 }}>상세 항목</div>
-                        <input value={it.description} onChange={(e) => change(idx, 'description', e.target.value)} style={{ flex: 1, border: '1px solid #e5e7eb', padding: 8 }} />
-                    </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                        <button onClick={() => move(idx, -1)} style={{ padding: '6px 10px', border: '1px solid #e5e7eb', background: 'white' }}>위로</button>
-                        <button onClick={() => move(idx, 1)} style={{ padding: '6px 10px', border: '1px solid #e5e7eb', background: 'white' }}>아래로</button>
-                    </div>
-                </div>
-            ))}
-            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                <button onClick={addItem} style={{ padding: '10px 14px', border: '1px solid #e5e7eb', background: 'white' }}>+ 항목 추가</button>
-                <button onClick={save} disabled={saving} style={{ padding: '10px 14px', background: saving ? '#9ca3af' : '#111827', color: 'white', border: 'none' }}>{saving ? '저장 중...' : '저장'}</button>
-            </div>
-        </div>
-    )
-}
-

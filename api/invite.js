@@ -77,8 +77,7 @@ async function handleUpsert(req, res) {
       'groom_father_name', 'groom_mother_name', 'groom_name',
       'bride_father_name', 'bride_mother_name', 'bride_name',
       'show_groom_father_chrysanthemum', 'show_groom_mother_chrysanthemum',
-      'show_bride_father_chrysanthemum', 'show_bride_mother_chrysanthemum',
-      'son_label', 'daughter_label'
+      'show_bride_father_chrysanthemum', 'show_bride_mother_chrysanthemum'
     ]
     let { invite } = req.body || {}
     if (!invite) return res.status(400).json({ success: false, error: 'invite is required' })
@@ -124,8 +123,6 @@ function getDefaultInvite(pageId) {
     show_groom_mother_chrysanthemum: false,
     show_bride_father_chrysanthemum: false,
     show_bride_mother_chrysanthemum: false,
-    son_label: '아들',
-    daughter_label: '딸',
   }
 }
 
@@ -154,8 +151,6 @@ function validateToken(token) {
 //   show_groom_mother_chrysanthemum boolean default false,
 //   show_bride_father_chrysanthemum boolean default false,
 //   show_bride_mother_chrysanthemum boolean default false,
-//   son_label text default '아들',
-//   daughter_label text default '딸',
 //   updated_at timestamptz default now()
 // );
 

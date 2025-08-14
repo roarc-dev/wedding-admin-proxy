@@ -125,6 +125,8 @@ export default function PhotoSection(props: PhotoSectionProps) {
     // Settings 기반 이미지 URL 생성
     const buildImageUrlFromSettings = (s: PageSettings | null): string | undefined => {
         if (!s) return undefined
+        const derived = (s as any).photo_section_image_public_url as string | undefined
+        if (derived) return derived
         const direct = s.photo_section_image_url || undefined
         const fromPath = s.photo_section_image_path
             ? `https://yjlzizakdjghpfduxcki.supabase.co/storage/v1/object/public/images/${s.photo_section_image_path}`

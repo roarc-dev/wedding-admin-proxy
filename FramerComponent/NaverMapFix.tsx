@@ -6,6 +6,57 @@
 import React, { useRef, useEffect, useState } from "react"
 import { addPropertyControls, ControlType } from "framer"
 
+// 프록시 서버 URL (고정된 Production URL)
+const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app"
+
+// 페이지 설정 정보 타입 정의
+interface PageSettings {
+    id?: string
+    page_id: string
+    venue_name?: string
+    venue_address?: string
+    created_at?: string
+    updated_at?: string
+}
+
+// 프록시를 통한 안전한 페이지 설정 가져오기
+async function getPageSettings(pageId: string): Promise<PageSettings | null> {
+    try {
+        const response = await fetch(
+            `${PROXY_BASE_URL}/api/page-settings?pageId=${pageId}`,
+            {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            }
+        )
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        }
+
+        const result = await response.json()
+
+        if (result.success && result.data) {
+            return {
+                id: result.data.id,
+                page_id: result.data.page_id,
+                venue_name: result.data.venue_name || '',
+                venue_address: result.data.venue_address || '',
+                created_at: result.data.created_at,
+                updated_at: result.data.updated_at,
+            }
+        } else {
+            console.warn("페이지 설정이 없습니다:", result.error)
+            return null
+        }
+    } catch (error) {
+        console.error("페이지 설정 가져오기 실패:", error)
+        return null
+    }
+}
+
 declare global {
     interface Window {
         naver: any
@@ -18,13 +69,15 @@ declare global {
 interface Props {
     pageId: string
     placeName: string
+    forcePlaceName: string
     retina: boolean
     style?: React.CSSProperties
 }
 
-export default function NaverPlaceSearchMap({
+export default function NaverMapFix({
     pageId = "default",
     placeName = "",
+    forcePlaceName = "",
     retina,
     style,
 }: Props) {
@@ -33,9 +86,9 @@ export default function NaverPlaceSearchMap({
     const markerInstance = useRef<any>(null)
     const geocoderInstance = useRef<any>(null)
     const placesServiceInstance = useRef<any>(null)
+    const [pageSettings, setPageSettings] = useState<PageSettings | null>(null)
     const [venueName, setVenueName] = useState("")
     const [naverClientId, setNaverClientId] = useState("")
-    const [naverKeyId, setNaverKeyId] = useState("")
     const [googleMapsApiKey, setGoogleMapsApiKey] = useState("")
     const [tmapApiKey, setTmapApiKey] = useState("")
     const [currentPosition, setCurrentPosition] = useState<{
@@ -406,43 +459,64 @@ export default function NaverPlaceSearchMap({
         }
     }
 
-    // API 로드
+    // API 로드 및 페이지 설정 가져오기
     useEffect(() => {
         const fetchConfigAndVenue = async () => {
             try {
-                setVenueName(placeName || "")
+                // 페이지 설정과 API 설정을 병렬로 로드
+                const [settings, configRes] = await Promise.all([
+                    getPageSettings(pageId),
+                    fetch("https://wedding-admin-proxy.vercel.app/api/map-config")
+                ])
+                
+                setPageSettings(settings)
+                
+                // 장소명 결정 로직: 강제 입력 > 서버 데이터 > 기본값
+                let finalVenueName = ""
+                
+                if (forcePlaceName && forcePlaceName.trim()) {
+                    // 강제 입력된 장소명이 있으면 우선 사용
+                    finalVenueName = forcePlaceName.trim()
+                    console.log("강제 입력된 장소명 사용:", finalVenueName)
+                } else if (settings?.venue_name && settings.venue_name.trim()) {
+                    // 서버에서 가져온 venue_name 사용
+                    finalVenueName = settings.venue_name.trim()
+                    console.log("서버 venue_name 사용:", finalVenueName)
+                } else if (placeName && placeName.trim()) {
+                    // 기존 placeName 사용 (하위 호환성)
+                    finalVenueName = placeName.trim()
+                    console.log("기존 placeName 사용:", finalVenueName)
+                }
+                
+                setVenueName(finalVenueName)
+                
+                // 검색 결과 검토 로직 추가
+                if (settings?.venue_name && settings?.venue_address) {
+                    console.log("서버 데이터 검토:", {
+                        venue_name: settings.venue_name,
+                        venue_address: settings.venue_address,
+                        final_venue_name: finalVenueName
+                    })
+                }
 
-                // API 키 로딩 시간을 더 여유롭게
-                try {
-                    const configRes = await fetch(
-                        "https://wedding-admin-proxy.vercel.app/api/map-config"
-                    )
-                    if (configRes.ok) {
-                        const configJson = await configRes.json()
-                        if (configJson.success) {
-                            setNaverClientId(
-                                configJson.data.naverClientId || "3cxftuac0e"
-                            )
-                            setNaverKeyId(configJson.data.naverKeyId || "")
-                            setGoogleMapsApiKey(
-                                configJson.data.googleMapsApiKey || ""
-                            )
-                            setTmapApiKey(configJson.data.tmapApiKey || "")
-                        } else {
-                            setNaverClientId("3cxftuac0e")
-                            setNaverKeyId("")
-                            setGoogleMapsApiKey("")
-                        }
+                // API 키 설정
+                if (configRes.ok) {
+                    const configJson = await configRes.json()
+                    if (configJson.success) {
+                        setNaverClientId(
+                            configJson.data.naverClientId || "3cxftuac0e"
+                        )
+                        setGoogleMapsApiKey(
+                            configJson.data.googleMapsApiKey || ""
+                        )
+                        setTmapApiKey(configJson.data.tmapApiKey || "")
                     } else {
                         setNaverClientId("3cxftuac0e")
-                        setNaverKeyId("")
                         setGoogleMapsApiKey("")
                     }
-                } catch (err) {
+                } else {
                     setNaverClientId("3cxftuac0e")
-                    setNaverKeyId("")
                     setGoogleMapsApiKey("")
-                    console.log("API config 로드 실패, 기본값 사용:", err)
                 }
 
                 // API 키 로딩 완료를 약간 지연시켜 안정성 확보
@@ -459,7 +533,7 @@ export default function NaverPlaceSearchMap({
         return () => {
             // cleanup
         }
-    }, [pageId, placeName])
+    }, [pageId, placeName, forcePlaceName])
 
     // 네이버 지도 및 구글 서비스 초기화 (API 키가 준비된 후)
     useEffect(() => {
@@ -495,9 +569,9 @@ export default function NaverPlaceSearchMap({
         // 네이버 지도는 검색 완료 후에만 초기화하도록 수정하지 않고,
         // 검색이 없는 경우를 위해 여전히 로드하되 마커만 숨김
         if (!window.naver || !window.naver.maps) {
-            const currentNaverKeyId = naverKeyId || naverClientId || "3cxftuac0e"
+            const currentNaverClientId = naverClientId || "3cxftuac0e"
             const naverScript = document.createElement("script")
-            naverScript.src = `https://openapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${currentNaverKeyId}`
+            naverScript.src = `https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${currentNaverClientId}`
             naverScript.async = true
             naverScript.onload = () => {
                 // 네이버 지도 로드 후 대기 시간 단축
@@ -515,7 +589,7 @@ export default function NaverPlaceSearchMap({
             naverScript.onerror = () => console.log("네이버 지도 API 로드 실패")
             document.head.appendChild(naverScript)
         }
-    }, [apiKeysLoaded, naverClientId, naverKeyId, googleMapsApiKey, venueName])
+    }, [apiKeysLoaded, naverClientId, googleMapsApiKey, venueName])
 
     // 구글 서비스 초기화 후 바로 검색하는 헬퍼 함수
     const initGoogleServicesAndSearch = () => {
@@ -588,24 +662,31 @@ export default function NaverPlaceSearchMap({
     )
 }
 
-NaverPlaceSearchMap.defaultProps = {
+NaverMapFix.defaultProps = {
     pageId: "default",
     placeName: "",
+    forcePlaceName: "",
     retina: true,
 }
 
-addPropertyControls(NaverPlaceSearchMap, {
+addPropertyControls(NaverMapFix, {
     pageId: {
         type: ControlType.String,
         title: "페이지 ID",
         defaultValue: "default",
         placeholder: "각 결혼식 페이지를 구분하는 고유 ID",
     },
+    forcePlaceName: {
+        type: ControlType.String,
+        title: "강제 장소명",
+        defaultValue: "",
+        placeholder: "서버 데이터 대신 사용할 장소명 (공란시 서버 데이터 사용)",
+    },
     placeName: {
         type: ControlType.String,
-        title: "장소명",
+        title: "장소명 (하위 호환)",
         defaultValue: "",
-        placeholder: "검색할 장소의 이름",
+        placeholder: "검색할 장소의 이름 (강제 장소명이 없을 때 사용)",
     },
     retina: {
         type: ControlType.Boolean,
