@@ -1,10 +1,7 @@
 {
   "regions": ["icn1"],
   "functions": {
-    "api/*.js": {
-      "maxDuration": 15,
-      "memory": 1024
-    }
+    "api/router.js": { "maxDuration": 15, "memory": 1024 }
   },
   "headers": [
     {

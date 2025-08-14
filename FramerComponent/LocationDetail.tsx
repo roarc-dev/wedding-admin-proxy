@@ -54,7 +54,16 @@ export default function LocationDetail(props: LocationDetailProps) {
     async function load() {
       setLoading(true)
       try {
-        const res = await fetch(`${PROXY_BASE_URL}/api/transport?pageId=${encodeURIComponent(pageId)}`)
+        const bases = [typeof window !== 'undefined' ? window.location.origin : '', PROXY_BASE_URL].filter(Boolean)
+        let res: Response | null = null
+        for (const base of bases) {
+          try {
+            const tryRes = await fetch(`${base}/api/router?transport&pageId=${encodeURIComponent(pageId)}`)
+            res = tryRes
+            if (tryRes.ok) break
+          } catch {}
+        }
+        if (!res) throw new Error('network error')
         const result = await res.json()
         if (mounted && result?.success && Array.isArray(result.data)) {
           setItems(result.data)

@@ -5828,7 +5828,7 @@ function TransportTab({
             setLoading(true)
             setErrorMsg("")
             try {
-                const res = await request(`/api/transport?pageId=${encodeURIComponent(pageId)}`)
+                const res = await request(`/api/router?transport&pageId=${encodeURIComponent(pageId)}`)
                 if (!res.ok) throw new Error(`load failed: ${res.status}`)
                 const result = await res.json()
                 if (mounted && result?.success && Array.isArray(result.data)) {
@@ -5902,7 +5902,7 @@ function TransportTab({
             let text = ""
             for (const base of bases) {
                 try {
-                    const tryRes = await fetch(`${base}/api/transport`, {
+                    const tryRes = await fetch(`${base}/api/router?transport`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
