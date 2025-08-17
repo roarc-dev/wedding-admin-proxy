@@ -215,6 +215,9 @@ async function handleUpdateSettings(req, res, validatedUser) {
       'highlight_color',
       'highlight_text_color',
       'gallery_type',
+      'page_title',
+      'page_description',
+      'page_url',
     ]
 
     let sanitized = Object.fromEntries(
