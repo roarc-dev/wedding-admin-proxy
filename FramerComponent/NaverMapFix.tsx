@@ -502,19 +502,37 @@ export default function NaverMapFix({
                 // API 키 설정
                 if (configRes.ok) {
                     const configJson = await configRes.json()
+                    console.log("Map config response:", configJson)
+                    
                     if (configJson.success) {
+                        // map-config.js의 실제 필드명에 맞춰 수정
                         setNaverClientId(
-                            configJson.data.naverClientId || "3cxftuac0e"
+                            configJson.data.naverMapsKey || 
+                            configJson.data.naverClientId || 
+                            "3cxftuac0e"
                         )
                         setGoogleMapsApiKey(
-                            configJson.data.googleMapsApiKey || ""
+                            configJson.data.googleMapsApiKey || 
+                            configJson.data.googleMapsKey || 
+                            ""
                         )
-                        setTmapApiKey(configJson.data.tmapApiKey || "")
+                        setTmapApiKey(
+                            configJson.data.tmapApiKey || 
+                            ""
+                        )
+                        
+                        console.log("API keys loaded:", {
+                            naver: configJson.data.naverMapsKey || configJson.data.naverClientId,
+                            google: configJson.data.googleMapsApiKey || configJson.data.googleMapsKey,
+                            tmap: configJson.data.tmapApiKey
+                        })
                     } else {
+                        console.warn("Map config failed:", configJson.error)
                         setNaverClientId("3cxftuac0e")
                         setGoogleMapsApiKey("")
                     }
                 } else {
+                    console.warn("Map config request failed:", configRes.status)
                     setNaverClientId("3cxftuac0e")
                     setGoogleMapsApiKey("")
                 }
