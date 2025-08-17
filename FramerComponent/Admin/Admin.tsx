@@ -5883,6 +5883,52 @@ function TransportTab({
         setItems((prev) => prev.map((it, i) => (i === index ? { ...it, [field]: value } : it)))
     }
 
+    // 텍스트 포맷팅 함수들
+    const insertFormat = (index: number, format: "bold" | "small") => {
+        const textareaId = `description-${index}`
+        const textarea = document.getElementById(textareaId) as HTMLTextAreaElement
+        if (!textarea) return
+
+        const start = textarea.selectionStart
+        const end = textarea.selectionEnd
+        const selectedText = textarea.value.substring(start, end)
+        const beforeText = textarea.value.substring(0, start)
+        const afterText = textarea.value.substring(end)
+
+        let newText = ""
+        let cursorOffset = 0
+
+        if (format === "bold") {
+            if (selectedText) {
+                newText = `${beforeText}*${selectedText}*${afterText}`
+                cursorOffset = start + selectedText.length + 2
+            } else {
+                newText = `${beforeText}*텍스트*${afterText}`
+                cursorOffset = start + 1
+            }
+        } else if (format === "small") {
+            if (selectedText) {
+                newText = `${beforeText}{${selectedText}}${afterText}`
+                cursorOffset = start + selectedText.length + 2
+            } else {
+                newText = `${beforeText}{텍스트}${afterText}`
+                cursorOffset = start + 1
+            }
+        }
+
+        // 값 업데이트
+        change(index, "description", newText)
+
+        // 커서 위치 복원 (다음 렌더링 이후)
+        setTimeout(() => {
+            const updatedTextarea = document.getElementById(textareaId) as HTMLTextAreaElement
+            if (updatedTextarea) {
+                updatedTextarea.focus()
+                updatedTextarea.setSelectionRange(cursorOffset, cursorOffset)
+            }
+        }, 0)
+    }
+
     const save = async () => {
         if (!pageId) {
             setErrorMsg("페이지 ID가 필요합니다")
@@ -5976,12 +6022,61 @@ function TransportTab({
                                 </div>
                                 <div style={{ display: "flex", gap: 10, marginBottom: 8 }}>
                                     <div style={{ width: 60, color: "#6b7280", fontSize: 12 }}>상세 항목</div>
-                                    <input
-                                        value={it.description}
-                                        onChange={(e) => change(idx, "description", e.target.value)}
-                                        style={{ flex: 1, border: "1px solid #e5e7eb", padding: 8 }}
-                                        placeholder="예: 버스 번호와 정류장"
-                                    />
+                                    <div style={{ flex: 1 }}>
+                                        <textarea
+                                            id={`description-${idx}`}
+                                            value={it.description}
+                                            onChange={(e) => change(idx, "description", e.target.value)}
+                                            style={{ 
+                                                width: "100%",
+                                                border: "1px solid #e5e7eb", 
+                                                padding: 8, 
+                                                minHeight: 80,
+                                                resize: "vertical",
+                                                fontFamily: "inherit",
+                                                fontSize: 14,
+                                                marginBottom: 6
+                                            }}
+                                            placeholder="예: 버스 번호와 정류장&#10;여러 줄 입력 가능"
+                                            rows={3}
+                                        />
+                                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                            <button
+                                                type="button"
+                                                onClick={() => insertFormat(idx, "bold")}
+                                                style={{
+                                                    padding: "4px 8px",
+                                                    border: "1px solid #d1d5db",
+                                                    backgroundColor: "#f9fafb",
+                                                    borderRadius: 4,
+                                                    fontSize: 12,
+                                                    cursor: "pointer",
+                                                    fontFamily: "Pretendard SemiBold"
+                                                }}
+                                                title="선택한 텍스트를 두껍게 (*텍스트*)"
+                                            >
+                                                *볼드*
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => insertFormat(idx, "small")}
+                                                style={{
+                                                    padding: "4px 8px",
+                                                    border: "1px solid #d1d5db",
+                                                    backgroundColor: "#f9fafb",
+                                                    borderRadius: 4,
+                                                    fontSize: 12,
+                                                    cursor: "pointer"
+                                                }}
+                                                title="선택한 텍스트를 작게 ({텍스트})"
+                                            >
+                                                {"{작게}"}
+                                            </button>
+                                            <span style={{ fontSize: 11, color: "#9ca3af", alignSelf: "center" }}>
+                                                텍스트 선택 후 버튼 클릭
+                                            </span>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div style={{ display: "flex", gap: 8 }}>
                                     <button onClick={() => move(idx, -1)} style={{ padding: "6px 10px", border: "1px solid #e5e7eb", background: "white" }}>위로</button>
