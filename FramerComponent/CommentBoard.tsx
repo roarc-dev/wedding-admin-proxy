@@ -47,8 +47,6 @@ export default function CommentBoard({
 
     async function fetchComments() {
         try {
-            const url = `${PROXY_BASE_URL}/api/comments`
-
             const requestBody = {
                 action: "getByPageId",
                 pageId: pageId,
@@ -56,13 +54,33 @@ export default function CommentBoard({
                 itemsPerPage: ITEMS_PER_PAGE,
             }
 
-            const response = await fetch(url, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(requestBody),
-            })
+            // 여러 base URL로 시도
+            const bases = [
+                typeof window !== "undefined" ? window.location.origin : "",
+                PROXY_BASE_URL,
+            ].filter(Boolean)
+
+            let response: Response | null = null
+            for (const base of bases) {
+                try {
+                    const tryResponse = await fetch(`${base}/api/comments`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify(requestBody),
+                    })
+                    response = tryResponse
+                    if (tryResponse.ok) break
+                } catch (fetchError) {
+                    console.log(`Failed to fetch from ${base}:`, fetchError)
+                    // 다음 base URL로 계속 시도
+                }
+            }
+
+            if (!response) {
+                throw new Error("모든 서버 연결에 실패했습니다")
+            }
 
             if (!response.ok) {
                 const errorText = await response.text()
@@ -75,6 +93,7 @@ export default function CommentBoard({
             if (result.success) {
                 setComments(result.data || [])
                 setTotalPages(Math.ceil((result.count || 0) / ITEMS_PER_PAGE))
+                setErrorMessage("") // 성공 시 에러 메시지 클리어
             } else {
                 throw new Error(result.error || "데이터를 가져올 수 없습니다")
             }
@@ -97,8 +116,6 @@ export default function CommentBoard({
         }
 
         try {
-            const url = `${PROXY_BASE_URL}/api/comments`
-
             const requestBody = {
                 action: "insert",
                 name: name,
@@ -107,13 +124,33 @@ export default function CommentBoard({
                 page_id: pageId,
             }
 
-            const response = await fetch(url, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(requestBody),
-            })
+            // 여러 base URL로 시도
+            const bases = [
+                typeof window !== "undefined" ? window.location.origin : "",
+                PROXY_BASE_URL,
+            ].filter(Boolean)
+
+            let response: Response | null = null
+            for (const base of bases) {
+                try {
+                    const tryResponse = await fetch(`${base}/api/comments`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify(requestBody),
+                    })
+                    response = tryResponse
+                    if (tryResponse.ok) break
+                } catch (fetchError) {
+                    console.log(`Failed to submit to ${base}:`, fetchError)
+                    // 다음 base URL로 계속 시도
+                }
+            }
+
+            if (!response) {
+                throw new Error("모든 서버 연결에 실패했습니다")
+            }
 
             if (!response.ok) {
                 const errorText = await response.text()
@@ -151,8 +188,6 @@ export default function CommentBoard({
         }
 
         try {
-            const url = `${PROXY_BASE_URL}/api/comments`
-
             const requestBody = {
                 action: "delete",
                 id: deleteCommentId,
@@ -160,13 +195,33 @@ export default function CommentBoard({
                 page_id: pageId,
             }
 
-            const response = await fetch(url, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(requestBody),
-            })
+            // 여러 base URL로 시도
+            const bases = [
+                typeof window !== "undefined" ? window.location.origin : "",
+                PROXY_BASE_URL,
+            ].filter(Boolean)
+
+            let response: Response | null = null
+            for (const base of bases) {
+                try {
+                    const tryResponse = await fetch(`${base}/api/comments`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify(requestBody),
+                    })
+                    response = tryResponse
+                    if (tryResponse.ok) break
+                } catch (fetchError) {
+                    console.log(`Failed to delete from ${base}:`, fetchError)
+                    // 다음 base URL로 계속 시도
+                }
+            }
+
+            if (!response) {
+                throw new Error("모든 서버 연결에 실패했습니다")
+            }
 
             if (!response.ok) {
                 const errorText = await response.text()
