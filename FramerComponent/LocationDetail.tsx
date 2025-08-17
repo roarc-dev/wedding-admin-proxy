@@ -58,7 +58,7 @@ export default function LocationDetail(props: LocationDetailProps) {
         let res: Response | null = null
         for (const base of bases) {
           try {
-            const tryRes = await fetch(`${base}/api/router?transport&pageId=${encodeURIComponent(pageId)}`)
+            const tryRes = await fetch(`${base}/api/page-settings?transport&pageId=${encodeURIComponent(pageId)}`)
             res = tryRes
             if (tryRes.ok) break
           } catch {}

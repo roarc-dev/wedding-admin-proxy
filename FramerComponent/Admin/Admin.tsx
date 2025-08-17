@@ -5790,6 +5790,7 @@ function TransportTab({
     ]
 
     const [items, setItems] = React.useState<TransportItem[]>(DEFAULT_ITEMS)
+    const [locationName, setLocationName] = React.useState<string>("")
     const [loading, setLoading] = React.useState(false)
     const [saving, setSaving] = React.useState(false)
     const [errorMsg, setErrorMsg] = React.useState<string>("")
@@ -5828,17 +5829,22 @@ function TransportTab({
             setLoading(true)
             setErrorMsg("")
             try {
-                const res = await request(`/api/router?transport&pageId=${encodeURIComponent(pageId)}`)
+                const res = await request(`/api/page-settings?transport&pageId=${encodeURIComponent(pageId)}`)
                 if (!res.ok) throw new Error(`load failed: ${res.status}`)
                 const result = await res.json()
-                if (mounted && result?.success && Array.isArray(result.data)) {
-                    const loaded: TransportItem[] = result.data.map((it: any, idx: number) => ({
-                        id: it.id,
-                        title: String(it.title ?? ""),
-                        description: String(it.description ?? ""),
-                        display_order: Number(it.display_order ?? idx + 1),
-                    }))
-                    setItems(loaded.length > 0 ? loaded : DEFAULT_ITEMS)
+                if (mounted && result?.success) {
+                    if (Array.isArray(result.data)) {
+                        const loaded: TransportItem[] = result.data.map((it: any, idx: number) => ({
+                            id: it.id,
+                            title: String(it.title ?? ""),
+                            description: String(it.description ?? ""),
+                            display_order: Number(it.display_order ?? idx + 1),
+                        }))
+                        setItems(loaded.length > 0 ? loaded : DEFAULT_ITEMS)
+                    }
+                    if (result.locationName) {
+                        setLocationName(String(result.locationName))
+                    }
                 } else if (mounted) {
                     setItems(DEFAULT_ITEMS)
                 }
@@ -5902,13 +5908,13 @@ function TransportTab({
             let text = ""
             for (const base of bases) {
                 try {
-                    const tryRes = await fetch(`${base}/api/router?transport`, {
+                    const tryRes = await fetch(`${base}/api/page-settings?transport`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                     ...(token ? { Authorization: `Bearer ${token}` } : {}),
                 },
-                        body: JSON.stringify({ pageId, items }),
+                        body: JSON.stringify({ pageId, items, locationName }),
                     })
                     res = tryRes
                     text = await tryRes.text()
@@ -5943,7 +5949,15 @@ function TransportTab({
                 <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>페이지 ID</div>
                 <div style={{ padding: 12, border: "1px solid #e5e7eb", background: "#f9fafb", color: "#111827", fontSize: 14, marginBottom: 16 }}>
                     {pageId || "(미지정)"}
-                                </div>
+                </div>
+
+                <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>장소명</div>
+                <input
+                    value={locationName}
+                    onChange={(e) => setLocationName(e.target.value)}
+                    style={{ width: "100%", padding: 12, border: "1px solid #e5e7eb", marginBottom: 16 }}
+                    placeholder="예: 그랜드볼룸 웨딩홀"
+                />
 
                 {loading ? (
                     <div style={{ padding: 12, color: "#6b7280" }}>불러오는 중...</div>

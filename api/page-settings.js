@@ -44,6 +44,21 @@ export default async function handler(req, res) {
   }
 
   try {
+    // 교통편 요청인지 확인
+    if (req.query.transport !== undefined) {
+      switch (req.method) {
+        case 'GET':
+          return await handleGetTransport(req, res)
+        case 'POST':
+          return await handleUpdateTransport(req, res, validatedUser)
+        default:
+          return res.status(405).json({ 
+            success: false, 
+            error: 'Method not allowed' 
+          })
+      }
+    }
+
     switch (req.method) {
       case 'GET':
         return await handleGetSettings(req, res)
@@ -255,6 +270,134 @@ async function handleUpdateSettings(req, res, validatedUser) {
       details: error && error.details ? error.details : undefined,
       hint: error && error.hint ? error.hint : undefined,
       code: error && error.code ? error.code : undefined
+    })
+  }
+}
+
+async function handleGetTransport(req, res) {
+  const { pageId } = req.query
+
+  if (!pageId) {
+    return res.status(400).json({
+      success: false,
+      error: 'pageId is required'
+    })
+  }
+
+  try {
+    // transport_infos 테이블에서 교통편 정보 조회
+    const { data: transportData, error: transportError } = await supabase
+      .from('transport_infos')
+      .select('*')
+      .eq('page_id', pageId)
+      .order('display_order')
+
+    if (transportError && transportError.code !== 'PGRST116') {
+      console.error('Transport query error:', transportError)
+    }
+
+    // page_settings에서 장소명 조회
+    const { data: settingsData, error: settingsError } = await supabase
+      .from('page_settings')
+      .select('transport_location_name')
+      .eq('page_id', pageId)
+      .single()
+
+    if (settingsError && settingsError.code !== 'PGRST116') {
+      console.error('Settings query error:', settingsError)
+    }
+
+    return res.json({
+      success: true,
+      data: transportData || [],
+      locationName: settingsData?.transport_location_name || ''
+    })
+  } catch (error) {
+    console.error('Get transport error:', error)
+    return res.status(500).json({
+      success: false,
+      error: '교통편 조회 중 오류가 발생했습니다'
+    })
+  }
+}
+
+async function handleUpdateTransport(req, res, validatedUser) {
+  const { pageId, items, locationName } = req.body
+
+  if (!pageId) {
+    return res.status(400).json({
+      success: false,
+      error: 'pageId is required'
+    })
+  }
+
+  try {
+    // 1) 사용자 인증 확인
+    const userId = validatedUser?.userId
+    if (!userId) {
+      return res.status(401).json({ 
+        success: false, 
+        error: '인증 사용자 정보를 찾을 수 없습니다' 
+      })
+    }
+
+    // 2) transport_infos 테이블 업데이트
+    if (Array.isArray(items)) {
+      // 기존 데이터 삭제
+      await supabase
+        .from('transport_infos')
+        .delete()
+        .eq('page_id', pageId)
+
+      // 새 데이터 삽입
+      if (items.length > 0) {
+        const transportItems = items.map((item, index) => ({
+          page_id: pageId,
+          title: item.title || '',
+          description: item.description || '',
+          display_order: item.display_order || index + 1
+        }))
+
+        const { error: insertError } = await supabase
+          .from('transport_infos')
+          .insert(transportItems)
+
+        if (insertError) {
+          console.error('Transport insert error:', insertError)
+          throw insertError
+        }
+      }
+    }
+
+    // 3) page_settings에 장소명 저장
+    if (locationName !== undefined) {
+      const { error: updateError } = await supabase
+        .from('page_settings')
+        .upsert(
+          {
+            page_id: pageId,
+            transport_location_name: locationName,
+            updated_at: new Date().toISOString()
+          },
+          { onConflict: 'page_id' }
+        )
+
+      if (updateError) {
+        console.error('Location name update error:', updateError)
+        throw updateError
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: '교통편 정보가 저장되었습니다'
+    })
+  } catch (error) {
+    console.error('Update transport error:', error)
+    return res.status(500).json({
+      success: false,
+      error: '교통편 저장 중 오류가 발생했습니다',
+      message: error?.message || String(error)
     })
   }
 }
