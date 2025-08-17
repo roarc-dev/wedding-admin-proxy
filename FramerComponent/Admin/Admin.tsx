@@ -2581,88 +2581,88 @@ export default function UnifiedWeddingAdmin2(props: any) {
             {/* 탭 메뉴 */}
             <div style={{ backgroundColor: "white", borderBottom: "1px solid #e0e0e0" }}>
                 <div style={{ display: "flex", padding: 0 }}>
-                    <button
+                <button
                         onClick={() => setCurrentTab("name")}
-                        style={{
-                            flex: "1",
-                            padding: "16px 12px",
+                    style={{
+                        flex: "1",
+                        padding: "16px 12px",
                             backgroundColor: currentTab === "name" ? "#000000" : "white",
                             color: currentTab === "name" ? "white" : "#666666",
-                            border: "none",
-                            borderRadius: "0",
-                            cursor: "pointer",
-                            fontSize: "12px",
-                            fontWeight: "500",
+                        border: "none",
+                        borderRadius: "0",
+                        cursor: "pointer",
+                        fontSize: "12px",
+                        fontWeight: "500",
                             borderBottom: currentTab === "name" ? "2px solid #000000" : "none",
-                        }}
-                    >
+                    }}
+                >
                         이름
-                    </button>
-                    <button
-                        onClick={() => setCurrentTab("photo")}
-                        style={{
-                            flex: "1",
-                            padding: "16px 12px",
+                </button>
+                <button
+                    onClick={() => setCurrentTab("photo")}
+                    style={{
+                        flex: "1",
+                        padding: "16px 12px",
                             backgroundColor: currentTab === "photo" ? "#000000" : "white",
-                            color: currentTab === "photo" ? "white" : "#666666",
-                            border: "none",
-                            borderRadius: "0",
-                            cursor: "pointer",
-                            fontSize: "12px",
-                            fontWeight: "500",
+                        color: currentTab === "photo" ? "white" : "#666666",
+                        border: "none",
+                        borderRadius: "0",
+                        cursor: "pointer",
+                        fontSize: "12px",
+                        fontWeight: "500",
                             borderBottom: currentTab === "photo" ? "2px solid #000000" : "none",
-                        }}
-                    >
-                        포토섹션
-                    </button>
-                    <button
+                    }}
+                >
+                    포토섹션
+                </button>
+                <button
                         onClick={() => setCurrentTab("invite")}
-                        style={{
-                            flex: "1",
-                            padding: "16px 12px",
+                    style={{
+                        flex: "1",
+                        padding: "16px 12px",
                             backgroundColor: currentTab === "invite" ? "#000000" : "white",
                             color: currentTab === "invite" ? "white" : "#666666",
-                            border: "none",
-                            borderRadius: "0",
-                            cursor: "pointer",
-                            fontSize: "12px",
-                            fontWeight: "500",
+                        border: "none",
+                        borderRadius: "0",
+                        cursor: "pointer",
+                        fontSize: "12px",
+                        fontWeight: "500",
                             borderBottom: currentTab === "invite" ? "2px solid #000000" : "none",
-                        }}
-                    >
+                    }}
+                >
                         청첩장
-                    </button>
+                </button>
                 </div>
                 <div style={{ display: "flex", padding: 0 }}>
-                    <button
+                <button
                         onClick={() => setCurrentTab("transport")}
-                        style={{
-                            flex: "1",
-                            padding: "16px 12px",
+                    style={{
+                        flex: "1",
+                        padding: "16px 12px",
                             backgroundColor: currentTab === "transport" ? "#000000" : "white",
                             color: currentTab === "transport" ? "white" : "#666666",
-                            border: "none",
-                            borderRadius: "0",
-                            cursor: "pointer",
-                            fontSize: "12px",
-                            fontWeight: "500",
+                        border: "none",
+                        borderRadius: "0",
+                        cursor: "pointer",
+                        fontSize: "12px",
+                        fontWeight: "500",
                             borderBottom: currentTab === "transport" ? "2px solid #000000" : "none",
-                        }}
-                    >
+                    }}
+                >
                         교통안내
-                    </button>
-                    <button
+                </button>
+                <button
                         onClick={() => setCurrentTab("calendar")}
-                        style={{
-                            flex: "1",
-                            padding: "16px 12px",
+                    style={{
+                        flex: "1",
+                        padding: "16px 12px",
                             backgroundColor: currentTab === "calendar" ? "#000000" : "white",
                             color: currentTab === "calendar" ? "white" : "#666666",
-                            border: "none",
-                            borderRadius: "0",
-                            cursor: "pointer",
-                            fontSize: "12px",
-                            fontWeight: "500",
+                        border: "none",
+                        borderRadius: "0",
+                        cursor: "pointer",
+                        fontSize: "12px",
+                        fontWeight: "500",
                             borderBottom: currentTab === "calendar" ? "2px solid #000000" : "none",
                         }}
                     >
@@ -2701,7 +2701,7 @@ export default function UnifiedWeddingAdmin2(props: any) {
                         }}
                     >
                         연락처
-                    </button>
+                </button>
                 </div>
             </div>
 
@@ -5770,7 +5770,7 @@ export default function UnifiedWeddingAdmin2(props: any) {
             </AnimatePresence>
 
             {null}
-        </div>
+                                </div>
     )
 }
 
@@ -5943,12 +5943,12 @@ function TransportTab({
                 <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>페이지 ID</div>
                 <div style={{ padding: 12, border: "1px solid #e5e7eb", background: "#f9fafb", color: "#111827", fontSize: 14, marginBottom: 16 }}>
                     {pageId || "(미지정)"}
-                </div>
+                                </div>
 
                 {loading ? (
                     <div style={{ padding: 12, color: "#6b7280" }}>불러오는 중...</div>
                 ) : (
-                    <div>
+                                <div>
                         {items.map((it, idx) => (
                             <div key={idx} style={{ border: "1px solid #e5e7eb", padding: 12, marginBottom: 12 }}>
                                 <div style={{ display: "flex", gap: 10, marginBottom: 8 }}>
@@ -5972,8 +5972,8 @@ function TransportTab({
                                 <div style={{ display: "flex", gap: 8 }}>
                                     <button onClick={() => move(idx, -1)} style={{ padding: "6px 10px", border: "1px solid #e5e7eb", background: "white" }}>위로</button>
                                     <button onClick={() => move(idx, 1)} style={{ padding: "6px 10px", border: "1px solid #e5e7eb", background: "white" }}>아래로</button>
-                                </div>
                             </div>
+                        </div>
                         ))}
 
                         <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
@@ -5983,8 +5983,8 @@ function TransportTab({
 
                         {errorMsg && <div style={{ marginTop: 10, color: "#b91c1c", fontSize: 13 }}>{errorMsg}</div>}
                         {successMsg && <div style={{ marginTop: 10, color: "#065f46", fontSize: 13 }}>{successMsg}</div>}
-                    </div>
-                )}
+                </div>
+            )}
             </div>
         </div>
     )

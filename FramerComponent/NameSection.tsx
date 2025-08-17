@@ -38,6 +38,8 @@ export default function NameSection(props: NameSectionProps) {
     const groomRef = useRef<HTMLDivElement | null>(null)
     const brideRef = useRef<HTMLDivElement | null>(null)
     const [nameFontSize, setNameFontSize] = useState(48)
+    const [andSvgScale, setAndSvgScale] = useState(1)
+    const [marginSize, setMarginSize] = useState(14)
 
     // 애니메이션 트리거를 위한 useInView
     const isInView = useInView(nameContainerRef, { once: true, amount: 0.3 })
@@ -50,24 +52,28 @@ export default function NameSection(props: NameSectionProps) {
         const containerWidth = (nameContainerRef.current as HTMLDivElement)
             .clientWidth
         const availableWidth = Math.max(0, containerWidth - 80)
-        const containerHeight = 240
-        const availableHeightPerName = (containerHeight - 50) / 2
-        let fontSize = 48
+        
+        // 화면 가로 너비에 비례한 크기 조정 (390px 기준)
+        const scale = containerWidth / 390
+        const targetFontSize = scale * 48 // 390px에서 48px
+        const minFontSize = scale * 20 // 최소 크기
+        
+        // 간격과 SVG도 비례 조정
+        setMarginSize(14 * scale)
+        setAndSvgScale(scale)
+        
+        let fontSize = targetFontSize
 
         const testFontSize = (size: number): boolean => {
             if (!groomRef.current || !brideRef.current) return false
             groomRef.current.style.fontSize = `${size}px`
-            const groomOverflows =
-                groomRef.current.scrollWidth > availableWidth ||
-                groomRef.current.scrollHeight > availableHeightPerName
+            const groomOverflows = groomRef.current.scrollWidth > availableWidth
             brideRef.current.style.fontSize = `${size}px`
-            const brideOverflows =
-                brideRef.current.scrollWidth > availableWidth ||
-                brideRef.current.scrollHeight > availableHeightPerName
+            const brideOverflows = brideRef.current.scrollWidth > availableWidth
             return groomOverflows || brideOverflows
         }
 
-        while (testFontSize(fontSize) && fontSize > 20) {
+        while (testFontSize(fontSize) && fontSize > minFontSize) {
             fontSize -= 1
         }
         setNameFontSize(fontSize)
@@ -132,8 +138,10 @@ export default function NameSection(props: NameSectionProps) {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    margin: "14px",
+                    margin: `${marginSize}px`,
                     height: "42px",
+                    transform: `scale(${andSvgScale})`,
+                    transformOrigin: "center",
                 }}
             >
                 <AndSvg />
