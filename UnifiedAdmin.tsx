@@ -22,11 +22,11 @@ function removeAuthToken() {
 async function authenticateAdmin(username, password) {
     console.log("Login attempt:", {
         username,
-        url: `${PROXY_BASE_URL}/api/auth`,
+        url: `${PROXY_BASE_URL}/api/user-management`,
     })
 
     try {
-        const response = await fetch(`${PROXY_BASE_URL}/api/auth`, {
+        const response = await fetch(`${PROXY_BASE_URL}/api/user-management`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

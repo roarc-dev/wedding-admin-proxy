@@ -14,12 +14,13 @@ interface SignupUserData {
 
 async function signupUser(userData: SignupUserData): Promise<any> {
     try {
-        const response = await fetch(`${PROXY_BASE_URL}/api/register`, {
+        const response = await fetch(`${PROXY_BASE_URL}/api/user-management`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
+                action: "register",
                 username: userData.username,
                 password: userData.password,
                 name: userData.name,

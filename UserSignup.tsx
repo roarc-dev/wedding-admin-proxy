@@ -8,12 +8,13 @@ const PROXY_BASE_URL = "https://wedding-admin-proxy-git-main-roarcs-projects.ver
 // 회원가입 함수 - 프록시를 통한 안전한 연결
 async function signupUser(userData) {
     try {
-        const response = await fetch(`${PROXY_BASE_URL}/api/register`, {
+        const response = await fetch(`${PROXY_BASE_URL}/api/user-management`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
+                action: "register",
                 username: userData.username,
                 password: userData.password,
                 name: userData.name

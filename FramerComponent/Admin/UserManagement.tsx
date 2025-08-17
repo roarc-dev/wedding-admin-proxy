@@ -52,7 +52,7 @@ async function authenticateAdmin(
     password: string
 ): Promise<AuthResult> {
     try {
-        const response = await fetch(`${PROXY_BASE_URL}/api/auth`, {
+        const response = await fetch(`${PROXY_BASE_URL}/api/user-management`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -95,7 +95,7 @@ async function authenticateAdmin(
 // 사용자 관리 API 함수들 - auth.js를 사용하도록 수정
 async function getAllUsers(): Promise<User[]> {
     try {
-        const response = await fetch(`${PROXY_BASE_URL}/api/auth`, {
+        const response = await fetch(`${PROXY_BASE_URL}/api/user-management`, {
             method: "GET",
             headers: {
                 Authorization: `Bearer ${getAuthToken()}`,
@@ -123,7 +123,7 @@ interface CreateUserData {
 
 async function createUser(userData: CreateUserData): Promise<any> {
     try {
-        const response = await fetch(`${PROXY_BASE_URL}/api/auth`, {
+        const response = await fetch(`${PROXY_BASE_URL}/api/user-management`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -163,7 +163,7 @@ interface UpdateUserData {
 
 async function updateUser(userData: UpdateUserData): Promise<any> {
     try {
-        const response = await fetch(`${PROXY_BASE_URL}/api/auth`, {
+        const response = await fetch(`${PROXY_BASE_URL}/api/user-management`, {
             method: "PUT",
             headers: {
                 "Content-Type": "application/json",
@@ -188,7 +188,7 @@ async function updateUser(userData: UpdateUserData): Promise<any> {
 
 async function deleteUser(userId: string): Promise<any> {
     try {
-        const response = await fetch(`${PROXY_BASE_URL}/api/auth`, {
+        const response = await fetch(`${PROXY_BASE_URL}/api/user-management`, {
             method: "DELETE",
             headers: {
                 "Content-Type": "application/json",
@@ -218,7 +218,7 @@ async function approveUser(
     pageId?: string | null
 ): Promise<any> {
     try {
-        const response = await fetch(`${PROXY_BASE_URL}/api/auth`, {
+        const response = await fetch(`${PROXY_BASE_URL}/api/user-management`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
