@@ -21,9 +21,10 @@ export default async function handler(req, res) {
     req.query.action === 'getByPageId' || 
     req.query.action === 'getAllPages'
   )
+  const hasAuthHeader = !!req.headers.authorization
 
   // 공개 요청은 강한 캐싱으로 CDN/브라우저 egress 절감
-  if (isPublicImageRequest) {
+  if (isPublicImageRequest && !hasAuthHeader) {
     // 5분 브라우저, 1일 CDN, 오래된 동안 재검증 허용
     res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=86400, stale-while-revalidate=604800')
   } else {
