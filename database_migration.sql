@@ -60,3 +60,8 @@ ADD COLUMN IF NOT EXISTS highlight_shape TEXT DEFAULT 'circle' CHECK (highlight_
 ADD COLUMN IF NOT EXISTS highlight_color TEXT DEFAULT '#e0e0e0',
 ADD COLUMN IF NOT EXISTS highlight_text_color TEXT DEFAULT 'black' CHECK (highlight_text_color IN ('black', 'white')),
 ADD COLUMN IF NOT EXISTS gallery_type TEXT DEFAULT 'thumbnail' CHECK (gallery_type IN ('thumbnail', 'slide'));
+
+-- invite_cards 테이블에 호칭 필드 추가
+ALTER TABLE invite_cards
+ADD COLUMN IF NOT EXISTS son_label TEXT DEFAULT '아들',
+ADD COLUMN IF NOT EXISTS daughter_label TEXT DEFAULT '딸';
