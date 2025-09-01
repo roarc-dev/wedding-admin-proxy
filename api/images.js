@@ -10,7 +10,8 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-  // 캐시 정책: 공개 조회는 캐시 허용, 관리자 작업은 캐시 방지
+  // 캐시 방지 (관리 화면에서 즉시 반영)
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate')
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end()
@@ -21,16 +22,6 @@ export default async function handler(req, res) {
     req.query.action === 'getByPageId' || 
     req.query.action === 'getAllPages'
   )
-  const hasAuthHeader = !!req.headers.authorization
-
-  // 공개 요청은 강한 캐싱으로 CDN/브라우저 egress 절감
-  if (isPublicImageRequest && !hasAuthHeader) {
-    // 5분 브라우저, 1일 CDN, 오래된 동안 재검증 허용
-    res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=86400, stale-while-revalidate=604800')
-  } else {
-    // 관리/변경 요청은 캐시 금지
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate')
-  }
 
   let validatedUser = null
 
@@ -127,10 +118,18 @@ async function handleGetImages(req, res) {
 
       if (error) throw error
 
-      // 캐시 친화적 응답: public_url 그대로 전달 (업로드 시 경로가 바뀌므로 최신 반영)
+      // 즉시 반영을 위해 public_url에 캐시 버스팅 쿼리 추가 (응답 시점 기준)
+      const versionTs = Date.now()
+      const versioned = (data || []).map((row) => {
+        const url = row.public_url || ''
+        if (!url) return row
+        const sep = url.includes('?') ? '&' : '?'
+        return { ...row, public_url: `${url}${sep}v=${versionTs}` }
+      })
+
       return res.json({ 
         success: true, 
-        data: data || [] 
+        data: versioned 
       })
 
     } else {
@@ -245,8 +244,7 @@ async function handleImageOperation(req, res) {
         .from('images')
         .upload(fileName, buffer, {
           contentType: mimeType,
-          // 장기 캐시로 CDN 히트율 상승 (1년)
-          cacheControl: '31536000'
+          cacheControl: '3600'
         })
 
       if (uploadError) throw uploadError
