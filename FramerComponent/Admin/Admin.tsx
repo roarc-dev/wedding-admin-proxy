@@ -8525,8 +8525,9 @@ function TransportTab({
                     if (result.locationName) {
                         setLocationName(String(result.locationName))
                     }
-                    if (result.venue_address) {
-                        setVenue_address(String(result.venue_address))
+                    if (result.venue_address !== undefined) {
+                        console.log("TransportTab 로드 - venue_address:", result.venue_address)
+                        setVenue_address(String(result.venue_address || ""))
                     }
                 } else if (mounted) {
                     setItems(DEFAULT_ITEMS)
@@ -8669,8 +8670,9 @@ function TransportTab({
                                 items,
                                 locationName,
                                 venue_address,
-                            }),
+                            })
                         }
+                        console.log("TransportTab 저장 - venue_address:", venue_address)
                     )
                     res = tryRes
                     text = await tryRes.text()
