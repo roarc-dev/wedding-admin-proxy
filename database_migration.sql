@@ -65,3 +65,58 @@ ADD COLUMN IF NOT EXISTS gallery_type TEXT DEFAULT 'thumbnail' CHECK (gallery_ty
 ALTER TABLE invite_cards
 ADD COLUMN IF NOT EXISTS son_label TEXT DEFAULT '아들',
 ADD COLUMN IF NOT EXISTS daughter_label TEXT DEFAULT '딸';
+
+-- =====================================================
+-- GROOM/BRIDE NAME 동기화 마이그레이션
+-- page_settings.groom_name_kr ↔ invite_cards.groom_name 자동 동기화
+-- =====================================================
+
+-- 1. 기존 groom_name, bride_name 컬럼명을 백업
+ALTER TABLE invite_cards
+ADD COLUMN IF NOT EXISTS groom_name_old TEXT,
+ADD COLUMN IF NOT EXISTS bride_name_old TEXT;
+
+-- 2. 기존 데이터 백업 (안전하게 보존)
+UPDATE invite_cards
+SET groom_name_old = groom_name,
+    bride_name_old = bride_name
+WHERE groom_name IS NOT NULL OR bride_name IS NOT NULL;
+
+-- 3. 기존 컬럼들을 Generated Column으로 변경
+-- (page_settings의 groom_name_kr, bride_name_kr를 참조)
+ALTER TABLE invite_cards
+DROP COLUMN IF EXISTS groom_name,
+DROP COLUMN IF EXISTS bride_name;
+
+-- Generated Column 추가 (page_settings 참조)
+ALTER TABLE invite_cards
+ADD COLUMN groom_name TEXT GENERATED ALWAYS AS (
+    COALESCE(
+        (SELECT groom_name_kr FROM page_settings WHERE page_id = invite_cards.page_id LIMIT 1),
+        groom_name_old  -- 기존 데이터가 없으면 백업 데이터 사용
+    )
+) STORED,
+
+ADD COLUMN bride_name TEXT GENERATED ALWAYS AS (
+    COALESCE(
+        (SELECT bride_name_kr FROM page_settings WHERE page_id = invite_cards.page_id LIMIT 1),
+        bride_name_old  -- 기존 데이터가 없으면 백업 데이터 사용
+    )
+) STORED;
+
+-- 4. 인덱스 생성으로 성능 향상
+CREATE INDEX IF NOT EXISTS idx_invite_cards_page_id ON invite_cards(page_id);
+CREATE INDEX IF NOT EXISTS idx_page_settings_page_id ON page_settings(page_id);
+
+-- 5. 데이터 검증 쿼리 (마이그레이션 후 실행 권장)
+-- 다음 쿼리로 데이터 일치 확인 가능:
+-- SELECT
+--     ic.page_id,
+--     ic.groom_name,
+--     ps.groom_name_kr,
+--     ic.bride_name,
+--     ps.bride_name_kr,
+--     CASE WHEN ic.groom_name = ps.groom_name_kr THEN '✅' ELSE '❌' END as groom_match,
+--     CASE WHEN ic.bride_name = ps.bride_name_kr THEN '✅' ELSE '❌' END as bride_match
+-- FROM invite_cards ic
+-- LEFT JOIN page_settings ps ON ic.page_id = ps.page_id;
