@@ -296,10 +296,10 @@ async function handleGetTransport(req, res) {
       console.error('Transport query error:', transportError)
     }
 
-    // page_settings에서 장소명과 주소 조회
+    // page_settings에서 장소명 조회
     const { data: settingsData, error: settingsError } = await supabase
       .from('page_settings')
-      .select('transport_location_name, venue_address')
+      .select('transport_location_name')
       .eq('page_id', pageId)
       .single()
 
@@ -310,8 +310,7 @@ async function handleGetTransport(req, res) {
     return res.json({
       success: true,
       data: transportData || [],
-      locationName: settingsData?.transport_location_name || '',
-      venue_address: settingsData?.venue_address || ''
+      locationName: settingsData?.transport_location_name || ''
     })
   } catch (error) {
     console.error('Get transport error:', error)
@@ -323,9 +322,7 @@ async function handleGetTransport(req, res) {
 }
 
 async function handleUpdateTransport(req, res, validatedUser) {
-  const { pageId, items, locationName, venue_address } = req.body
-
-  console.log("handleUpdateTransport - 수신된 데이터:", { pageId, items, locationName, venue_address })
+  const { pageId, items, locationName } = req.body
 
   if (!pageId) {
     return res.status(400).json({
@@ -372,33 +369,23 @@ async function handleUpdateTransport(req, res, validatedUser) {
       }
     }
 
-    // 3) page_settings에 장소명과 주소 저장
-    if (locationName !== undefined || venue_address !== undefined) {
-      console.log("page_settings 업데이트 - locationName:", locationName, "venue_address:", venue_address)
-
-      const updateData: Record<string, any> = {
-        page_id: pageId,
-        updated_at: new Date().toISOString()
-      }
-
-      if (locationName !== undefined) {
-        updateData.transport_location_name = locationName
-      }
-
-      if (venue_address !== undefined) {
-        updateData.venue_address = venue_address
-      }
-
+    // 3) page_settings에 장소명 저장
+    if (locationName !== undefined) {
       const { error: updateError } = await supabase
         .from('page_settings')
-        .upsert(updateData, { onConflict: 'page_id' })
+        .upsert(
+          {
+            page_id: pageId,
+            transport_location_name: locationName,
+            updated_at: new Date().toISOString()
+          },
+          { onConflict: 'page_id' }
+        )
 
       if (updateError) {
-        console.error('Page settings update error:', updateError)
+        console.error('Location name update error:', updateError)
         throw updateError
       }
-
-      console.log("page_settings 업데이트 완료:", updateData)
     }
 
     return res.json({
