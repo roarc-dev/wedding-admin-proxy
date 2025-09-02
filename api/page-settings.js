@@ -299,10 +299,10 @@ async function handleGetTransport(req, res) {
       console.error('Transport query error:', transportError)
     }
 
-    // page_settings에서 장소명과 주소 조회
+    // page_settings에서 장소명 조회
     const { data: settingsData, error: settingsError } = await supabase
       .from('page_settings')
-      .select('transport_location_name, venue_address')
+      .select('transport_location_name')
       .eq('page_id', pageId)
       .single()
 
@@ -313,8 +313,7 @@ async function handleGetTransport(req, res) {
     return res.json({
       success: true,
       data: transportData || [],
-      locationName: settingsData?.transport_location_name || '',
-      venueAddress: settingsData?.venue_address || ''
+      locationName: settingsData?.transport_location_name || ''
     })
   } catch (error) {
     console.error('Get transport error:', error)
@@ -326,7 +325,7 @@ async function handleGetTransport(req, res) {
 }
 
 async function handleUpdateTransport(req, res, validatedUser) {
-  const { pageId, items, locationName, venueAddress } = req.body || {}
+  const { pageId, items, locationName } = req.body || {}
 
   if (!pageId) {
     return res.status(400).json({
@@ -388,30 +387,23 @@ async function handleUpdateTransport(req, res, validatedUser) {
       }
     }
 
-    // 3) page_settings에 장소명과 주소 저장
-    const updateData: Record<string, unknown> = {
-      page_id: pageId,
-      updated_at: new Date().toISOString()
-    }
-
+    // 3) page_settings에 장소명 저장
     if (locationName !== undefined) {
       const safeLocation = typeof locationName === 'string' ? locationName : ''
-      updateData.transport_location_name = safeLocation.length > 200 ? safeLocation.slice(0, 200) : safeLocation
-    }
-
-    if (venueAddress !== undefined) {
-      const safeAddress = typeof venueAddress === 'string' ? venueAddress : ''
-      updateData.venue_address = safeAddress.length > 500 ? safeAddress.slice(0, 500) : safeAddress
-    }
-
-    // 데이터가 있는 경우에만 업데이트
-    if (locationName !== undefined || venueAddress !== undefined) {
+      const trimmed = safeLocation.length > 200 ? safeLocation.slice(0, 200) : safeLocation
       const { error: updateError } = await supabase
         .from('page_settings')
-        .upsert(updateData, { onConflict: 'page_id' })
+        .upsert(
+          {
+            page_id: pageId,
+            transport_location_name: trimmed,
+            updated_at: new Date().toISOString()
+          },
+          { onConflict: 'page_id' }
+        )
 
       if (updateError) {
-        console.error('Page settings update error:', updateError)
+        console.error('Location name update error:', updateError)
         throw updateError
       }
     }
