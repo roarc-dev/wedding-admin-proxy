@@ -2638,10 +2638,10 @@ function AdminMainContent(props: any) {
                     invitation_text: inviteData.invitationText,
                     groom_father_name: inviteData.groomFatherName,
                     groom_mother_name: inviteData.groomMotherName,
-                    // groom_name, bride_name은 Trigger로 page_settings, wedding_contacts에 자동 동기화됨
-                    // invite_cards를 수정하면 다른 테이블들도 자동으로 업데이트됨
+                    groom_name: inviteData.groomName, // invite_cards에 저장하고 Trigger로 동기화
                     bride_father_name: inviteData.brideFatherName,
                     bride_mother_name: inviteData.brideMotherName,
+                    bride_name: inviteData.brideName, // invite_cards에 저장하고 Trigger로 동기화
                     show_groom_father_chrysanthemum:
                         inviteData.showGroomFatherChrysanthemum,
                     show_groom_mother_chrysanthemum:
