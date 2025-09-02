@@ -13,6 +13,7 @@ const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app"
 interface PageSettings {
     id?: string
     page_id: string
+    venue_name?: string
     venue_address?: string
     created_at?: string
     updated_at?: string
@@ -41,6 +42,7 @@ async function getPageSettings(pageId: string): Promise<PageSettings | null> {
             return {
                 id: result.data.id,
                 page_id: result.data.page_id,
+                venue_name: result.data.venue_name || '',
                 venue_address: result.data.venue_address || '',
                 created_at: result.data.created_at,
                 updated_at: result.data.updated_at,
@@ -469,30 +471,35 @@ export default function NaverMapFix({
                 
                 setPageSettings(settings)
                 
-                // 장소 주소 결정 로직: 강제 입력 > 서버 데이터 > 기본값
-                let finalVenueAddress = ""
+                // 장소 결정 로직: 강제 입력 > venue_address > venue_name > 기본값
+                let finalVenueName = ""
 
                 if (forcePlaceName && forcePlaceName.trim()) {
                     // 강제 입력된 장소명이 있으면 우선 사용
-                    finalVenueAddress = forcePlaceName.trim()
-                    console.log("강제 입력된 장소 주소 사용:", finalVenueAddress)
+                    finalVenueName = forcePlaceName.trim()
+                    console.log("강제 입력된 장소명 사용:", finalVenueName)
                 } else if (settings?.venue_address && settings.venue_address.trim()) {
-                    // 서버에서 가져온 venue_address 사용
-                    finalVenueAddress = settings.venue_address.trim()
-                    console.log("서버 venue_address 사용:", finalVenueAddress)
+                    // venue_address를 우선 사용 (새로운 방식)
+                    finalVenueName = settings.venue_address.trim()
+                    console.log("서버 venue_address 사용:", finalVenueName)
+                } else if (settings?.venue_name && settings.venue_name.trim()) {
+                    // venue_name을 하위 호환성으로 사용
+                    finalVenueName = settings.venue_name.trim()
+                    console.log("서버 venue_name 사용 (하위 호환):", finalVenueName)
                 } else if (placeName && placeName.trim()) {
                     // 기존 placeName 사용 (하위 호환성)
-                    finalVenueAddress = placeName.trim()
-                    console.log("기존 placeName 사용:", finalVenueAddress)
+                    finalVenueName = placeName.trim()
+                    console.log("기존 placeName 사용:", finalVenueName)
                 }
 
-                setVenueAddress(finalVenueAddress)
-                
+                setVenueAddress(finalVenueName)
+
                 // 검색 결과 검토 로직 추가
-                if (settings?.venue_address) {
+                if (settings?.venue_address || settings?.venue_name) {
                     console.log("서버 데이터 검토:", {
+                        venue_name: settings.venue_name,
                         venue_address: settings.venue_address,
-                        final_venue_address: finalVenueAddress
+                        final_venue_name: finalVenueName
                     })
                 }
 
@@ -655,7 +662,7 @@ export default function NaverMapFix({
                     borderRadius: 8,
                 }}
             >
-                장소 주소가 입력되지 않았습니다. Property Controls에서 장소명을
+                장소명이 입력되지 않았습니다. Property Controls에서 장소명을
                 입력하세요.
             </div>
         )
@@ -699,9 +706,9 @@ addPropertyControls(NaverMapFix, {
     },
     placeName: {
         type: ControlType.String,
-        title: "장소 주소 (하위 호환)",
+        title: "장소명/주소 (하위 호환)",
         defaultValue: "",
-        placeholder: "검색할 장소의 주소 (강제 장소명이 없을 때 사용)",
+        placeholder: "검색할 장소의 이름 또는 주소 (강제 장소명이 없을 때 사용)",
     },
     retina: {
         type: ControlType.Boolean,
