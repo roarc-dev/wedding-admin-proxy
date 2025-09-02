@@ -127,9 +127,9 @@ WHERE page_id IN (SELECT page_id FROM page_settings);
 -- 4. 범용 동기화 Function 생성
 CREATE OR REPLACE FUNCTION sync_three_table_names(
     p_page_id TEXT,
+    p_source_table TEXT,
     p_groom_name TEXT DEFAULT NULL,
-    p_bride_name TEXT DEFAULT NULL,
-    p_source_table TEXT
+    p_bride_name TEXT DEFAULT NULL
 )
 RETURNS VOID AS $$
 BEGIN
@@ -195,12 +195,12 @@ RETURNS TRIGGER AS $$
 BEGIN
     -- groom_name_kr이 변경되었을 때
     IF (OLD.groom_name_kr IS DISTINCT FROM NEW.groom_name_kr) THEN
-        PERFORM sync_three_table_names(NEW.page_id, NEW.groom_name_kr, NULL, 'page_settings');
+        PERFORM sync_three_table_names(NEW.page_id, 'page_settings', NEW.groom_name_kr, NULL);
     END IF;
 
     -- bride_name_kr이 변경되었을 때
     IF (OLD.bride_name_kr IS DISTINCT FROM NEW.bride_name_kr) THEN
-        PERFORM sync_three_table_names(NEW.page_id, NULL, NEW.bride_name_kr, 'page_settings');
+        PERFORM sync_three_table_names(NEW.page_id, 'page_settings', NULL, NEW.bride_name_kr);
     END IF;
 
     RETURN NEW;
@@ -213,12 +213,12 @@ RETURNS TRIGGER AS $$
 BEGIN
     -- groom_name이 변경되었을 때
     IF (OLD.groom_name IS DISTINCT FROM NEW.groom_name) THEN
-        PERFORM sync_three_table_names(NEW.page_id, NEW.groom_name, NULL, 'invite_cards');
+        PERFORM sync_three_table_names(NEW.page_id, 'invite_cards', NEW.groom_name, NULL);
     END IF;
 
     -- bride_name이 변경되었을 때
     IF (OLD.bride_name IS DISTINCT FROM NEW.bride_name) THEN
-        PERFORM sync_three_table_names(NEW.page_id, NULL, NEW.bride_name, 'invite_cards');
+        PERFORM sync_three_table_names(NEW.page_id, 'invite_cards', NULL, NEW.bride_name);
     END IF;
 
     RETURN NEW;
@@ -231,12 +231,12 @@ RETURNS TRIGGER AS $$
 BEGIN
     -- groom_name이 변경되었을 때
     IF (OLD.groom_name IS DISTINCT FROM NEW.groom_name) THEN
-        PERFORM sync_three_table_names(NEW.page_id, NEW.groom_name, NULL, 'wedding_contacts');
+        PERFORM sync_three_table_names(NEW.page_id, 'wedding_contacts', NEW.groom_name, NULL);
     END IF;
 
     -- bride_name이 변경되었을 때
     IF (OLD.bride_name IS DISTINCT FROM NEW.bride_name) THEN
-        PERFORM sync_three_table_names(NEW.page_id, NULL, NEW.bride_name, 'wedding_contacts');
+        PERFORM sync_three_table_names(NEW.page_id, 'wedding_contacts', NULL, NEW.bride_name);
     END IF;
 
     RETURN NEW;
