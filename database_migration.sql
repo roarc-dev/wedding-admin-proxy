@@ -67,7 +67,7 @@ ADD COLUMN IF NOT EXISTS son_label TEXT DEFAULT '아들',
 ADD COLUMN IF NOT EXISTS daughter_label TEXT DEFAULT '딸';
 
 -- =====================================================
--- GROOM/BRIDE NAME 동기화 마이그레이션
+-- GROOM/BRIDE NAME 동기화 마이그레이션 (Trigger 방식)
 -- page_settings.groom_name_kr ↔ invite_cards.groom_name 자동 동기화
 -- =====================================================
 
@@ -82,33 +82,57 @@ SET groom_name_old = groom_name,
     bride_name_old = bride_name
 WHERE groom_name IS NOT NULL OR bride_name IS NOT NULL;
 
--- 3. 기존 컬럼들을 Generated Column으로 변경
--- (page_settings의 groom_name_kr, bride_name_kr를 참조)
-ALTER TABLE invite_cards
-DROP COLUMN IF EXISTS groom_name,
-DROP COLUMN IF EXISTS bride_name;
+-- 3. 기존 데이터로 현재 값 설정 (초기 동기화)
+UPDATE invite_cards
+SET groom_name = COALESCE(
+    (SELECT groom_name_kr FROM page_settings WHERE page_id = invite_cards.page_id LIMIT 1),
+    groom_name_old,
+    groom_name
+)
+WHERE page_id IN (SELECT page_id FROM page_settings);
 
--- Generated Column 추가 (page_settings 참조)
-ALTER TABLE invite_cards
-ADD COLUMN groom_name TEXT GENERATED ALWAYS AS (
-    COALESCE(
-        (SELECT groom_name_kr FROM page_settings WHERE page_id = invite_cards.page_id LIMIT 1),
-        groom_name_old  -- 기존 데이터가 없으면 백업 데이터 사용
-    )
-) STORED,
+UPDATE invite_cards
+SET bride_name = COALESCE(
+    (SELECT bride_name_kr FROM page_settings WHERE page_id = invite_cards.page_id LIMIT 1),
+    bride_name_old,
+    bride_name
+)
+WHERE page_id IN (SELECT page_id FROM page_settings);
 
-ADD COLUMN bride_name TEXT GENERATED ALWAYS AS (
-    COALESCE(
-        (SELECT bride_name_kr FROM page_settings WHERE page_id = invite_cards.page_id LIMIT 1),
-        bride_name_old  -- 기존 데이터가 없으면 백업 데이터 사용
-    )
-) STORED;
+-- 4. Trigger Function 생성 (page_settings 변경 시 invite_cards 자동 업데이트)
+CREATE OR REPLACE FUNCTION sync_groom_bride_names()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- groom_name_kr이 변경되었을 때
+    IF (OLD.groom_name_kr IS DISTINCT FROM NEW.groom_name_kr) THEN
+        UPDATE invite_cards
+        SET groom_name = NEW.groom_name_kr
+        WHERE page_id = NEW.page_id;
+    END IF;
 
--- 4. 인덱스 생성으로 성능 향상
+    -- bride_name_kr이 변경되었을 때
+    IF (OLD.bride_name_kr IS DISTINCT FROM NEW.bride_name_kr) THEN
+        UPDATE invite_cards
+        SET bride_name = NEW.bride_name_kr
+        WHERE page_id = NEW.page_id;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 5. Trigger 생성 (page_settings 업데이트 시 자동 실행)
+DROP TRIGGER IF EXISTS trigger_sync_groom_bride_names ON page_settings;
+CREATE TRIGGER trigger_sync_groom_bride_names
+    AFTER UPDATE ON page_settings
+    FOR EACH ROW
+    EXECUTE FUNCTION sync_groom_bride_names();
+
+-- 6. 인덱스 생성으로 성능 향상
 CREATE INDEX IF NOT EXISTS idx_invite_cards_page_id ON invite_cards(page_id);
 CREATE INDEX IF NOT EXISTS idx_page_settings_page_id ON page_settings(page_id);
 
--- 5. 데이터 검증 쿼리 (마이그레이션 후 실행 권장)
+-- 7. 데이터 검증 쿼리 (마이그레이션 후 실행 권장)
 -- 다음 쿼리로 데이터 일치 확인 가능:
 -- SELECT
 --     ic.page_id,
@@ -119,4 +143,5 @@ CREATE INDEX IF NOT EXISTS idx_page_settings_page_id ON page_settings(page_id);
 --     CASE WHEN ic.groom_name = ps.groom_name_kr THEN '✅' ELSE '❌' END as groom_match,
 --     CASE WHEN ic.bride_name = ps.bride_name_kr THEN '✅' ELSE '❌' END as bride_match
 -- FROM invite_cards ic
--- LEFT JOIN page_settings ps ON ic.page_id = ps.page_id;
+-- LEFT JOIN page_settings ps ON ic.page_id = ps.page_id
+-- LIMIT 10;
