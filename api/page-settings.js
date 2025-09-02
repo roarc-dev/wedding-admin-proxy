@@ -215,9 +215,6 @@ async function handleUpdateSettings(req, res, validatedUser) {
       'highlight_color',
       'highlight_text_color',
       'gallery_type',
-      'page_title',
-      'page_description',
-      'page_url',
     ]
 
     let sanitized = Object.fromEntries(
@@ -299,10 +296,10 @@ async function handleGetTransport(req, res) {
       console.error('Transport query error:', transportError)
     }
 
-    // page_settings에서 장소명과 주소 조회
+    // page_settings에서 장소명 조회
     const { data: settingsData, error: settingsError } = await supabase
       .from('page_settings')
-      .select('transport_location_name, venue_address')
+      .select('transport_location_name')
       .eq('page_id', pageId)
       .single()
 
@@ -313,8 +310,7 @@ async function handleGetTransport(req, res) {
     return res.json({
       success: true,
       data: transportData || [],
-      locationName: settingsData?.transport_location_name || '',
-      venueAddress: settingsData?.venue_address || ''
+      locationName: settingsData?.transport_location_name || ''
     })
   } catch (error) {
     console.error('Get transport error:', error)
@@ -326,7 +322,7 @@ async function handleGetTransport(req, res) {
 }
 
 async function handleUpdateTransport(req, res, validatedUser) {
-  const { pageId, items, locationName, venueAddress } = req.body || {}
+  const { pageId, items, locationName } = req.body
 
   if (!pageId) {
     return res.status(400).json({
@@ -345,41 +341,26 @@ async function handleUpdateTransport(req, res, validatedUser) {
       })
     }
 
-    // 2) transport_infos 테이블 업데이트 (안정성 강화를 위한 검증/정규화)
+    // 2) transport_infos 테이블 업데이트
     if (Array.isArray(items)) {
-      // 입력 크기 제한 (예: 최대 50개 항목)
-      const slice = items.slice(0, 50)
-      const normalized = slice.map((item, index) => {
-        const title = typeof item?.title === 'string' ? item.title : ''
-        const description = typeof item?.description === 'string' ? item.description : ''
-        const display_order = Number(item?.display_order || index + 1)
-        // 과도한 길이로 인한 DB 에러 방지 (필요시 길이 조정)
-        const safeTitle = title.length > 200 ? title.slice(0, 200) : title
-        const safeDesc = description.length > 5000 ? description.slice(0, 5000) : description
-        return {
-          page_id: pageId,
-          title: safeTitle,
-          description: safeDesc,
-          display_order,
-        }
-      })
-
-      // 기존 데이터 삭제 (오류 체크)
-      const { error: deleteError } = await supabase
+      // 기존 데이터 삭제
+      await supabase
         .from('transport_infos')
         .delete()
         .eq('page_id', pageId)
 
-      if (deleteError) {
-        console.error('Transport delete error:', deleteError)
-        throw deleteError
-      }
-
       // 새 데이터 삽입
-      if (normalized.length > 0) {
+      if (items.length > 0) {
+        const transportItems = items.map((item, index) => ({
+          page_id: pageId,
+          title: item.title || '',
+          description: item.description || '',
+          display_order: item.display_order || index + 1
+        }))
+
         const { error: insertError } = await supabase
           .from('transport_infos')
-          .insert(normalized)
+          .insert(transportItems)
 
         if (insertError) {
           console.error('Transport insert error:', insertError)
@@ -388,43 +369,21 @@ async function handleUpdateTransport(req, res, validatedUser) {
       }
     }
 
-    // 3) page_settings에 장소명과 주소 저장 (기존 데이터 보존)
-    if (locationName !== undefined || venueAddress !== undefined) {
-      // 기존 데이터를 먼저 조회
-      const { data: existingData, error: fetchError } = await supabase
-        .from('page_settings')
-        .select('*')
-        .eq('page_id', pageId)
-        .single()
-
-      if (fetchError && fetchError.code !== 'PGRST116') {
-        console.error('Fetch existing data error:', fetchError)
-        throw fetchError
-      }
-
-      // 기존 데이터와 새로운 데이터를 병합
-      const updateData: Record<string, unknown> = {
-        ...existingData,
-        page_id: pageId,
-        updated_at: new Date().toISOString()
-      }
-
-      if (locationName !== undefined) {
-        const safeLocation = typeof locationName === 'string' ? locationName : ''
-        updateData.transport_location_name = safeLocation.length > 200 ? safeLocation.slice(0, 200) : safeLocation
-      }
-
-      if (venueAddress !== undefined) {
-        const safeAddress = typeof venueAddress === 'string' ? venueAddress : ''
-        updateData.venue_address = safeAddress.length > 500 ? safeAddress.slice(0, 500) : safeAddress
-      }
-
+    // 3) page_settings에 장소명 저장
+    if (locationName !== undefined) {
       const { error: updateError } = await supabase
         .from('page_settings')
-        .upsert(updateData, { onConflict: 'page_id' })
+        .upsert(
+          {
+            page_id: pageId,
+            transport_location_name: locationName,
+            updated_at: new Date().toISOString()
+          },
+          { onConflict: 'page_id' }
+        )
 
       if (updateError) {
-        console.error('Page settings update error:', updateError)
+        console.error('Location name update error:', updateError)
         throw updateError
       }
     }
