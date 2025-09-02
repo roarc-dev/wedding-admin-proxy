@@ -125,142 +125,60 @@ SET bride_name = COALESCE(
 WHERE page_id IN (SELECT page_id FROM page_settings);
 
 -- 4. 범용 동기화 Function 생성
-CREATE OR REPLACE FUNCTION sync_three_table_names(
+CREATE OR REPLACE FUNCTION sync_from_invite_cards(
     p_page_id TEXT,
-    p_source_table TEXT,
     p_groom_name TEXT DEFAULT NULL,
     p_bride_name TEXT DEFAULT NULL
 )
 RETURNS VOID AS $$
 BEGIN
-    -- page_settings에서 변경된 경우
-    IF p_source_table = 'page_settings' THEN
-        -- invite_cards 업데이트
-        IF p_groom_name IS NOT NULL THEN
-            UPDATE invite_cards SET groom_name = p_groom_name WHERE page_id = p_page_id;
-        END IF;
-        IF p_bride_name IS NOT NULL THEN
-            UPDATE invite_cards SET bride_name = p_bride_name WHERE page_id = p_page_id;
-        END IF;
+    -- invite_cards에서 변경된 경우에만 동기화 (단방향)
+    -- page_settings 업데이트
+    IF p_groom_name IS NOT NULL THEN
+        UPDATE page_settings SET groom_name_kr = p_groom_name WHERE page_id = p_page_id;
+    END IF;
+    IF p_bride_name IS NOT NULL THEN
+        UPDATE page_settings SET bride_name_kr = p_bride_name WHERE page_id = p_page_id;
+    END IF;
 
-        -- wedding_contacts 업데이트 (groom_name만, bride_name은 page_settings에 없음)
-        IF p_groom_name IS NOT NULL THEN
-            UPDATE wedding_contacts SET groom_name = p_groom_name WHERE page_id = p_page_id;
-        END IF;
-
-    -- invite_cards에서 변경된 경우
-    ELSIF p_source_table = 'invite_cards' THEN
-        -- page_settings 업데이트
-        IF p_groom_name IS NOT NULL THEN
-            UPDATE page_settings SET groom_name_kr = p_groom_name WHERE page_id = p_page_id;
-        END IF;
-        IF p_bride_name IS NOT NULL THEN
-            UPDATE page_settings SET bride_name_kr = p_bride_name WHERE page_id = p_page_id;
-        END IF;
-
-        -- wedding_contacts 업데이트
-        IF p_groom_name IS NOT NULL THEN
-            UPDATE wedding_contacts SET groom_name = p_groom_name WHERE page_id = p_page_id;
-        END IF;
-        IF p_bride_name IS NOT NULL THEN
-            UPDATE wedding_contacts SET bride_name = p_bride_name WHERE page_id = p_page_id;
-        END IF;
-
-    -- wedding_contacts에서 변경된 경우
-    ELSIF p_source_table = 'wedding_contacts' THEN
-        -- page_settings 업데이트
-        IF p_groom_name IS NOT NULL THEN
-            UPDATE page_settings SET groom_name_kr = p_groom_name WHERE page_id = p_page_id;
-        END IF;
-        IF p_bride_name IS NOT NULL THEN
-            UPDATE page_settings SET bride_name_kr = p_bride_name WHERE page_id = p_page_id;
-        END IF;
-
-        -- invite_cards 업데이트
-        IF p_groom_name IS NOT NULL THEN
-            UPDATE invite_cards SET groom_name = p_groom_name WHERE page_id = p_page_id;
-        END IF;
-        IF p_bride_name IS NOT NULL THEN
-            UPDATE invite_cards SET bride_name = p_bride_name WHERE page_id = p_page_id;
-        END IF;
+    -- wedding_contacts 업데이트
+    IF p_groom_name IS NOT NULL THEN
+        UPDATE wedding_contacts SET groom_name = p_groom_name WHERE page_id = p_page_id;
+    END IF;
+    IF p_bride_name IS NOT NULL THEN
+        UPDATE wedding_contacts SET bride_name = p_bride_name WHERE page_id = p_page_id;
     END IF;
 END;
 $$ LANGUAGE plpgsql;
 
--- 5. 각 테이블별 Trigger Function 생성
-
--- page_settings용 Trigger Function
-CREATE OR REPLACE FUNCTION trigger_sync_from_page_settings()
-RETURNS TRIGGER AS $$
-BEGIN
-    -- groom_name_kr이 변경되었을 때
-    IF (OLD.groom_name_kr IS DISTINCT FROM NEW.groom_name_kr) THEN
-        PERFORM sync_three_table_names(NEW.page_id, 'page_settings', NEW.groom_name_kr, NULL);
-    END IF;
-
-    -- bride_name_kr이 변경되었을 때
-    IF (OLD.bride_name_kr IS DISTINCT FROM NEW.bride_name_kr) THEN
-        PERFORM sync_three_table_names(NEW.page_id, 'page_settings', NULL, NEW.bride_name_kr);
-    END IF;
-
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- invite_cards용 Trigger Function
+-- 5. invite_cards용 Trigger Function (단방향 동기화)
 CREATE OR REPLACE FUNCTION trigger_sync_from_invite_cards()
 RETURNS TRIGGER AS $$
 BEGIN
     -- groom_name이 변경되었을 때
     IF (OLD.groom_name IS DISTINCT FROM NEW.groom_name) THEN
-        PERFORM sync_three_table_names(NEW.page_id, 'invite_cards', NEW.groom_name, NULL);
+        PERFORM sync_from_invite_cards(NEW.page_id, NEW.groom_name, NULL);
     END IF;
 
     -- bride_name이 변경되었을 때
     IF (OLD.bride_name IS DISTINCT FROM NEW.bride_name) THEN
-        PERFORM sync_three_table_names(NEW.page_id, 'invite_cards', NULL, NEW.bride_name);
+        PERFORM sync_from_invite_cards(NEW.page_id, NULL, NEW.bride_name);
     END IF;
 
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
--- wedding_contacts용 Trigger Function
-CREATE OR REPLACE FUNCTION trigger_sync_from_wedding_contacts()
-RETURNS TRIGGER AS $$
-BEGIN
-    -- groom_name이 변경되었을 때
-    IF (OLD.groom_name IS DISTINCT FROM NEW.groom_name) THEN
-        PERFORM sync_three_table_names(NEW.page_id, 'wedding_contacts', NEW.groom_name, NULL);
-    END IF;
-
-    -- bride_name이 변경되었을 때
-    IF (OLD.bride_name IS DISTINCT FROM NEW.bride_name) THEN
-        PERFORM sync_three_table_names(NEW.page_id, 'wedding_contacts', NULL, NEW.bride_name);
-    END IF;
-
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- 6. Trigger 생성
+-- 6. Trigger 생성 (invite_cards에서만 단방향 동기화)
 DROP TRIGGER IF EXISTS trigger_sync_from_page_settings ON page_settings;
-CREATE TRIGGER trigger_sync_from_page_settings
-    AFTER UPDATE ON page_settings
-    FOR EACH ROW
-    EXECUTE FUNCTION trigger_sync_from_page_settings();
-
 DROP TRIGGER IF EXISTS trigger_sync_from_invite_cards ON invite_cards;
+DROP TRIGGER IF EXISTS trigger_sync_from_wedding_contacts ON wedding_contacts;
+
+-- invite_cards에서 변경 시 다른 테이블들로 동기화
 CREATE TRIGGER trigger_sync_from_invite_cards
     AFTER UPDATE ON invite_cards
     FOR EACH ROW
     EXECUTE FUNCTION trigger_sync_from_invite_cards();
-
-DROP TRIGGER IF EXISTS trigger_sync_from_wedding_contacts ON wedding_contacts;
-CREATE TRIGGER trigger_sync_from_wedding_contacts
-    AFTER UPDATE ON wedding_contacts
-    FOR EACH ROW
-    EXECUTE FUNCTION trigger_sync_from_wedding_contacts();
 
 -- 7. 인덱스 생성으로 성능 향상
 CREATE INDEX IF NOT EXISTS idx_invite_cards_page_id ON invite_cards(page_id);

@@ -2601,12 +2601,12 @@ function AdminMainContent(props: any) {
                         d.groom_father_name ?? prev.groomFatherName,
                     groomMotherName:
                         d.groom_mother_name ?? prev.groomMotherName,
-                    groomName: pageSettings.groom_name_kr || prev.groomName, // DB Generated Column으로 page_settings.groom_name_kr과 자동 동기화
+                    groomName: d.groom_name || pageSettings.groom_name_kr || prev.groomName, // invite_cards.groom_name 우선 사용
                     brideFatherName:
                         d.bride_father_name ?? prev.brideFatherName,
                     brideMotherName:
                         d.bride_mother_name ?? prev.brideMotherName,
-                    brideName: pageSettings.bride_name_kr || prev.brideName, // DB Generated Column으로 page_settings.bride_name_kr과 자동 동기화
+                    brideName: d.bride_name || pageSettings.bride_name_kr || prev.brideName, // invite_cards.bride_name 우선 사용
                     showGroomFatherChrysanthemum:
                         !!d.show_groom_father_chrysanthemum,
                     showGroomMotherChrysanthemum:
@@ -2621,8 +2621,8 @@ function AdminMainContent(props: any) {
             } else {
                 setInviteData((prev) => ({
                     ...prev,
-                    groomName: pageSettings.groom_name_kr || prev.groomName, // DB Generated Column으로 page_settings.groom_name_kr과 자동 동기화
-                    brideName: pageSettings.bride_name_kr || prev.brideName, // DB Generated Column으로 page_settings.bride_name_kr과 자동 동기화
+                    groomName: pageSettings.groom_name_kr || prev.groomName, // invite_cards 데이터 없을 때 page_settings에서 가져옴
+                    brideName: pageSettings.bride_name_kr || prev.brideName, // invite_cards 데이터 없을 때 page_settings에서 가져옴
                 }))
             }
         } catch (_err) {
@@ -2638,8 +2638,8 @@ function AdminMainContent(props: any) {
                     invitation_text: inviteData.invitationText,
                     groom_father_name: inviteData.groomFatherName,
                     groom_mother_name: inviteData.groomMotherName,
-                    // groom_name, bride_name은 DB Generated Column으로 자동 동기화됨
-                    // page_settings.groom_name_kr, bride_name_kr에서 자동으로 복사됨
+                    // groom_name, bride_name은 Trigger로 page_settings, wedding_contacts에 자동 동기화됨
+                    // invite_cards를 수정하면 다른 테이블들도 자동으로 업데이트됨
                     bride_father_name: inviteData.brideFatherName,
                     bride_mother_name: inviteData.brideMotherName,
                     show_groom_father_chrysanthemum:
