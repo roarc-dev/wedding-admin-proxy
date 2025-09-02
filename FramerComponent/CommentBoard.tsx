@@ -24,7 +24,7 @@ export default function CommentBoard({
     fontFamily = "Pretendard Regular",
     inputBackgroundColor = "#f5f5f5",
     inputTextColor = "#000000",
-    commentBackgroundColor = "#ffffff",
+    commentBackgroundColor = "rgba(0,0,0,0)",
 }: CommentBoardProps) {
     const [name, setName] = useState("")
     const [password, setPassword] = useState("")
@@ -40,6 +40,8 @@ export default function CommentBoard({
     const [expandedComments, setExpandedComments] = useState<Set<string>>(
         new Set()
     )
+    // 작성 모달
+    const [showWriteModal, setShowWriteModal] = useState(false)
 
     useEffect(() => {
         fetchComments()
@@ -54,7 +56,6 @@ export default function CommentBoard({
                 itemsPerPage: ITEMS_PER_PAGE,
             }
 
-            // 여러 base URL로 시도
             const bases = [
                 typeof window !== "undefined" ? window.location.origin : "",
                 PROXY_BASE_URL,
@@ -65,23 +66,17 @@ export default function CommentBoard({
                 try {
                     const tryResponse = await fetch(`${base}/api/comments`, {
                         method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                        },
+                        headers: { "Content-Type": "application/json" },
                         body: JSON.stringify(requestBody),
                     })
                     response = tryResponse
                     if (tryResponse.ok) break
                 } catch (fetchError) {
                     console.log(`Failed to fetch from ${base}:`, fetchError)
-                    // 다음 base URL로 계속 시도
                 }
             }
 
-            if (!response) {
-                throw new Error("모든 서버 연결에 실패했습니다")
-            }
-
+            if (!response) throw new Error("모든 서버 연결에 실패했습니다")
             if (!response.ok) {
                 const errorText = await response.text()
                 console.error("Error response:", errorText)
@@ -93,7 +88,7 @@ export default function CommentBoard({
             if (result.success) {
                 setComments(result.data || [])
                 setTotalPages(Math.ceil((result.count || 0) / ITEMS_PER_PAGE))
-                setErrorMessage("") // 성공 시 에러 메시지 클리어
+                setErrorMessage("")
             } else {
                 throw new Error(result.error || "데이터를 가져올 수 없습니다")
             }
@@ -105,7 +100,6 @@ export default function CommentBoard({
 
     async function handleSubmit() {
         setErrorMessage("")
-
         if (!name || !password || !commentText) {
             setErrorMessage("모든 항목을 입력해주세요.")
             return
@@ -124,7 +118,6 @@ export default function CommentBoard({
                 page_id: pageId,
             }
 
-            // 여러 base URL로 시도
             const bases = [
                 typeof window !== "undefined" ? window.location.origin : "",
                 PROXY_BASE_URL,
@@ -135,23 +128,17 @@ export default function CommentBoard({
                 try {
                     const tryResponse = await fetch(`${base}/api/comments`, {
                         method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                        },
+                        headers: { "Content-Type": "application/json" },
                         body: JSON.stringify(requestBody),
                     })
                     response = tryResponse
                     if (tryResponse.ok) break
                 } catch (fetchError) {
                     console.log(`Failed to submit to ${base}:`, fetchError)
-                    // 다음 base URL로 계속 시도
                 }
             }
 
-            if (!response) {
-                throw new Error("모든 서버 연결에 실패했습니다")
-            }
-
+            if (!response) throw new Error("모든 서버 연결에 실패했습니다")
             if (!response.ok) {
                 const errorText = await response.text()
                 console.error("Error response:", errorText)
@@ -166,6 +153,7 @@ export default function CommentBoard({
                 setCommentText("")
                 setPage(1)
                 setRefresh((prev) => !prev)
+                setShowWriteModal(false) // 등록 후 작성 팝업 닫기
             } else {
                 throw new Error(result.error || "등록 중 오류가 발생했습니다.")
             }
@@ -183,7 +171,7 @@ export default function CommentBoard({
 
     async function confirmDelete() {
         if (!deletePassword || !/^\d{4}$/.test(deletePassword)) {
-            setErrorMessage("4자리 숫자 비밀번호를 입력하세요.")
+            setErrorMessage("4자리 비밀번호를 입력하세요.")
             return
         }
 
@@ -195,7 +183,6 @@ export default function CommentBoard({
                 page_id: pageId,
             }
 
-            // 여러 base URL로 시도
             const bases = [
                 typeof window !== "undefined" ? window.location.origin : "",
                 PROXY_BASE_URL,
@@ -206,23 +193,18 @@ export default function CommentBoard({
                 try {
                     const tryResponse = await fetch(`${base}/api/comments`, {
                         method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                        },
+                        headers: { "Content-Type": "application/json" },
                         body: JSON.stringify(requestBody),
                     })
                     response = tryResponse
                     if (tryResponse.ok) break
                 } catch (fetchError) {
                     console.log(`Failed to delete from ${base}:`, fetchError)
-                    // 다음 base URL로 계속 시도
                 }
             }
 
-            if (!response) {
-                throw new Error("모든 서버 연결에 실패했습니다")
-            }
-
+            if (!response)
+                throw new Error("서버 연결에 실패했습니다. 다시 시도해주세요.")
             if (!response.ok) {
                 const errorText = await response.text()
                 console.error("Error response:", errorText)
@@ -238,7 +220,10 @@ export default function CommentBoard({
                 setErrorMessage("")
                 setRefresh((prev) => !prev)
             } else {
-                throw new Error(result.error || "삭제 중 오류가 발생했습니다.")
+                throw new Error(
+                    result.error ||
+                        "삭제 중 오류가 발생했습니다. 다시 시도해주세요."
+                )
             }
         } catch (error: any) {
             console.error("댓글 삭제 에러:", error)
@@ -256,11 +241,8 @@ export default function CommentBoard({
     function toggleComment(commentId: string) {
         setExpandedComments((prev) => {
             const newSet = new Set(prev)
-            if (newSet.has(commentId)) {
-                newSet.delete(commentId)
-            } else {
-                newSet.add(commentId)
-            }
+            if (newSet.has(commentId)) newSet.delete(commentId)
+            else newSet.add(commentId)
             return newSet
         })
     }
@@ -271,117 +253,59 @@ export default function CommentBoard({
                 width: "100%",
                 height: "auto",
                 backgroundColor: backgroundColor,
-                padding: 20,
+                padding: 0,
+                WebkitTextSizeAdjust: "100%",
+                textSizeAdjust: "100%",
             }}
         >
-            <div
-                style={{
-                    display: "flex",
-                    gap: 8,
-                    marginBottom: 8,
-                    width: "100%",
-                }}
-            >
-                <input
-                    placeholder="이름"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    style={{
-                        width: "calc(50% - 4px)",
-                        padding: 12,
-                        backgroundColor: inputBackgroundColor,
-                        color: inputTextColor,
-                        border: "none",
-                        borderRadius: 0,
-                        fontSize: 16,
-                        fontFamily: "Pretendard Regular",
-                        outline: "none",
-                        boxSizing: "border-box",
+            {/* 댓글 남기기 버튼 */}
+            <div style={{ marginBottom: 16 }}>
+                <button
+                    onClick={() => {
+                        setShowWriteModal(true)
+                        setErrorMessage("")
                     }}
-                />
-                <input
-                    type="password"
-                    placeholder="4자리 숫자 비밀번호"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
                     style={{
-                        width: "calc(50% - 4px)",
-                        padding: 12,
-                        backgroundColor: inputBackgroundColor,
-                        color: inputTextColor,
+                        width: "100%",
+                        height: 54,
+                        backgroundColor: "#ECECEC",
+                        color: "black",
+                        fontSize: 14, // iOS 확대 방지
+                        fontFamily: "Pretendard SemiBold",
                         border: "none",
                         borderRadius: 0,
-                        fontSize: 16,
-                        fontFamily: fontFamily,
-                        outline: "none",
-                        boxSizing: "border-box",
-                    }}
-                />
-            </div>
-
-            <textarea
-                placeholder="축하의 한 마디"
-                value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
-                style={{
-                    width: "100%",
-                    marginBottom: 8,
-                    padding: 12,
-                    backgroundColor: inputBackgroundColor,
-                    color: inputTextColor,
-                    border: "none",
-                    borderRadius: 0,
-                    fontSize: 16,
-                    fontFamily: fontFamily,
-                    outline: "none",
-                    resize: "vertical",
-                    minHeight: 80,
-                    boxSizing: "border-box",
-                }}
-            />
-
-            {errorMessage && (
-                <div
-                    style={{
-                        padding: 12,
-                        marginBottom: 10,
-                        backgroundColor: "#fee",
-                        color: "#c33",
-                        border: "none",
-                        borderRadius: 0,
-                        fontSize: 12,
-                        fontFamily: fontFamily,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "8px",
                     }}
                 >
-                    {errorMessage}
-                </div>
-            )}
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="14"
+                        height="14"
+                        viewBox="0 0 19 19"
+                        fill="none"
+                        style={{
+                            display: "block",
+                        }}
+                    >
+                        <path
+                            d="M0 19V14.75L14.625 0.174988L18.8 4.44999L4.25 19H0Z"
+                            fill="black"
+                        />
+                    </svg>
+                    축하의 한마디
+                </button>
+            </div>
 
-            <button
-                onClick={handleSubmit}
-                style={{
-                    width: "100%",
-                    height: 44,
-                    backgroundColor: "#727272",
-                    color: backgroundColor,
-                    fontSize: 16,
-                    fontFamily: fontFamily,
-                    border: "none",
-                    borderRadius: 0,
-                    cursor: "pointer",
-                    marginBottom: 24,
-                    fontWeight: "500",
-                }}
-            >
-                등록
-            </button>
-
+            {/* 댓글 리스트 */}
             {comments.map((c, index) => {
                 const d = new Date(c.created_at)
                 const mm = String(d.getMonth() + 1).padStart(2, "0")
                 const dd = String(d.getDate()).padStart(2, "0")
                 const formattedDate = `${mm}/${dd}`
-
                 const isExpanded = expandedComments.has(c.id)
                 const isLongComment = c.comment.length > 100
 
@@ -389,7 +313,10 @@ export default function CommentBoard({
                     <div
                         key={c.id}
                         style={{
-                            padding: 16,
+                            paddingTop: 16,
+                            paddingRight: 0,
+                            paddingBottom: 16,
+                            paddingLeft: 0,
                             marginBottom: index === comments.length - 1 ? 0 : 0,
                             backgroundColor: commentBackgroundColor,
                             borderRadius: 0,
@@ -397,7 +324,7 @@ export default function CommentBoard({
                             borderBottom:
                                 index === comments.length - 1
                                     ? "none"
-                                    : "1px solid #c2c2c2",
+                                    : "0.5px solid #ECECEC",
                         }}
                     >
                         <div
@@ -417,10 +344,9 @@ export default function CommentBoard({
                             >
                                 <div
                                     style={{
-                                        fontWeight: "600",
                                         fontSize: 14,
-                                        color: textColor,
-                                        fontFamily: fontFamily,
+                                        color: "#757575",
+                                        fontFamily: "Pretendard SemiBold",
                                     }}
                                 >
                                     {c.name}
@@ -428,9 +354,9 @@ export default function CommentBoard({
                                 <div
                                     style={{
                                         fontSize: 12,
-                                        color: textColor,
+                                        color: "#aeaeae",
                                         opacity: 0.6,
-                                        fontFamily: fontFamily,
+                                        fontFamily: "Pretendard Regular",
                                     }}
                                 >
                                     {formattedDate}
@@ -440,18 +366,32 @@ export default function CommentBoard({
                             <button
                                 onClick={() => handleDelete(c.id)}
                                 style={{
-                                    padding: "6px 12px",
-                                    fontSize: 12,
-                                    backgroundColor: "#c2c2c2",
-                                    color: "white",
+                                    paddingTop: 6,
+                                    paddingRight: 4,
+                                    paddingBottom: 6,
+                                    paddingLeft: 6,
+                                    backgroundColor: "transparent",
                                     border: "none",
                                     borderRadius: 0,
                                     cursor: "pointer",
-                                    fontFamily: fontFamily,
-                                    fontWeight: "500",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
                                 }}
+                                title="삭제"
                             >
-                                삭제
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="8"
+                                    height="8"
+                                    viewBox="0 0 14 14"
+                                    fill="none"
+                                >
+                                    <path
+                                        d="M7.71094 7L13.1016 12.3984L12.3984 13.1016L7 7.71094L1.60156 13.1016L0.898438 12.3984L6.28906 7L0.898438 1.60156L1.60156 0.898438L7 6.28906L12.3984 0.898438L13.1016 1.60156L7.71094 7Z"
+                                        fill="#c7c7c7"
+                                    />
+                                </svg>
                             </button>
                         </div>
 
@@ -459,13 +399,15 @@ export default function CommentBoard({
                             style={{
                                 fontSize: 14,
                                 color: textColor,
-                                fontFamily: fontFamily,
+                                fontFamily: "Pretendard Regular",
                                 lineHeight: "1.5",
                                 maxHeight: isExpanded ? "200px" : "80px",
                                 overflowY: isExpanded ? "auto" : "hidden",
-                                position: "relative",
                                 wordBreak: "break-word",
                                 transition: "max-height 0.3s ease",
+                                paddingBottom:
+                                    !isExpanded && isLongComment ? "0" : "0",
+                                position: "relative",
                             }}
                         >
                             {c.comment}
@@ -474,47 +416,66 @@ export default function CommentBoard({
                                     style={{
                                         position: "absolute",
                                         bottom: 0,
+                                        left: 0,
                                         right: 0,
-                                        background: `linear-gradient(to right, transparent, ${commentBackgroundColor} 50%)`,
-                                        paddingLeft: 20,
+                                        height: "40px",
+                                        background: "linear-gradient(to bottom, transparent 0%, rgba(255, 255, 255, 0.8) 50%, white 100%)",
+                                        pointerEvents: "none",
                                     }}
-                                >
-                                    <button
-                                        onClick={() => toggleComment(c.id)}
-                                        style={{
-                                            fontSize: 12,
-                                            color: textColor,
-                                            opacity: 0.7,
-                                            backgroundColor: "transparent",
-                                            border: "none",
-                                            cursor: "pointer",
-                                            fontFamily: fontFamily,
-                                            textDecoration: "underline",
-                                        }}
-                                    >
-                                        더보기
-                                    </button>
-                                </div>
+                                />
                             )}
                         </div>
 
-                        {isExpanded && isLongComment && (
-                            <button
-                                onClick={() => toggleComment(c.id)}
+                        {!isExpanded && isLongComment && (
+                            <div
                                 style={{
-                                    fontSize: 12,
-                                    color: textColor,
-                                    opacity: 0.7,
-                                    backgroundColor: "transparent",
-                                    border: "none",
-                                    cursor: "pointer",
-                                    fontFamily: fontFamily,
-                                    textDecoration: "underline",
-                                    marginTop: 8,
+                                    marginTop: "12px",
+                                    textAlign: "right",
                                 }}
                             >
-                                접기
-                            </button>
+                                <button
+                                    onClick={() => toggleComment(c.id)}
+                                    style={{
+                                        fontSize: 12,
+                                        color: textColor,
+                                        opacity: 0.7,
+                                        backgroundColor: "transparent",
+                                        border: "none",
+                                        cursor: "pointer",
+                                        fontFamily: "Pretendard Regular",
+                                        textDecoration: "underline",
+                                        padding: "4px 4px",
+                                    }}
+                                >
+                                    더보기
+                                </button>
+                            </div>
+                        )}
+
+                        {isExpanded && isLongComment && (
+                            <div
+                                style={{
+                                    marginTop: "8px",
+                                    textAlign: "right",
+                                }}
+                            >
+                                <button
+                                    onClick={() => toggleComment(c.id)}
+                                    style={{
+                                        fontSize: 12,
+                                        color: textColor,
+                                        opacity: 0.7,
+                                        backgroundColor: "transparent",
+                                        border: "none",
+                                        cursor: "pointer",
+                                        fontFamily: "Pretendard Regular",
+                                        textDecoration: "underline",
+                                        marginTop: 8,
+                                    }}
+                                >
+                                    접기
+                                </button>
+                            </div>
                         )}
                     </div>
                 )
@@ -531,7 +492,7 @@ export default function CommentBoard({
                         fontFamily: fontFamily,
                     }}
                 >
-                    등록된 댓글이 없습니다.
+                    신랑 신부에게 축하의 한 마디를 남겨보세요.
                 </div>
             )}
 
@@ -541,7 +502,7 @@ export default function CommentBoard({
                         marginTop: 24,
                         display: "flex",
                         justifyContent: "center",
-                        gap: 8,
+                        gap: 4,
                     }}
                 >
                     {Array.from({ length: totalPages }, (_, i) => (
@@ -549,27 +510,189 @@ export default function CommentBoard({
                             key={i}
                             onClick={() => setPage(i + 1)}
                             style={{
-                                padding: "10px 16px",
+                                padding: "10px 8px",
                                 border: "none",
-                                backgroundColor:
-                                    page === i + 1
-                                        ? textColor
-                                        : backgroundColor,
-                                color:
-                                    page === i + 1
-                                        ? backgroundColor
-                                        : textColor,
+                                backgroundColor: "transparent",
+                                color: page === i + 1 ? "black" : "#aeaeae",
                                 borderRadius: 0,
                                 cursor: "pointer",
                                 fontSize: 14,
-                                fontFamily: fontFamily,
-                                fontWeight: "500",
-                                boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                                fontFamily: "Pretendard SemiBold",
                             }}
                         >
                             {i + 1}
                         </button>
                     ))}
+                </div>
+            )}
+
+            {/* 작성 모달 */}
+            {showWriteModal && (
+                <div
+                    role="dialog"
+                    aria-modal="true"
+                    style={{
+                        position: "fixed",
+                        inset: 0,
+                        backgroundColor: "rgba(0, 0, 0, 0.5)",
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        zIndex: 1000,
+                    }}
+                    onClick={() => {
+                        // 배경 클릭 시 닫기 (모달 내부 클릭은 버블링 방지)
+                        setShowWriteModal(false)
+                        setErrorMessage("")
+                    }}
+                >
+                    <div
+                        style={{
+                            backgroundColor: backgroundColor,
+                            padding: 24,
+                            borderRadius: 0,
+                            width: "min(560px, 92vw)",
+                            border: "none",
+                            WebkitTextSizeAdjust: "100%",
+                            textSizeAdjust: "100%",
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div
+                            style={{
+                                display: "flex",
+                                gap: 8,
+                                marginBottom: 8,
+                                width: "100%",
+                            }}
+                        >
+                            <input
+                                placeholder="이름"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                style={{
+                                    width: "calc(50% - 4px)",
+                                    padding: 12,
+                                    backgroundColor: inputBackgroundColor,
+                                    color: inputTextColor,
+                                    border: "none",
+                                    borderRadius: 0,
+                                    fontSize: 16, // iOS 확대 방지
+                                    fontFamily: fontFamily,
+                                    outline: "none",
+                                    boxSizing: "border-box",
+                                }}
+                                autoFocus
+                                enterKeyHint="next"
+                            />
+                            <input
+                                type="password"
+                                inputMode="numeric"
+                                pattern="\d{4}"
+                                maxLength={4}
+                                placeholder="4자리 숫자 비밀번호"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                style={{
+                                    width: "calc(50% - 4px)",
+                                    padding: 12,
+                                    backgroundColor: inputBackgroundColor,
+                                    color: inputTextColor,
+                                    border: "none",
+                                    borderRadius: 0,
+                                    fontSize: 16, // iOS 확대 방지
+                                    fontFamily: fontFamily,
+                                    outline: "none",
+                                    boxSizing: "border-box",
+                                }}
+                                enterKeyHint="next"
+                            />
+                        </div>
+
+                        <textarea
+                            placeholder="축하의 한 마디"
+                            value={commentText}
+                            onChange={(e) => setCommentText(e.target.value)}
+                            style={{
+                                width: "100%",
+                                marginBottom: 8,
+                                padding: 12,
+                                backgroundColor: inputBackgroundColor,
+                                color: inputTextColor,
+                                border: "none",
+                                borderRadius: 0,
+                                fontSize: 16, // iOS 확대 방지
+                                fontFamily: fontFamily,
+                                outline: "none",
+                                resize: "vertical",
+                                minHeight: 100,
+                                boxSizing: "border-box",
+                                lineHeight: 1.4,
+                            }}
+                            enterKeyHint="done"
+                        />
+
+                        {errorMessage && (
+                            <div
+                                style={{
+                                    padding: 12,
+                                    marginBottom: 10,
+                                    backgroundColor: "#fee",
+                                    color: "#c33",
+                                    border: "none",
+                                    borderRadius: 0,
+                                    fontSize: 12,
+                                    fontFamily: fontFamily,
+                                }}
+                            >
+                                {errorMessage}
+                            </div>
+                        )}
+
+                        <div
+                            style={{
+                                display: "flex",
+                                gap: 12,
+                                justifyContent: "flex-end",
+                                marginTop: 8,
+                            }}
+                        >
+                            <button
+                                onClick={() => {
+                                    setShowWriteModal(false)
+                                    setErrorMessage("")
+                                }}
+                                style={{
+                                    padding: "10px 20px",
+                                    backgroundColor: backgroundColor,
+                                    color: textColor,
+                                    border: "none",
+                                    borderRadius: 0,
+                                    cursor: "pointer",
+                                    fontSize: 14,
+                                    fontFamily: "Pretendard SemiBold",
+                                    opacity: 0.7,
+                                }}
+                            >
+                                취소
+                            </button>
+                            <button
+                                onClick={handleSubmit}
+                                style={{
+                                    padding: "10px 20px",
+                                    backgroundColor: "#727272",
+                                    color: backgroundColor,
+                                    border: "none",
+                                    borderRadius: 0,
+                                    cursor: "pointer",
+                                    fontSize: 14, // iOS 확대 방지
+                                    fontFamily: "Pretendard SemiBold",
+                                }}
+                            >
+                                등록
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -602,10 +725,9 @@ export default function CommentBoard({
                         <h4
                             style={{
                                 margin: "0 0 16px 0",
-                                fontSize: 18,
-                                fontFamily: fontFamily,
+                                fontSize: 16,
+                                fontFamily: "Pretendard SemiBold",
                                 color: textColor,
-                                fontWeight: "600",
                             }}
                         >
                             댓글 삭제
@@ -614,7 +736,7 @@ export default function CommentBoard({
                             style={{
                                 margin: "0 0 16px 0",
                                 fontSize: 14,
-                                fontFamily: fontFamily,
+                                fontFamily: "Pretendard Regular",
                                 color: textColor,
                                 opacity: 0.8,
                             }}
@@ -632,13 +754,16 @@ export default function CommentBoard({
                                 marginBottom: 20,
                                 border: "none",
                                 borderRadius: 0,
-                                fontSize: 14,
-                                fontFamily: fontFamily,
+                                fontSize: 16, // iOS 확대 방지
+                                fontFamily: "Pretendard Regular",
                                 backgroundColor: inputBackgroundColor,
                                 color: inputTextColor,
                                 outline: "none",
                                 boxSizing: "border-box",
                             }}
+                            inputMode="numeric"
+                            pattern="\d{4}"
+                            maxLength={4}
                         />
                         <div
                             style={{
@@ -657,8 +782,7 @@ export default function CommentBoard({
                                     borderRadius: 0,
                                     cursor: "pointer",
                                     fontSize: 14,
-                                    fontFamily: fontFamily,
-                                    fontWeight: "500",
+                                    fontFamily: "Pretendard SemiBold",
                                     opacity: 0.7,
                                 }}
                             >
@@ -674,8 +798,7 @@ export default function CommentBoard({
                                     borderRadius: 0,
                                     cursor: "pointer",
                                     fontSize: 14,
-                                    fontFamily: fontFamily,
-                                    fontWeight: "500",
+                                    fontFamily: "Pretendard SemiBold",
                                 }}
                             >
                                 삭제

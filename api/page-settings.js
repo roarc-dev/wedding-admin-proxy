@@ -149,8 +149,6 @@ async function handleGetSettings(req, res) {
     const cacheKey = data.updated_at ? new Date(data.updated_at).getTime() : Date.now()
     const publicUrl = baseUrl ? `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}v=${cacheKey}` : ''
     resolved.photo_section_image_public_url = publicUrl
-    // ✅ 응답 호환성: venue_address를 camelCase로도 제공
-    resolved.venueAddress = data?.venue_address ?? ''
 
     return res.json({
       success: true,
@@ -222,11 +220,6 @@ async function handleUpdateSettings(req, res, validatedUser) {
     let sanitized = Object.fromEntries(
       Object.entries(settings || {}).filter(([key]) => allowedKeys.includes(key))
     )
-
-    // ✅ venueAddress(camelCase) → DB 컬럼 venue_address(snake_case)로 매핑
-    if (settings && Object.prototype.hasOwnProperty.call(settings, 'venueAddress')) {
-      sanitized.venue_address = settings.venueAddress ?? null
-    }
 
     // 빈 문자열 날짜는 NULL로 저장 (Postgres date 타입 호환)
     if (Object.prototype.hasOwnProperty.call(sanitized, 'wedding_date')) {
@@ -303,10 +296,10 @@ async function handleGetTransport(req, res) {
       console.error('Transport query error:', transportError)
     }
 
-    // page_settings에서 장소명 조회
+    // page_settings에서 장소명과 주소 조회
     const { data: settingsData, error: settingsError } = await supabase
       .from('page_settings')
-      .select('transport_location_name')
+      .select('transport_location_name, venue_address')
       .eq('page_id', pageId)
       .single()
 
@@ -317,7 +310,8 @@ async function handleGetTransport(req, res) {
     return res.json({
       success: true,
       data: transportData || [],
-      locationName: settingsData?.transport_location_name || ''
+      locationName: settingsData?.transport_location_name || '',
+      venue_address: settingsData?.venue_address || ''
     })
   } catch (error) {
     console.error('Get transport error:', error)

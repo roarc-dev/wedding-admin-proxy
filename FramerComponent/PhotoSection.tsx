@@ -57,6 +57,29 @@ interface PhotoSectionProps {
     style?: React.CSSProperties
 }
 
+// Supabase public object URL -> render transform URL 생성 유틸
+function toTransformedUrl(
+    publicUrl: string,
+    opts: { width?: number; height?: number; quality?: number; format?: "webp" | "jpg" | "png"; resize?: "cover" | "contain" | "fill" }
+): string {
+    if (!publicUrl) return publicUrl
+    try {
+        const url = new URL(publicUrl)
+        const split = url.pathname.split("/storage/v1/object/")
+        if (split.length !== 2) return publicUrl
+        url.pathname = `/storage/v1/render/image/${split[1]}`
+        const params = url.searchParams
+        if (opts.width) params.set("width", String(opts.width))
+        if (opts.height) params.set("height", String(opts.height))
+        if (opts.quality) params.set("quality", String(opts.quality))
+        if (opts.format) params.set("format", opts.format)
+        if (opts.resize) params.set("resize", opts.resize)
+        return url.toString()
+    } catch {
+        return publicUrl
+    }
+}
+
 export default function PhotoSection(props: PhotoSectionProps) {
     const {
         pageId,
@@ -75,7 +98,7 @@ export default function PhotoSection(props: PhotoSectionProps) {
     } = props
 
     const [settings, setSettings] = useState<PageSettings | null>(null)
-    const [version, setVersion] = useState<number>(0)
+    // 버전 키는 updated_at을 사용하고, 랜덤 증분은 제거 (캐시 히트 보존)
 
     // 페이지 설정 로드
     useEffect(() => {
@@ -83,13 +106,11 @@ export default function PhotoSection(props: PhotoSectionProps) {
         async function load() {
             if (!pageId) {
                 setSettings(null)
-                setVersion((v) => v + 1)
                 return
             }
             const data = await getPageSettingsByPageId(pageId)
             if (!mounted) return
             setSettings(data)
-            setVersion((v) => v + 1)
         }
         load()
         return () => {
@@ -135,10 +156,13 @@ export default function PhotoSection(props: PhotoSectionProps) {
             : undefined
         const base = direct || fromPath
         if (!base) return undefined
-        const sep = base.includes("?") ? "&" : "?"
-        // updated_at이 있으면 캐시 키로 사용
-        const cacheKey = s.updated_at ? new Date(s.updated_at).getTime() : Date.now()
-        return `${base}${sep}v=${cacheKey}-${version}`
+        // updated_at이 있으면 캐시 키로만 사용 (랜덤 증분 제거)
+        if (s.updated_at) {
+            const sep = base.includes("?") ? "&" : "?"
+            const cacheKey = new Date(s.updated_at).getTime()
+            return `${base}${sep}v=${cacheKey}`
+        }
+        return base
     }
 
     const effectiveImageUrl = imageUrl ?? buildImageUrlFromSettings(settings)
@@ -170,16 +194,42 @@ export default function PhotoSection(props: PhotoSectionProps) {
             }}
         >
             {effectiveImageUrl ? (
-                <img
-                    src={effectiveImageUrl}
-                    alt="Wedding couple"
-                    style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "cover",
-                        objectPosition: "center",
-                    }}
-                />
+                (() => {
+                    const base = effectiveImageUrl
+                    const large = toTransformedUrl(base, { width: 860, quality: 80, format: 'jpg', resize: 'cover' })
+                    const small = toTransformedUrl(base, { width: 430, quality: 80, format: 'jpg', resize: 'cover' })
+                    const medium = toTransformedUrl(base, { width: 640, quality: 80, format: 'jpg', resize: 'cover' })
+                    const useTransform = large !== base && small !== base && medium !== base
+                    const srcSet = useTransform ? [
+                        `${small} 430w`,
+                        `${medium} 640w`,
+                        `${large} 860w`,
+                    ].join(', ') : undefined
+                    return (
+                        <img
+                            src={base}
+                            srcSet={srcSet}
+                            sizes="(max-width: 430px) 100vw, 430px"
+                            alt="Wedding couple"
+                            style={{
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover",
+                                objectPosition: "center",
+                            }}
+                            loading="lazy"
+                            decoding="async"
+                            onError={(e) => {
+                                const img = e.currentTarget as HTMLImageElement & { dataset?: any }
+                                if (img.dataset?.fallbackDone === '1') return
+                                if (!img.dataset) (img as any).dataset = {}
+                                img.dataset.fallbackDone = '1'
+                                img.srcset = ""
+                                img.src = base
+                            }}
+                        />
+                    )
+                })()
             ) : (
                 <div
                     style={{

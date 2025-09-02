@@ -51,37 +51,80 @@ export default function NameSection(props: NameSectionProps) {
 
         const containerWidth = (nameContainerRef.current as HTMLDivElement)
             .clientWidth
-        const availableWidth = Math.max(0, containerWidth - 80)
         
-        // 화면 가로 너비에 비례한 크기 조정 (390px 기준)
-        const scale = containerWidth / 390
-        const targetFontSize = scale * 48 // 390px에서 48px
-        const minFontSize = scale * 20 // 최소 크기
+        // 모바일 브라우저 최적화: 최대 너비 430px
+        const baseWidth = 390
+        const minWidth = 280
+        const maxWidth = 430
         
-        // 간격과 SVG도 비례 조정
-        setMarginSize(14 * scale)
-        setAndSvgScale(scale)
+        // 현재 너비를 모바일 범위로 제한
+        const clampedWidth = Math.max(minWidth, Math.min(maxWidth, containerWidth))
         
-        let fontSize = targetFontSize
-
+        // 비례 계수 계산 (0.7 ~ 1.1 범위로 제한하여 모바일에서 극단적 변화 방지)
+        const scale = Math.max(0.7, Math.min(1.1, clampedWidth / baseWidth))
+        
+        // 기본 크기들
+        const baseFontSize = 48
+        const baseMargin = 14
+        const baseSvgHeight = 42
+        
+        // 스케일에 따른 크기 계산
+        const targetFontSize = Math.round(baseFontSize * scale)
+        const targetMargin = Math.round(baseMargin * scale)
+        const targetSvgHeight = Math.round(baseSvgHeight * scale)
+        
+        // 모바일 최적화된 폰트 크기 제한
+        const minFontSize = Math.max(20, Math.round(baseFontSize * 0.7))
+        const maxFontSize = Math.min(56, Math.round(baseFontSize * 1.1))
+        
+        // SVG 스케일 계산 (높이 기준)
+        const svgScale = targetSvgHeight / baseSvgHeight
+        
+        // 사용 가능한 너비 계산 (SVG와 여백 고려)
+        const availableWidth = Math.max(0, containerWidth - (targetMargin * 2) - 20)
+        
+        // 폰트 크기 테스트 및 조정
         const testFontSize = (size: number): boolean => {
             if (!groomRef.current || !brideRef.current) return false
+            
             groomRef.current.style.fontSize = `${size}px`
             const groomOverflows = groomRef.current.scrollWidth > availableWidth
+            
             brideRef.current.style.fontSize = `${size}px`
             const brideOverflows = brideRef.current.scrollWidth > availableWidth
+            
             return groomOverflows || brideOverflows
         }
-
-        while (testFontSize(fontSize) && fontSize > minFontSize) {
-            fontSize -= 1
+        
+        // 최종 폰트 크기 결정
+        let finalFontSize = Math.min(targetFontSize, maxFontSize)
+        
+        // 오버플로우 체크하면서 크기 조정
+        while (testFontSize(finalFontSize) && finalFontSize > minFontSize) {
+            finalFontSize -= 1
         }
-        setNameFontSize(fontSize)
+        
+        // 상태 업데이트
+        setNameFontSize(finalFontSize)
+        setMarginSize(targetMargin)
+        setAndSvgScale(svgScale)
+        
+        // 디버깅용 로그 (개발 시 확인용)
+        console.log(`Container: ${containerWidth}px, Scale: ${scale.toFixed(2)}, Font: ${finalFontSize}px, Margin: ${targetMargin}px`)
     }
     useEffect(() => {
+        // 초기 로드 시 즉시 실행
         adjustTextSize()
-        const handleResize = () => setTimeout(adjustTextSize, 100)
+        
+        // 리사이즈 이벤트 핸들러 개선
+        const handleResize = () => {
+            // 디바운싱 없이 즉시 실행하여 반응성 향상
+            adjustTextSize()
+        }
+        
         window.addEventListener("resize", handleResize)
+        
+        // 컴포넌트 언마운트 시 정리
         return () => window.removeEventListener("resize", handleResize)
     }, [groomName, brideName])
 
@@ -91,7 +134,8 @@ export default function NameSection(props: NameSectionProps) {
             style={{
                 width: "100%",
                 height: "240px",
-                minWidth: "390px",
+                minWidth: "280px",
+                maxWidth: "430px",
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
@@ -117,7 +161,7 @@ export default function NameSection(props: NameSectionProps) {
                     fontFamily: "P22LateNovemberW01-Regular Regular",
                     fontSize: `${nameFontSize}px`,
                     textAlign: "center",
-                    lineHeight: "1.1",
+                    lineHeight: "1.2",
                     whiteSpace: "nowrap",
                     overflow: "hidden",
                 }}
@@ -139,7 +183,7 @@ export default function NameSection(props: NameSectionProps) {
                     alignItems: "center",
                     justifyContent: "center",
                     margin: `${marginSize}px`,
-                    height: "42px",
+                    height: `${Math.round(42 * (marginSize / 14))}px`,
                     transform: `scale(${andSvgScale})`,
                     transformOrigin: "center",
                 }}
@@ -161,7 +205,7 @@ export default function NameSection(props: NameSectionProps) {
                     fontFamily: "P22LateNovemberW01-Regular Regular",
                     fontSize: `${nameFontSize}px`,
                     textAlign: "center",
-                    lineHeight: "1.1",
+                    lineHeight: "1.2",
                     whiteSpace: "nowrap",
                     overflow: "hidden",
                 }}

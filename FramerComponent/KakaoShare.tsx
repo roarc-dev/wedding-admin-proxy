@@ -14,6 +14,8 @@ interface PageSettings {
     groom_name_kr?: string
     bride_name_kr?: string
     wedding_date?: string
+    wedding_hour?: string
+    wedding_minute?: string
     venue_name?: string
     updated_at?: string
 }
@@ -35,28 +37,10 @@ async function getPageSettings(pageId: string): Promise<PageSettings | null> {
     }
 }
 
-// 이미지 비율 계산 및 최적화
-function getOptimizedImageUrl(imageUrl: string, originalAspectRatio?: number): string {
-    if (!imageUrl) return ""
-    
-    // 기본 비율 (2:3 = 0.67, 정사각형 = 1.0)
-    const ratio = originalAspectRatio || 1.0
-    let width = 400
-    let height = 400
-    
-    if (ratio < 0.8) {
-        // 세로가 긴 이미지 (2:3 비율)
-        width = 400
-        height = 600
-    } else if (ratio > 1.2) {
-        // 가로가 긴 이미지
-        width = 600
-        height = 400
-    }
-    // 정사각형에 가까운 이미지는 400x400 유지
-    
-    const separator = imageUrl.includes("?") ? "&" : "?"
-    return `${imageUrl}${separator}width=${width}&height=${height}&quality=90&format=jpg`
+// Kakao 공유 호환성을 위해: 변환 URL 대신 공개 원본 URL을 그대로 사용
+// - Kakao 서버에서 이미지 크롤링 시 일부 변환 파라미터/포맷에 따라 실패 가능성이 있어 안정 경로 우선
+async function getOptimizedImageUrl(imageUrl: string): Promise<string> {
+    return imageUrl || ""
 }
 
 // PhotoSection 이미지 URL 생성
@@ -74,20 +58,18 @@ function buildImageUrl(settings: PageSettings | null): string {
     const base = direct || fromPath
     if (!base) return ""
     
-    const separator = base.includes("?") ? "&" : "?"
-    const cacheKey = settings.updated_at ? new Date(settings.updated_at).getTime() : Date.now()
-    return `${base}${separator}v=${cacheKey}`
+    // 안정적인 버전 키 (updated_at 기반)만 유지해, 캐시 히트 보존
+    if (settings.updated_at) {
+        const separator = base.includes("?") ? "&" : "?"
+        const cacheKey = new Date(settings.updated_at).getTime()
+        return `${base}${separator}v=${cacheKey}`
+    }
+    return base
 }
 
 interface KakaoShareProps {
     pageId?: string
-    kakaoApiKey?: string
-    buttonText?: string
-    buttonStyle?: "default" | "custom"
-    backgroundColor?: string
-    textColor?: string
-    borderRadius?: number
-    padding?: number
+    templateId?: string
     style?: React.CSSProperties
 }
 
@@ -100,19 +82,13 @@ declare global {
 export default function KakaoShare(props: KakaoShareProps) {
     const {
         pageId = "",
-        kakaoApiKey = "",
-        buttonText = "카카오톡 공유",
-        buttonStyle = "default",
-        backgroundColor = "#FEE500",
-        textColor = "#000000",
-        borderRadius = 8,
-        padding = 12,
+        templateId = "",
         style,
     } = props
 
     const [settings, setSettings] = useState<PageSettings | null>(null)
     const [isKakaoReady, setIsKakaoReady] = useState(false)
-    const [loading, setLoading] = useState(false)
+    const [preparedArgs, setPreparedArgs] = useState<Record<string, string> | null>(null)
 
     // 페이지 설정 로드
     useEffect(() => {
@@ -125,145 +101,187 @@ export default function KakaoShare(props: KakaoShareProps) {
         loadSettings()
     }, [pageId])
 
-    // 카카오 SDK 초기화
+    // 카카오 SDK 간단 확인 (사용자 정의 템플릿 방식)
     useEffect(() => {
-        if (!kakaoApiKey) return
+        let mounted = true
+        let checkInterval: NodeJS.Timeout | null = null
 
-        // 카카오 SDK가 이미 로드되어 있는지 확인
-        if (window.Kakao && window.Kakao.isInitialized()) {
-            setIsKakaoReady(true)
+        const checkKakaoSDK = () => {
+            if (window.Kakao && window.Kakao.isInitialized()) {
+                console.log("✅ 카카오 SDK 준비 완료")
+                if (mounted) setIsKakaoReady(true)
+                return true
+            }
+            return false
+        }
+
+        // 즉시 확인
+        if (checkKakaoSDK()) {
             return
         }
 
-        // 카카오 SDK 스크립트 로드
-        const script = document.createElement("script")
-        script.src = "https://developers.kakao.com/sdk/js/kakao.js"
-        script.async = true
-        script.onload = () => {
-            if (window.Kakao) {
-                window.Kakao.init(kakaoApiKey)
-                setIsKakaoReady(true)
-                console.log("카카오 SDK 초기화 완료")
+        // 주기적 확인 (500ms 간격, 최대 10초)
+        let attempts = 0
+        checkInterval = setInterval(() => {
+            attempts++
+            
+            if (checkKakaoSDK()) {
+                if (checkInterval) {
+                    clearInterval(checkInterval)
+                    checkInterval = null
+                }
+                return
             }
-        }
-        script.onerror = () => {
-            console.error("카카오 SDK 로드 실패")
-        }
-        document.head.appendChild(script)
+            
+            // 10초 후 포기
+            if (attempts >= 20) {
+                console.error("❌ 카카오 SDK 준비 타임아웃")
+                if (checkInterval) {
+                    clearInterval(checkInterval)
+                    checkInterval = null
+                }
+                if (mounted) setIsKakaoReady(false)
+            }
+        }, 500)
 
         return () => {
-            document.head.removeChild(script)
+            mounted = false
+            if (checkInterval) {
+                clearInterval(checkInterval)
+            }
         }
-    }, [kakaoApiKey])
+    }, [])
 
-    // 카카오톡 공유 실행
-    const handleKakaoShare = async () => {
-        if (!isKakaoReady || !settings) {
-            console.warn("카카오 SDK가 준비되지 않았거나 설정이 없습니다")
+    // 템플릿 인자 사전 준비: settings 변경 시 한 번 계산해 둔다
+    useEffect(() => {
+        let cancelled = false
+        async function prepare() {
+            if (!settings) {
+                setPreparedArgs(null)
+                return
+            }
+
+            // 이미지 URL 생성 사전 처리 (비동기는 여기서)
+            let imageUrl = ""
+            try {
+                const baseImageUrl = buildImageUrl(settings)
+                imageUrl = await getOptimizedImageUrl(baseImageUrl)
+            } catch (imageError) {
+                console.warn("이미지 생성 실패:", imageError)
+                const baseImageUrl = buildImageUrl(settings)
+                if (baseImageUrl) {
+                    const separator = baseImageUrl.includes("?") ? "&" : "?"
+                    imageUrl = `${baseImageUrl}${separator}width=400&height=600`
+                }
+            }
+
+            // 웨딩 날짜 형식 생성
+            const formatWeddingDate = (): string => {
+                if (!settings?.wedding_date) return "결혼식 날짜 미정"
+                try {
+                    const [year, month, day] = settings.wedding_date.split('-').map(v => parseInt(v, 10))
+                    const date = new Date(year, month - 1, day)
+                    const weekdays = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일']
+                    const weekday = weekdays[date.getDay()]
+                    const hour24 = parseInt(settings.wedding_hour || '0', 10)
+                    const minute = parseInt(settings.wedding_minute || '0', 10)
+                    const period = hour24 < 12 ? '오전' : '오후'
+                    const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12
+
+                    // 분단위가 있는 경우에만 분 표시
+                    const minuteStr = minute > 0 ? ` ${minute}분` : ''
+                    return `${year}년 ${month}월 ${day}일 ${weekday} ${period} ${hour12}시${minuteStr}`
+                } catch {
+                    return "결혼식 날짜 미정"
+                }
+            }
+
+            // URL에서 경로(path) 부분만 추출
+            const getUrlPath = (url: string): string => {
+                try {
+                    const urlObj = new URL(url)
+                    return urlObj.pathname.startsWith('/') ? urlObj.pathname.substring(1) : urlObj.pathname
+                } catch {
+                    return url
+                }
+            }
+
+            const computedArgs: Record<string, string> = {
+                GROOM_NAME: settings.groom_name_kr || "신랑",
+                BRIDE_NAME: settings.bride_name_kr || "신부",
+                WEDDING_DATE: formatWeddingDate(),
+                VENUE_NAME: settings.venue_name || "예식장",
+                WEDDING_IMAGE: imageUrl,
+                WEDDING_URL: getUrlPath(settings.page_url || (typeof window !== 'undefined' ? window.location.href : '')),
+            }
+
+            if (!cancelled) setPreparedArgs(computedArgs)
+        }
+        prepare()
+        return () => {
+            cancelled = true
+        }
+    }, [settings])
+
+    // 카카오톡 공유 실행: 클릭 시 동기적으로 즉시 호출 (iOS Safari 제스처 인정)
+    const handleKakaoShare = () => {
+        if (!templateId) {
+            alert("템플릿 ID가 설정되지 않았습니다.\nFramer에서 Template ID를 입력해주세요.")
+            return
+        }
+        if (!pageId) {
+            alert("페이지 ID가 설정되지 않았습니다.")
+            return
+        }
+        if (!settings || !preparedArgs) {
+            alert("페이지 설정을 불러오는 중입니다. 잠시 후 다시 시도해주세요.")
+            return
+        }
+        if (!window.Kakao || !window.Kakao.isInitialized()) {
+            alert("카카오 SDK가 준비되지 않았습니다. 페이지를 새로고침해주세요.")
             return
         }
 
-        setLoading(true)
-
         try {
-            // 이미지 URL 생성
-            const imageUrl = buildImageUrl(settings)
-            const optimizedImageUrl = getOptimizedImageUrl(imageUrl)
-
-            // 기본 제목과 설명 생성
-            const defaultTitle = settings.groom_name_kr && settings.bride_name_kr 
-                ? `${settings.groom_name_kr} ❤️ ${settings.bride_name_kr}의 결혼식`
-                : "결혼식에 초대합니다"
-            
-            const defaultDescription = settings.wedding_date && settings.venue_name
-                ? `${settings.wedding_date} ${settings.venue_name}에서 만나요!`
-                : "특별한 순간을 함께해주세요"
-
-            // 메시지 템플릿 데이터
-            const templateData = {
-                objectType: 'feed',
-                content: {
-                    title: settings.page_title || defaultTitle,
-                    description: settings.page_description || defaultDescription,
-                    imageUrl: optimizedImageUrl,
-                    link: {
-                        mobileWebUrl: settings.page_url || window.location.href,
-                        webUrl: settings.page_url || window.location.href
-                    }
-                },
-                buttons: [
-                    {
-                        title: '웹으로 보기',
-                        link: {
-                            mobileWebUrl: settings.page_url || window.location.href,
-                            webUrl: settings.page_url || window.location.href
-                        }
-                    }
-                ]
-            }
-
-            console.log("카카오톡 공유 데이터:", templateData)
-
-            // 카카오톡 공유 실행
-            window.Kakao.Link.sendDefault(templateData)
-
+            window.Kakao.Share.sendCustom({
+                templateId: parseInt(templateId),
+                templateArgs: preparedArgs,
+            })
         } catch (error) {
-            console.error("카카오톡 공유 실패:", error)
-            alert("카카오톡 공유에 실패했습니다. 다시 시도해주세요.")
-        } finally {
-            setLoading(false)
+            console.error("카카오톡 공유 오류:", error)
+            alert("카카오톡 공유에 실패했습니다.")
         }
     }
 
-    // 버튼 스타일
-    const buttonStyles = {
-        default: {
-            backgroundColor: "#FEE500",
-            color: "#000000",
-            border: "none",
-            borderRadius: "8px",
-            padding: "12px 16px",
-            fontSize: "14px",
-            fontWeight: "500",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "8px",
-            minWidth: "120px",
-            transition: "all 0.2s ease",
-        },
-        custom: {
-            backgroundColor,
-            color: textColor,
-            border: "none",
-            borderRadius: `${borderRadius}px`,
-            padding: `${padding}px`,
-            fontSize: "14px",
-            fontWeight: "500",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "8px",
-            minWidth: "120px",
-            transition: "all 0.2s ease",
-        }
+    // 고정된 버튼 스타일
+    const buttonStyle = {
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        overflow: "hidden",
+        border: "none",
+        backgroundColor: "#E0E0E0",
+        fontFamily: "Pretendard SemiBold",
+        fontSize: "14px",
+        color: "#000", // 글씨 색상은 강제로 검정색으로 설정
+        textDecoration: "none",
+        cursor: "pointer",
+        transition: "all 0.2s ease",
     }
-
-    const currentButtonStyle = buttonStyles[buttonStyle]
 
     return (
         <div style={{ ...style, display: "inline-block" }}>
             <button
                 onClick={handleKakaoShare}
-                disabled={!isKakaoReady || !settings || loading}
+                disabled={!settings || !isKakaoReady || !templateId || !preparedArgs}
                 style={{
-                    ...currentButtonStyle,
-                    opacity: (!isKakaoReady || !settings || loading) ? 0.6 : 1,
+                    ...buttonStyle,
+                    opacity: (!settings || !isKakaoReady || !templateId || !preparedArgs) ? 0.6 : 1,
                 }}
                 onMouseEnter={(e) => {
-                    if (!loading && isKakaoReady && settings) {
+                    if (settings && isKakaoReady && templateId && preparedArgs) {
                         e.currentTarget.style.transform = "scale(1.02)"
                     }
                 }}
@@ -271,83 +289,23 @@ export default function KakaoShare(props: KakaoShareProps) {
                     e.currentTarget.style.transform = "scale(1)"
                 }}
             >
-                {/* 카카오톡 아이콘 */}
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 3c5.799 0 10.5 3.664 10.5 8.185 0 4.52-4.701 8.184-10.5 8.184a13.5 13.5 0 01-1.727-.11l-4.408 2.883c-.501.265-.678.236-.472-.413l.892-3.678c-2.88-1.46-4.785-3.99-4.785-6.866C1.5 6.665 6.201 3 12 3z"/>
-                </svg>
-                {loading ? "공유 중..." : buttonText}
+                {"카카오톡으로 공유하기"}
             </button>
-            
-            {/* 상태 메시지 */}
-            {!kakaoApiKey && (
-                <div style={{ fontSize: "12px", color: "#ff6b6b", marginTop: "4px" }}>
-                    카카오 API 키가 필요합니다
-                </div>
-            )}
-            {!pageId && (
-                <div style={{ fontSize: "12px", color: "#ff6b6b", marginTop: "4px" }}>
-                    페이지 ID가 필요합니다
-                </div>
-            )}
         </div>
     )
 }
 
 addPropertyControls(KakaoShare, {
+    templateId: {
+        type: ControlType.String,
+        title: "Template ID",
+        defaultValue: "",
+        placeholder: "카카오 개발자 콘솔에서 생성한 템플릿 ID (숫자)",
+    },
     pageId: {
         type: ControlType.String,
         title: "Page ID",
         defaultValue: "",
         placeholder: "예: mypageid",
-    },
-    kakaoApiKey: {
-        type: ControlType.String,
-        title: "카카오 API Key",
-        defaultValue: "",
-        placeholder: "카카오 개발자에서 발급받은 JavaScript 키",
-    },
-    buttonText: {
-        type: ControlType.String,
-        title: "버튼 텍스트",
-        defaultValue: "카카오톡 공유",
-    },
-    buttonStyle: {
-        type: ControlType.Enum,
-        title: "버튼 스타일",
-        options: ["default", "custom"],
-        optionTitles: ["기본 (카카오 스타일)", "커스텀"],
-        defaultValue: "default",
-    },
-    backgroundColor: {
-        type: ControlType.Color,
-        title: "배경색",
-        defaultValue: "#FEE500",
-        hidden: (props) => props.buttonStyle !== "custom",
-    },
-    textColor: {
-        type: ControlType.Color,
-        title: "텍스트 색상",
-        defaultValue: "#000000",
-        hidden: (props) => props.buttonStyle !== "custom",
-    },
-    borderRadius: {
-        type: ControlType.Number,
-        title: "모서리 둥글기",
-        defaultValue: 8,
-        min: 0,
-        max: 20,
-        step: 1,
-        unit: "px",
-        hidden: (props) => props.buttonStyle !== "custom",
-    },
-    padding: {
-        type: ControlType.Number,
-        title: "내부 여백",
-        defaultValue: 12,
-        min: 4,
-        max: 24,
-        step: 2,
-        unit: "px",
-        hidden: (props) => props.buttonStyle !== "custom",
     },
 })

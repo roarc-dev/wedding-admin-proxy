@@ -22,7 +22,8 @@ export default function Location(props: LocationProps) {
 
     const [venueName, setVenueName] = useState<string>("")
     const [venueAddress, setVenueAddress] = useState<string>("")
-    const [transportLocationName, setTransportLocationName] = useState<string>("")
+    const [transportLocationName, setTransportLocationName] =
+        useState<string>("")
     const [loading, setLoading] = useState<boolean>(false)
     const [showCopyMessage, setShowCopyMessage] = useState<boolean>(false)
 
@@ -40,7 +41,9 @@ export default function Location(props: LocationProps) {
                 if (mounted && result.success && result.data) {
                     setVenueName(result.data.venue_name || "")
                     setVenueAddress(result.data.venue_address || "")
-                    setTransportLocationName(result.data.transport_location_name || "")
+                    setTransportLocationName(
+                        result.data.transport_location_name || ""
+                    )
                 }
             } catch {
                 // noop
@@ -100,11 +103,27 @@ export default function Location(props: LocationProps) {
                         textAlign: "center",
                         color: "black",
                         fontSize: 18,
-                        fontFamily: "Pretendard SemiBold",
                         lineHeight: "32px",
                     }}
                 >
-                    {loading ? "" : displayLocationName}
+                    {loading ? "" : displayLocationName.includes("|") ? (
+                        displayLocationName.split("|").map((part, index, array) => (
+                            <React.Fragment key={index}>
+                                <span style={{ fontFamily: "Pretendard SemiBold" }}>
+                                    {part.trim()}
+                                </span>
+                                {index < array.length - 1 && (
+                                    <span style={{ fontFamily: "Pretendard Regular" }}>
+                                        {" | "}
+                                    </span>
+                                )}
+                            </React.Fragment>
+                        ))
+                    ) : (
+                        <span style={{ fontFamily: "Pretendard SemiBold" }}>
+                            {displayLocationName}
+                        </span>
+                    )}
                 </div>
 
                 {/* 상세 주소 + 복사 */}

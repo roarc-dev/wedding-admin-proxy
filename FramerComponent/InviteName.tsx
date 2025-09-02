@@ -3,6 +3,42 @@ import { addPropertyControls, ControlType } from "framer"
 
 const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app"
 
+function renderBoldSegments(text: string, baseStyle?: React.CSSProperties): JSX.Element[] {
+    const out: JSX.Element[] = []
+    let last = 0
+    let key = 0
+    const re = /\*([^*]+)\*/g
+    let m: RegExpExecArray | null
+    while ((m = re.exec(text)) !== null) {
+        const start = m.index
+        const end = start + m[0].length
+        if (start > last) {
+            const chunk = text.slice(last, start)
+            if (chunk) out.push(
+                <span key={`nb-${key++}`} style={baseStyle}>
+                    {chunk}
+                </span>
+            )
+        }
+        const boldText = m[1]
+        out.push(
+            <span key={`b-${key++}`} style={{ ...(baseStyle || {}), fontFamily: "Pretendard SemiBold" }}>
+                {boldText}
+            </span>
+        )
+        last = end
+    }
+    if (last < text.length) {
+        const rest = text.slice(last)
+        if (rest) out.push(
+            <span key={`nb-${key++}`} style={baseStyle}>
+                {rest}
+            </span>
+        )
+    }
+    return out
+}
+
 function renderInvitationSegments(text: string): JSX.Element[] {
     const lines = (text || "").split("\n")
     const rendered: JSX.Element[] = []
@@ -19,23 +55,21 @@ function renderInvitationSegments(text: string): JSX.Element[] {
             if (start > lastIndex) {
                 const chunk = line.slice(lastIndex, start)
                 if (chunk) parts.push(
-                    <span key={`t-${i}-${keySeq++}`}>{chunk}</span>
+                    <span key={`t-${i}-${keySeq++}`}>{renderBoldSegments(chunk)}</span>
                 )
             }
             const inner = match[1]
-            if (inner) parts.push(
-                <span
-                    key={`q-${i}-${keySeq++}`}
-                    style={{ fontSize: 14, lineHeight: "1em", color: "#6e6e6e" }}
-                >
-                    {inner}
-                </span>
-            )
+            if (inner)
+                parts.push(
+                    <span key={`q-${i}-${keySeq++}`} style={{ fontSize: 14, lineHeight: "1em", color: "#6e6e6e" }}>
+                        {renderBoldSegments(inner, { fontSize: 14, lineHeight: "1em", color: "#6e6e6e" })}
+                    </span>
+                )
             lastIndex = end
         }
         if (lastIndex < line.length) {
             const rest = line.slice(lastIndex)
-            if (rest) parts.push(<span key={`t-${i}-${keySeq++}`}>{rest}</span>)
+            if (rest) parts.push(<span key={`t-${i}-${keySeq++}`}>{renderBoldSegments(rest)}</span>)
         }
         rendered.push(
             <span key={`line-${i}`}>
