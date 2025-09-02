@@ -13,7 +13,6 @@ const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app"
 interface PageSettings {
     id?: string
     page_id: string
-    venue_name?: string
     venue_address?: string
     created_at?: string
     updated_at?: string
@@ -42,7 +41,6 @@ async function getPageSettings(pageId: string): Promise<PageSettings | null> {
             return {
                 id: result.data.id,
                 page_id: result.data.page_id,
-                venue_name: result.data.venue_name || '',
                 venue_address: result.data.venue_address || '',
                 created_at: result.data.created_at,
                 updated_at: result.data.updated_at,
@@ -87,7 +85,7 @@ export default function NaverMapFix({
     const geocoderInstance = useRef<any>(null)
     const placesServiceInstance = useRef<any>(null)
     const [pageSettings, setPageSettings] = useState<PageSettings | null>(null)
-    const [venueName, setVenueName] = useState("")
+    const [venueAddress, setVenueAddress] = useState("")
     const [naverClientId, setNaverClientId] = useState("")
     const [googleMapsApiKey, setGoogleMapsApiKey] = useState("")
     const [tmapApiKey, setTmapApiKey] = useState("")
@@ -418,7 +416,7 @@ export default function NaverMapFix({
             markerInstance.current,
             "click",
             () => {
-                const encodedName = encodeURIComponent(venueName || "위치")
+                const encodedName = encodeURIComponent(venueAddress || "위치")
                 const appName =
                     encodeURIComponent(window.location.hostname) || "framer"
 
@@ -448,10 +446,10 @@ export default function NaverMapFix({
             console.log("구글 서비스 초기화 완료")
 
             // 서비스 초기화 후 대기 시간을 더 길게
-            if (venueName.trim()) {
+            if (venueAddress.trim()) {
                 setTimeout(() => {
-                    console.log("구글 서비스 초기화 후 검색 시작:", venueName)
-                    searchPlace(venueName)
+                    console.log("구글 서비스 초기화 후 검색 시작:", venueAddress)
+                    searchPlace(venueAddress)
                 }, 1000) // 1초로 증가
             }
         } catch (err) {
@@ -471,31 +469,30 @@ export default function NaverMapFix({
                 
                 setPageSettings(settings)
                 
-                // 장소명 결정 로직: 강제 입력 > 서버 데이터 > 기본값
-                let finalVenueName = ""
-                
+                // 장소 주소 결정 로직: 강제 입력 > 서버 데이터 > 기본값
+                let finalVenueAddress = ""
+
                 if (forcePlaceName && forcePlaceName.trim()) {
                     // 강제 입력된 장소명이 있으면 우선 사용
-                    finalVenueName = forcePlaceName.trim()
-                    console.log("강제 입력된 장소명 사용:", finalVenueName)
-                } else if (settings?.venue_name && settings.venue_name.trim()) {
-                    // 서버에서 가져온 venue_name 사용
-                    finalVenueName = settings.venue_name.trim()
-                    console.log("서버 venue_name 사용:", finalVenueName)
+                    finalVenueAddress = forcePlaceName.trim()
+                    console.log("강제 입력된 장소 주소 사용:", finalVenueAddress)
+                } else if (settings?.venue_address && settings.venue_address.trim()) {
+                    // 서버에서 가져온 venue_address 사용
+                    finalVenueAddress = settings.venue_address.trim()
+                    console.log("서버 venue_address 사용:", finalVenueAddress)
                 } else if (placeName && placeName.trim()) {
                     // 기존 placeName 사용 (하위 호환성)
-                    finalVenueName = placeName.trim()
-                    console.log("기존 placeName 사용:", finalVenueName)
+                    finalVenueAddress = placeName.trim()
+                    console.log("기존 placeName 사용:", finalVenueAddress)
                 }
-                
-                setVenueName(finalVenueName)
+
+                setVenueAddress(finalVenueAddress)
                 
                 // 검색 결과 검토 로직 추가
-                if (settings?.venue_name && settings?.venue_address) {
+                if (settings?.venue_address) {
                     console.log("서버 데이터 검토:", {
-                        venue_name: settings.venue_name,
                         venue_address: settings.venue_address,
-                        final_venue_name: finalVenueName
+                        final_venue_address: finalVenueAddress
                     })
                 }
 
@@ -579,7 +576,7 @@ export default function NaverMapFix({
             window.google &&
             window.google.maps &&
             googleMapsApiKey &&
-            venueName.trim()
+            venueAddress.trim()
         ) {
             initGoogleServicesAndSearch()
         }
@@ -597,7 +594,7 @@ export default function NaverMapFix({
                     // 검색이 이미 완료된 경우에만 지도 초기화
                     if (
                         searchSuccess ||
-                        !venueName.trim() ||
+                        !venueAddress.trim() ||
                         !googleMapsApiKey
                     ) {
                         initNaverMap()
@@ -607,7 +604,7 @@ export default function NaverMapFix({
             naverScript.onerror = () => console.log("네이버 지도 API 로드 실패")
             document.head.appendChild(naverScript)
         }
-    }, [apiKeysLoaded, naverClientId, googleMapsApiKey, venueName])
+    }, [apiKeysLoaded, naverClientId, googleMapsApiKey, venueAddress])
 
     // 구글 서비스 초기화 후 바로 검색하는 헬퍼 함수
     const initGoogleServicesAndSearch = () => {
@@ -616,11 +613,11 @@ export default function NaverMapFix({
         }
     }
 
-    // 장소명만 변경되었을 때의 검색
+    // 장소 주소만 변경되었을 때의 검색
     useEffect(() => {
-        console.log("venueName 상태 변경:", venueName)
+        console.log("venueAddress 상태 변경:", venueAddress)
         if (
-            venueName.trim() &&
+            venueAddress.trim() &&
             mapInstance.current &&
             geocoderInstance.current &&
             placesServiceInstance.current &&
@@ -629,10 +626,10 @@ export default function NaverMapFix({
             !isLoading && // 현재 로딩 중이 아닐 때만
             searchRetryCount.current === 0 // 재시도 중이 아닐 때만
         ) {
-            console.log("조건 만족, 검색 실행:", venueName)
-            searchPlace(venueName)
+            console.log("조건 만족, 검색 실행:", venueAddress)
+            searchPlace(venueAddress)
         }
-    }, [venueName])
+    }, [venueAddress])
 
     // 검색 성공 시 지도 초기화 및 마커 표시 업데이트
     useEffect(() => {
@@ -647,8 +644,8 @@ export default function NaverMapFix({
         }
     }, [searchSuccess, currentPosition])
 
-    // venueName 없으면 안내 메시지
-    if (!venueName || !venueName.trim()) {
+    // venueAddress 없으면 안내 메시지
+    if (!venueAddress || !venueAddress.trim()) {
         return (
             <div
                 style={{
@@ -658,7 +655,7 @@ export default function NaverMapFix({
                     borderRadius: 8,
                 }}
             >
-                장소명이 입력되지 않았습니다. Property Controls에서 장소명을
+                장소 주소가 입력되지 않았습니다. Property Controls에서 장소명을
                 입력하세요.
             </div>
         )
@@ -702,9 +699,9 @@ addPropertyControls(NaverMapFix, {
     },
     placeName: {
         type: ControlType.String,
-        title: "장소명 (하위 호환)",
+        title: "장소 주소 (하위 호환)",
         defaultValue: "",
-        placeholder: "검색할 장소의 이름 (강제 장소명이 없을 때 사용)",
+        placeholder: "검색할 장소의 주소 (강제 장소명이 없을 때 사용)",
     },
     retina: {
         type: ControlType.Boolean,
