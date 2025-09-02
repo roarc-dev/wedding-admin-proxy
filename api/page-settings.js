@@ -325,7 +325,7 @@ async function handleGetTransport(req, res) {
 }
 
 async function handleUpdateTransport(req, res, validatedUser) {
-  const { pageId, items, locationName } = req.body
+  const { pageId, items, locationName } = req.body || {}
 
   if (!pageId) {
     return res.status(400).json({
@@ -344,26 +344,41 @@ async function handleUpdateTransport(req, res, validatedUser) {
       })
     }
 
-    // 2) transport_infos 테이블 업데이트
+    // 2) transport_infos 테이블 업데이트 (안정성 강화를 위한 검증/정규화)
     if (Array.isArray(items)) {
-      // 기존 데이터 삭제
-      await supabase
+      // 입력 크기 제한 (예: 최대 50개 항목)
+      const slice = items.slice(0, 50)
+      const normalized = slice.map((item, index) => {
+        const title = typeof item?.title === 'string' ? item.title : ''
+        const description = typeof item?.description === 'string' ? item.description : ''
+        const display_order = Number(item?.display_order || index + 1)
+        // 과도한 길이로 인한 DB 에러 방지 (필요시 길이 조정)
+        const safeTitle = title.length > 200 ? title.slice(0, 200) : title
+        const safeDesc = description.length > 5000 ? description.slice(0, 5000) : description
+        return {
+          page_id: pageId,
+          title: safeTitle,
+          description: safeDesc,
+          display_order,
+        }
+      })
+
+      // 기존 데이터 삭제 (오류 체크)
+      const { error: deleteError } = await supabase
         .from('transport_infos')
         .delete()
         .eq('page_id', pageId)
 
-      // 새 데이터 삽입
-      if (items.length > 0) {
-        const transportItems = items.map((item, index) => ({
-          page_id: pageId,
-          title: item.title || '',
-          description: item.description || '',
-          display_order: item.display_order || index + 1
-        }))
+      if (deleteError) {
+        console.error('Transport delete error:', deleteError)
+        throw deleteError
+      }
 
+      // 새 데이터 삽입
+      if (normalized.length > 0) {
         const { error: insertError } = await supabase
           .from('transport_infos')
-          .insert(transportItems)
+          .insert(normalized)
 
         if (insertError) {
           console.error('Transport insert error:', insertError)
@@ -374,12 +389,14 @@ async function handleUpdateTransport(req, res, validatedUser) {
 
     // 3) page_settings에 장소명 저장
     if (locationName !== undefined) {
+      const safeLocation = typeof locationName === 'string' ? locationName : ''
+      const trimmed = safeLocation.length > 200 ? safeLocation.slice(0, 200) : safeLocation
       const { error: updateError } = await supabase
         .from('page_settings')
         .upsert(
           {
             page_id: pageId,
-            transport_location_name: locationName,
+            transport_location_name: trimmed,
             updated_at: new Date().toISOString()
           },
           { onConflict: 'page_id' }
