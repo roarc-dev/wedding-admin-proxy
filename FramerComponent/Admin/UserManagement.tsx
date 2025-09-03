@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import styled from "styled-components"
 import { addPropertyControls, ControlType } from "framer"
 
 // 프록시 서버 URL (고정된 Production URL) - AccountBtn.tsx 패턴과 동일
@@ -211,41 +211,6 @@ async function deleteUser(userId: string): Promise<any> {
     }
 }
 
-// 사용자 승인/거부 함수
-async function approveUser(
-    userId: string,
-    status: "approved" | "rejected",
-    pageId?: string | null
-): Promise<any> {
-    try {
-        const response = await fetch(`${PROXY_BASE_URL}/api/user-management`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${getAuthToken()}`,
-            },
-            body: JSON.stringify({
-                action: "approveUser",
-                userId,
-                status,
-                pageId,
-            }),
-        })
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-        }
-
-        return await response.json()
-    } catch (error) {
-        console.error("Approve user error:", error)
-        return {
-            success: false,
-            error: "사용자 승인 중 오류가 발생했습니다",
-        }
-    }
-}
-
 interface User {
     id: string
     username: string
@@ -257,13 +222,270 @@ interface User {
     page_id?: string
 }
 
+// Styled Components
+const StyledGap16 = styled.div`
+  width: 375px;
+  height: 16px;
+  position: relative;
+`;
+
+const StyledUseradminspan = styled.span`
+  color: black;
+  font-size: 28px;
+  font-family: P22LateNovemberW01-Regular;
+  font-weight: 400;
+  word-wrap: break-word;
+`;
+
+const StyledGap1601 = styled.div`
+  width: 375px;
+  height: 16px;
+  position: relative;
+`;
+
+const StyledSpan = styled.span`
+  color: black;
+  font-size: 14px;
+  font-family: Pretendard;
+  font-weight: 600;
+  word-wrap: break-word;
+`;
+
+const StyledGap1602 = styled.div`
+  width: 375px;
+  height: 16px;
+  position: relative;
+`;
+
+const Styled01span = styled.span`
+  color: #7F7F7F;
+  font-size: 12px;
+  font-family: Pretendard;
+  font-weight: 400;
+  word-wrap: break-word;
+`;
+
+const StyledPwspan = styled.span`
+  color: #AEAEAE;
+  font-size: 12px;
+  font-family: Pretendard;
+  font-weight: 400;
+  word-wrap: break-word;
+`;
+
+const StyledPageidspan = styled.span`
+  color: #AEAEAE;
+  font-size: 14px;
+  font-family: Pretendard;
+  font-weight: 400;
+  word-wrap: break-word;
+`;
+
+const StyledFrame2117912734 = styled.div`
+  width: 167.50px;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 8px;
+  display: flex;
+`;
+
+const StyledFrame2117912735 = styled.div`
+  height: 32px;
+  padding: 12px;
+  outline: 1px #E5E6E8 solid;
+  outline-offset: -0.50px;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  display: flex;
+  cursor: pointer;
+  background: white;
+  border-radius: 2px;
+`;
+
+const StyledName = styled.div`
+  align-self: stretch;
+  height: 32px;
+  padding: 16px;
+  border-radius: 2px;
+  outline: 1px #E5E6E8 solid;
+  outline-offset: -0.50px;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  display: flex;
+  background: white;
+`;
+
+const StyledNameInput = styled.input`
+  width: 100%;
+  border: none;
+  outline: none;
+  font-size: 14px;
+  font-family: Pretendard;
+  font-weight: 400;
+  color: #AEAEAE;
+  background: transparent;
+
+  &::placeholder {
+    color: #AEAEAE;
+  }
+`;
+
+const StyledFrame211791273501 = styled.div`
+  align-self: stretch;
+  height: 32px;
+  padding: 12px;
+  background: black;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  display: inline-flex;
+  cursor: pointer;
+  border-radius: 2px;
+`;
+
+const StyledFrame2117912733 = styled.div`
+  align-self: stretch;
+  justify-content: space-between;
+  align-items: center;
+  display: inline-flex;
+`;
+
+const StyledFrame2117912731 = styled.div`
+  align-self: stretch;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 12px;
+  display: flex;
+`;
+
+const StyledFrame2117912727 = styled.div`
+  align-self: stretch;
+  padding: 14px;
+  background: white;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: flex-start;
+  gap: 12px;
+  display: flex;
+`;
+
+const StyledFrame2117912732 = styled.div`
+  align-self: stretch;
+  padding: 28px;
+  background: #ECECEC;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: flex-start;
+  gap: 14px;
+  display: flex;
+`;
+
+const StyledFrame2117912729 = styled.div`
+  flex: 1 1 0;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  display: flex;
+`;
+
+const StyledFrame2117912730 = styled.div`
+  align-self: stretch;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 24px;
+  display: inline-flex;
+`;
+
+const StyledFrame2117912726 = styled.div`
+  align-self: stretch;
+  padding-left: 28px;
+  padding-right: 28px;
+  padding-top: 18px;
+  padding-bottom: 18px;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: flex-start;
+  gap: 24px;
+  display: flex;
+`;
+
+const StyledAdmin = styled.div`
+  width: 375px;
+  height: 100vh;
+  background: white;
+  overflow: hidden;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  display: inline-flex;
+`;
+
+const StyledDeleteButton = styled.button`
+  width: 24px;
+  height: 24px;
+  background: #FF4444;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+  margin-left: 8px;
+`;
+
+const StyledAddIcon = styled.div`
+  width: 34px;
+  height: 34px;
+  border: 1px solid #E5E6E8;
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: white;
+
+  svg {
+    width: 20px;
+    height: 20px;
+  }
+`;
+
+const StyledRefreshIcon = styled.div`
+  width: 34px;
+  height: 34px;
+  border: 1px solid #E5E6E8;
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: white;
+
+  svg {
+    width: 20px;
+    height: 20px;
+  }
+`;
+
 export default function UserManagement(props: { style?: React.CSSProperties }) {
     const { style } = props
 
     // 공통 상태
     const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false)
-    const [currentUser, setCurrentUser] = useState<{ username: string; name?: string } | null>(null)
-    const [loginForm, setLoginForm] = useState<{ username: string; password: string }>({ username: "", password: "" })
+    const [currentUser, setCurrentUser] = useState<{
+        username: string
+        name?: string
+    } | null>(null)
+    const [loginForm, setLoginForm] = useState<{
+        username: string
+        password: string
+    }>({ username: "", password: "" })
     const [loginError, setLoginError] = useState<string>("")
     const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false)
 
@@ -272,20 +494,17 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
     const [loading, setLoading] = useState<boolean>(false)
     const [error, setError] = useState<string | null>(null)
     const [success, setSuccess] = useState<string | null>(null)
-    const [showAddModal, setShowAddModal] = useState<boolean>(false)
-    const [editingUser, setEditingUser] = useState<User | null>(null)
-    const [showApprovalModal, setShowApprovalModal] = useState<boolean>(false)
-    const [approvingUser, setApprovingUser] = useState<User | null>(null)
-    const [pageIdInput, setPageIdInput] = useState<string>("")
 
-    const [userForm, setUserForm] = useState({
+    // 새 사용자 추가 상태
+    const [newUserForm, setNewUserForm] = useState({
         username: "",
         password: "",
         name: "",
-        is_active: true,
-        newPassword: "",
         page_id: "",
     })
+
+    // 사용자별 Page ID 상태 관리
+    const [userPageIds, setUserPageIds] = useState<{[key: string]: string}>({})
 
     // 세션 확인
     useEffect(() => {
@@ -302,41 +521,19 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
         }
     }, [])
 
-    // 로그인
-    const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault()
-        setIsLoggingIn(true)
-        setLoginError("")
-
-        const result = await authenticateAdmin(
-            loginForm.username,
-            loginForm.password
-        )
-        if (result.success) {
-            setIsAuthenticated(true)
-            setCurrentUser(result.user)
-            setLoginForm({ username: "", password: "" })
-            loadUsers()
-        } else {
-            setLoginError(result.error)
-        }
-        setIsLoggingIn(false)
-    }
-
-    // 로그아웃
-    const handleLogout = () => {
-        removeAuthToken()
-        setIsAuthenticated(false)
-        setCurrentUser(null)
-        setUsers([])
-    }
-
     // 사용자 목록 로드
     const loadUsers = async () => {
         setLoading(true)
         try {
             const usersData = await getAllUsers()
             setUsers(usersData)
+
+            // 각 사용자의 현재 page_id를 상태에 저장
+            const pageIdMap: {[key: string]: string} = {}
+            usersData.forEach(user => {
+                pageIdMap[user.id] = user.page_id || ""
+            })
+            setUserPageIds(pageIdMap)
         } catch (err) {
             setError("사용자 목록을 불러오는데 실패했습니다.")
         } finally {
@@ -345,126 +542,76 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
     }
 
     // 새 사용자 추가
-    const handleAddUser = () => {
-        setUserForm({
-            username: "",
-            password: "",
-            name: "",
-            is_active: true,
-            newPassword: "",
-            page_id: "",
-        })
-        setEditingUser(null)
-        setShowAddModal(true)
-    }
-
-    // 사용자 편집
-    const handleEditUser = (user: User) => {
-        setUserForm({
-            username: user.username,
-            password: "",
-            name: user.name,
-            is_active: user.is_active,
-            newPassword: "",
-            page_id: user.page_id || "",
-        })
-        setEditingUser(user)
-        setShowAddModal(true)
-    }
-
-    // 사용자 승인 모달 열기
-    const handleShowApprovalModal = (user: User) => {
-        setApprovingUser(user)
-        setPageIdInput("")
-        setShowApprovalModal(true)
-    }
-
-    // 사용자 승인
-    const handleApproveUser = async (status: "approved" | "rejected") => {
-        if (!approvingUser) return
+    const handleCreateUser = async () => {
+        if (!newUserForm.username || !newUserForm.password || !newUserForm.name) {
+            setError("모든 필드를 입력하세요.")
+            return
+        }
 
         setLoading(true)
         try {
-            const result = await approveUser(
-                approvingUser.id,
-                status,
-                status === "approved" ? pageIdInput : null
-            )
+            const result = await createUser({
+                username: newUserForm.username,
+                password: newUserForm.password,
+                name: newUserForm.name,
+            })
 
             if (result.success) {
-                setSuccess(result.message)
-                setShowApprovalModal(false)
-                setApprovingUser(null)
-                setPageIdInput("")
+                setSuccess("사용자가 성공적으로 추가되었습니다.")
+                setNewUserForm({ username: "", password: "", name: "", page_id: "" })
                 loadUsers()
             } else {
                 setError(result.error)
             }
         } catch (err) {
-            setError("승인 처리 중 오류가 발생했습니다.")
+            setError("사용자 추가 중 오류가 발생했습니다.")
         } finally {
             setLoading(false)
         }
     }
 
-    // 사용자 저장
-    const handleSaveUser = async () => {
+    // Page ID 변경 핸들러
+    const handlePageIdChange = (userId: string, pageId: string) => {
+        setUserPageIds(prev => ({
+            ...prev,
+            [userId]: pageId
+        }))
+    }
+
+    // 사용자 저장 (Page ID 업데이트)
+    const handleSaveUser = async (userId: string) => {
+        const pageId = userPageIds[userId] || ""
+
         setLoading(true)
         try {
-            let result
-            if (editingUser) {
-                // 수정
-                const updateData: UpdateUserData = {
-                    id: editingUser.id,
-                    username: userForm.username,
-                    name: userForm.name,
-                    is_active: userForm.is_active,
-                    page_id: userForm.page_id,
-                }
-                if (userForm.newPassword) {
-                    updateData.newPassword = userForm.newPassword
-                }
-                result = await updateUser(updateData)
-            } else {
-                // 새 사용자 추가
-                if (
-                    !userForm.username ||
-                    !userForm.password ||
-                    !userForm.name
-                ) {
-                    setError("모든 필드를 입력하세요.")
-                    setLoading(false)
-                    return
-                }
-                result = await createUser({
-                    username: userForm.username,
-                    password: userForm.password,
-                    name: userForm.name,
-                    page_id: userForm.page_id,
-                })
-            }
+            const result = await updateUser({
+                id: userId,
+                username: users.find(u => u.id === userId)?.username || "",
+                name: users.find(u => u.id === userId)?.name || "",
+                is_active: pageId ? true : false, // Page ID가 있으면 활성, 없으면 비활성
+                page_id: pageId,
+            })
 
             if (result.success) {
-                setSuccess(result.message || "작업이 완료되었습니다.")
-                setShowAddModal(false)
+                setSuccess("사용자 정보가 성공적으로 저장되었습니다.")
                 loadUsers()
             } else {
                 setError(result.error)
             }
         } catch (err) {
-            setError("작업 중 오류가 발생했습니다.")
+            setError("저장 중 오류가 발생했습니다.")
         } finally {
             setLoading(false)
         }
     }
 
     // 사용자 삭제
-    const handleDeleteUser = async (user: User) => {
-        if (!confirm(`정말로 '${user.name}' 사용자를 삭제하시겠습니까?`)) return
+    const handleDeleteUser = async (userId: string) => {
+        if (!confirm("정말로 이 사용자를 삭제하시겠습니까?")) return
 
         setLoading(true)
         try {
-            const result = await deleteUser(user.id)
+            const result = await deleteUser(userId)
 
             if (result.success) {
                 setSuccess("사용자가 성공적으로 삭제되었습니다.")
@@ -490,969 +637,108 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
         }
     }, [error, success])
 
-    // 승인 상태별 사용자 분류
-    const pendingUsers = users.filter((user: User) => user.approval_status === "pending")
-    const approvedUsers = users.filter((user: User) => user.approval_status === "approved")
-    const rejectedUsers = users.filter((user: User) => user.approval_status === "rejected")
-
-    // 로그인 화면
-    if (!isAuthenticated) {
-        return (
-            <div
-                style={{
-                    ...style,
-                    padding: "40px",
-                    backgroundColor: "#f8f9fa",
-                    borderRadius: "12px",
-                    display: "flex",
-                    justifyContent: "center",
-                }}
-            >
-                <div
-                    style={{
-                        backgroundColor: "white",
-                        padding: "40px",
-                        borderRadius: "12px",
-                        boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
-                        maxWidth: "400px",
-                        width: "100%",
-                    }}
-                >
-                    <div style={{ textAlign: "center", marginBottom: "30px" }}>
-                        <div style={{ fontSize: "48px", marginBottom: "16px" }}>
-                            👥
-                        </div>
-                        <h2
-                            style={{
-                                margin: 0,
-                                fontSize: "24px",
-                                color: "#1a237e",
-                            }}
-                        >
-                            사용자 관리
-                        </h2>
-                        <p
-                            style={{
-                                margin: "8px 0 0",
-                                fontSize: "14px",
-                                color: "#666",
-                            }}
-                        >
-                            관리자 계정으로 로그인하세요
-                        </p>
-                    </div>
-
-                    <form onSubmit={handleLogin}>
-                        <div style={{ marginBottom: "20px" }}>
-                            <label
-                                style={{
-                                    display: "block",
-                                    marginBottom: "6px",
-                                    fontSize: "14px",
-                                    fontWeight: "bold",
-                                }}
-                            >
-                                아이디
-                            </label>
-                            <input
-                                type="text"
-                                value={loginForm.username}
-                                onChange={(e) =>
-                                    setLoginForm((prev) => ({
-                                        ...prev,
-                                        username: e.target.value,
-                                    }))
-                                }
-                                style={{
-                                    width: "100%",
-                                    padding: "12px",
-                                    border: "2px solid #e0e0e0",
-                                    borderRadius: "8px",
-                                    boxSizing: "border-box",
-                                    fontSize: "16px",
-                                }}
-                                required
-                            />
-                        </div>
-
-                        <div style={{ marginBottom: "24px" }}>
-                            <label
-                                style={{
-                                    display: "block",
-                                    marginBottom: "6px",
-                                    fontSize: "14px",
-                                    fontWeight: "bold",
-                                }}
-                            >
-                                비밀번호
-                            </label>
-                            <input
-                                type="password"
-                                value={loginForm.password}
-                                onChange={(e) =>
-                                    setLoginForm((prev) => ({
-                                        ...prev,
-                                        password: e.target.value,
-                                    }))
-                                }
-                                style={{
-                                    width: "100%",
-                                    padding: "12px",
-                                    border: "2px solid #e0e0e0",
-                                    borderRadius: "8px",
-                                    boxSizing: "border-box",
-                                    fontSize: "16px",
-                                }}
-                                required
-                            />
-                        </div>
-
-                        {loginError && (
-                            <div
-                                style={{
-                                    padding: "12px",
-                                    backgroundColor: "#ffebee",
-                                    color: "#c62828",
-                                    borderRadius: "6px",
-                                    marginBottom: "20px",
-                                    textAlign: "center",
-                                }}
-                            >
-                                {loginError}
-                            </div>
-                        )}
-
-                        <button
-                            type="submit"
-                            disabled={isLoggingIn}
-                            style={{
-                                width: "100%",
-                                padding: "14px",
-                                backgroundColor: "#1a237e",
-                                color: "white",
-                                border: "none",
-                                borderRadius: "8px",
-                                fontSize: "16px",
-                                fontWeight: "bold",
-                                cursor: "pointer",
-                            }}
-                        >
-                            {isLoggingIn ? "로그인 중..." : "로그인"}
-                        </button>
-                    </form>
-                </div>
-            </div>
-        )
-    }
-
-    // 관리자 화면
     return (
-        <div
-            style={{
-                ...style,
-                display: "flex",
-                flexDirection: "column",
-                gap: "20px",
-                padding: "20px",
-            }}
-        >
-            {/* 헤더 */}
-            <div
-                style={{
-                    padding: "16px",
-                    backgroundColor: "#1a237e",
-                    color: "white",
-                    borderRadius: "8px",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                }}
-            >
-                <div>
-                    <h2 style={{ margin: 0, fontSize: "18px" }}>
-                        👥 사용자 관리
-                    </h2>
-                    <div
-                        style={{
-                            fontSize: "12px",
-                            opacity: 0.8,
-                            marginTop: "4px",
-                        }}
-                    >
-                        {currentUser?.name || currentUser?.username}님 | 승인
-                        대기: {pendingUsers.length}명 | 승인됨:{" "}
-                        {approvedUsers.length}명
-                    </div>
-                </div>
-                <button
-                    onClick={handleLogout}
-                    style={{
-                        padding: "8px 16px",
-                        backgroundColor: "#f44336",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "6px",
-                        cursor: "pointer",
-                        fontSize: "14px",
-                    }}
-                >
-                    로그아웃
-                </button>
-            </div>
-
-            {/* 알림 메시지 */}
-            <AnimatePresence>
-                {(error || success) && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        style={{
-                            padding: "12px 20px",
-                            borderRadius: "6px",
-                            backgroundColor: error ? "#fef2f2" : "#f0fdf4",
-                            border: `1px solid ${error ? "#fecaca" : "#bbf7d0"}`,
-                            color: error ? "#dc2626" : "#16a34a",
-                        }}
-                    >
-                        {error || success}
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-            {/* 승인 대기자 섹션 */}
-            {pendingUsers.length > 0 && (
-                <div
-                    style={{
-                        backgroundColor: "#fffbeb",
-                        border: "1px solid #fbbf24",
-                        borderRadius: "10px",
-                        padding: "20px",
-                    }}
-                >
-                    <h3
-                        style={{
-                            fontSize: "18px",
-                            fontWeight: "600",
-                            color: "#92400e",
-                            margin: "0 0 15px 0",
-                        }}
-                    >
-                        ⏳ 승인 대기 중인 사용자 ({pendingUsers.length})
-                    </h3>
-                    <div
-                        style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "10px",
-                        }}
-                    >
-                        {pendingUsers.map((user) => (
-                            <div
-                                key={user.id}
-                                style={{
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    alignItems: "center",
-                                    padding: "15px",
-                                    backgroundColor: "white",
-                                    borderRadius: "8px",
-                                    border: "1px solid #fbbf24",
-                                }}
-                            >
-                                <div>
-                                    <h4
-                                        style={{
-                                            fontSize: "16px",
-                                            fontWeight: "600",
-                                            color: "#1f2937",
-                                            margin: "0 0 5px 0",
-                                        }}
-                                    >
-                                        {user.name} ({user.username})
-                                    </h4>
-                                    <p
-                                        style={{
-                                            fontSize: "14px",
-                                            color: "#6b7280",
-                                            margin: 0,
-                                        }}
-                                    >
-                                        가입일:{" "}
-                                        {new Date(
-                                            user.created_at
-                                        ).toLocaleDateString()}
-                                    </p>
-                                </div>
-                                <div style={{ display: "flex", gap: "10px" }}>
-                                    <motion.button
-                                        onClick={() =>
-                                            handleShowApprovalModal(user)
-                                        }
-                                        style={{
-                                            padding: "8px 16px",
-                                            backgroundColor: "#10b981",
-                                            color: "white",
-                                            border: "none",
-                                            borderRadius: "4px",
-                                            fontSize: "12px",
-                                            cursor: "pointer",
-                                        }}
-                                        whileHover={{ scale: 1.05 }}
-                                        whileTap={{ scale: 0.95 }}
-                                    >
-                                        승인 처리
-                                    </motion.button>
-                                    <motion.button
-                                        onClick={() =>
-                                            handleApproveUser("rejected")
-                                        }
-                                        style={{
-                                            padding: "8px 16px",
-                                            backgroundColor: "#ef4444",
-                                            color: "white",
-                                            border: "none",
-                                            borderRadius: "4px",
-                                            fontSize: "12px",
-                                            cursor: "pointer",
-                                        }}
-                                        whileHover={{ scale: 1.05 }}
-                                        whileTap={{ scale: 0.95 }}
-                                    >
-                                        거부
-                                    </motion.button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* 사용자 목록 헤더 */}
-            <div
-                style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "20px",
-                    backgroundColor: "white",
-                    borderRadius: "10px",
-                    boxShadow: "0 2px 4px rgba(0, 0, 0, 0.05)",
-                }}
-            >
-                <h2
-                    style={{
-                        fontSize: "20px",
-                        fontWeight: "600",
-                        color: "#1f2937",
-                        margin: 0,
-                    }}
-                >
-                    전체 사용자 목록 ({users.length})
-                </h2>
-                <div style={{ display: "flex", gap: "10px" }}>
-                    <motion.button
-                        onClick={handleAddUser}
-                        style={{
-                            padding: "10px 20px",
-                            backgroundColor: "#10b981",
-                            color: "white",
-                            border: "none",
-                            borderRadius: "6px",
-                            fontSize: "14px",
-                            fontWeight: "500",
-                            cursor: "pointer",
-                        }}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                    >
-                        직접 사용자 추가
-                    </motion.button>
-                    <motion.button
-                        onClick={loadUsers}
-                        style={{
-                            padding: "10px 20px",
-                            backgroundColor: "#2196f3",
-                            color: "white",
-                            border: "none",
-                            borderRadius: "6px",
-                            fontSize: "14px",
-                            fontWeight: "500",
-                            cursor: "pointer",
-                        }}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                    >
-                        새로고침
-                    </motion.button>
-                </div>
-            </div>
+        <StyledAdmin>
+            <StyledGap16 />
+            <StyledUseradminspan>USER ADMIN</StyledUseradminspan>
+            <StyledGap1601 />
+            <StyledFrame2117912726>
+                <StyledFrame2117912730>
+                    <StyledSpan>전체 사용자 목록 ({users.length})</StyledSpan>
+                    <StyledFrame2117912729>
+                        <StyledAddIcon onClick={handleCreateUser}>
+                            <svg width="34" height="34" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <rect x="1" y="1" width="32" height="32" fill="white"/>
+                                <rect x="1" y="1" width="32" height="32" stroke="#E5E6E8"/>
+                                <path d="M24 18H18V24H16V18H10V16H16V10H18V16H24V18Z" fill="#757575"/>
+                            </svg>
+                        </StyledAddIcon>
+                        <StyledRefreshIcon onClick={loadUsers}>
+                            <svg width="34" height="34" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <rect x="1" y="1" width="32" height="32" stroke="#E5E6E8"/>
+                                <path d="M17 25C14.7667 25 12.875 24.225 11.325 22.675C9.775 21.125 9 19.2333 9 17C9 14.7667 9.775 12.875 11.325 11.325C12.875 9.775 14.7667 9 17 9C18.15 9 19.25 9.23733 20.3 9.712C21.35 10.1867 22.25 10.866 23 11.75V9H25V16H18V14H22.2C21.6667 13.0667 20.9377 12.3333 20.013 11.8C19.0883 11.2667 18.084 11 17 11C15.3333 11 13.9167 11.5833 12.75 12.75C11.5833 13.9167 11 15.3333 11 17C11 18.6667 11.5833 20.0833 12.75 21.25C13.9167 22.4167 15.3333 23 17 23C18.2833 23 19.4417 22.6333 20.475 21.9C21.5083 21.1667 22.2333 20.2 22.65 19H24.75C24.2833 20.7667 23.3333 22.2083 21.9 23.325C20.4667 24.4417 18.8333 25 17 25Z" fill="#757575"/>
+                            </svg>
+                        </StyledRefreshIcon>
+                    </StyledFrame2117912729>
+                </StyledFrame2117912730>
+            </StyledFrame2117912726>
+            <StyledGap1602 />
 
             {/* 사용자 목록 */}
-            <div
-                style={{
-                    backgroundColor: "white",
-                    borderRadius: "10px",
-                    boxShadow: "0 2px 4px rgba(0, 0, 0, 0.05)",
-                    overflow: "hidden",
-                }}
-            >
-                {loading ? (
-                    <div
-                        style={{
-                            textAlign: "center",
-                            padding: "40px",
-                            color: "#6b7280",
-                        }}
-                    >
-                        로딩 중...
-                    </div>
-                ) : users.length === 0 ? (
-                    <div
-                        style={{
-                            textAlign: "center",
-                            padding: "40px",
-                            color: "#6b7280",
-                        }}
-                    >
-                        등록된 사용자가 없습니다.
-                    </div>
-                ) : (
-                    <div style={{ padding: "20px" }}>
-                        {users.map((user, index) => (
-                            <motion.div
-                                key={user.id}
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: index * 0.1 }}
-                                style={{
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    alignItems: "center",
-                                    padding: "15px",
-                                    border: "1px solid #e5e7eb",
-                                    borderRadius: "8px",
-                                    marginBottom: "10px",
-                                    backgroundColor:
-                                        user.approval_status === "pending"
-                                            ? "#fffbeb"
-                                            : user.approval_status ===
-                                                "rejected"
-                                              ? "#fef2f2"
-                                              : user.is_active
-                                                ? "#fafafa"
-                                                : "#f3f4f6",
-                                }}
-                            >
-                                <div>
-                                    <h3
-                                        style={{
-                                            fontSize: "16px",
-                                            fontWeight: "600",
-                                            color: user.is_active
-                                                ? "#1f2937"
-                                                : "#6b7280",
-                                            margin: "0 0 5px 0",
-                                        }}
-                                    >
-                                        {user.name} ({user.username})
-                                        {user.approval_status === "pending" &&
-                                            " - 승인 대기"}
-                                        {user.approval_status === "rejected" &&
-                                            " - 승인 거부"}
-                                        {!user.is_active &&
-                                            user.approval_status ===
-                                                "approved" &&
-                                            " - 비활성"}
-                                    </h3>
-                                    <p
-                                        style={{
-                                            fontSize: "14px",
-                                            color: "#6b7280",
-                                            margin: 0,
-                                        }}
-                                    >
-                                        가입:{" "}
-                                        {new Date(
-                                            user.created_at
-                                        ).toLocaleDateString()}
-                                        {user.last_login &&
-                                            ` | 마지막 로그인: ${new Date(user.last_login).toLocaleDateString()}`}
-                                        {user.page_id &&
-                                            ` | Page ID: ${user.page_id}`}
-                                    </p>
+            <StyledFrame2117912732>
+                {users.map((user, index) => {
+                    const pageId = userPageIds[user.id] || user.page_id || ""
+
+                    return (
+                        <StyledFrame2117912727 key={user.id}>
+                            <StyledFrame2117912733>
+                                <StyledFrame2117912734>
+                                    <StyledSpan>{user.name}</StyledSpan>
+                                    <Styled01span>ID: {user.username}</Styled01span>
+                                </StyledFrame2117912734>
+                                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                    <StyledFrame2117912735>
+                                        <StyledPwspan>PW변경</StyledPwspan>
+                                    </StyledFrame2117912735>
+                                    <StyledDeleteButton onClick={() => handleDeleteUser(user.id)}>
+                                        ✕
+                                    </StyledDeleteButton>
                                 </div>
-                                <div
-                                    style={{
-                                        display: "flex",
-                                        gap: "10px",
-                                    }}
-                                >
-                                    {user.approval_status === "pending" && (
-                                        <motion.button
-                                            onClick={() =>
-                                                handleShowApprovalModal(user)
-                                            }
-                                            style={{
-                                                padding: "8px 16px",
-                                                backgroundColor: "#10b981",
-                                                color: "white",
-                                                border: "none",
-                                                borderRadius: "4px",
-                                                fontSize: "12px",
-                                                cursor: "pointer",
-                                            }}
-                                            whileHover={{ scale: 1.05 }}
-                                            whileTap={{ scale: 0.95 }}
-                                        >
-                                            승인
-                                        </motion.button>
-                                    )}
-                                    <motion.button
-                                        onClick={() => handleEditUser(user)}
-                                        style={{
-                                            padding: "8px 16px",
-                                            backgroundColor: "#3b82f6",
-                                            color: "white",
-                                            border: "none",
-                                            borderRadius: "4px",
-                                            fontSize: "12px",
-                                            cursor: "pointer",
-                                        }}
-                                        whileHover={{ scale: 1.05 }}
-                                        whileTap={{ scale: 0.95 }}
-                                    >
-                                        편집
-                                    </motion.button>
-                                    <motion.button
-                                        onClick={() => handleDeleteUser(user)}
-                                        style={{
-                                            padding: "8px 16px",
-                                            backgroundColor: "#ef4444",
-                                            color: "white",
-                                            border: "none",
-                                            borderRadius: "4px",
-                                            fontSize: "12px",
-                                            cursor: "pointer",
-                                        }}
-                                        whileHover={{ scale: 1.05 }}
-                                        whileTap={{ scale: 0.95 }}
-                                    >
-                                        삭제
-                                    </motion.button>
-                                </div>
-                            </motion.div>
-                        ))}
-                    </div>
-                )}
-            </div>
-
-            {/* 사용자 추가/편집 모달 */}
-            <AnimatePresence>
-                {showAddModal && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        style={{
-                            position: "fixed",
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            backgroundColor: "rgba(0, 0, 0, 0.5)",
-                            zIndex: 1000,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            padding: "20px",
-                        }}
-                    >
-                        <motion.div
-                            initial={{ scale: 0.8, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.8, opacity: 0 }}
-                            style={{
-                                backgroundColor: "white",
-                                borderRadius: "10px",
-                                padding: "30px",
-                                width: "100%",
-                                maxWidth: "500px",
-                                maxHeight: "80vh",
-                                overflow: "auto",
-                            }}
-                        >
-                            <h2
-                                style={{
-                                    fontSize: "24px",
-                                    fontWeight: "600",
-                                    marginBottom: "20px",
-                                    color: "#1f2937",
-                                }}
-                            >
-                                {editingUser ? "사용자 편집" : "새 사용자 추가"}
-                            </h2>
-
-                            <div
-                                style={{
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    gap: "20px",
-                                    marginBottom: "30px",
-                                }}
-                            >
-                                <InputField
-                                    label="사용자명"
-                                    type="text"
-                                    value={userForm.username}
-                                     onChange={(value: string) =>
-                                        setUserForm((prev) => ({
-                                            ...prev,
-                                            username: value,
-                                        }))
-                                    }
-                                    required
-                                />
-
-                                <InputField
-                                    label="이름"
-                                    type="text"
-                                    value={userForm.name}
-                                     onChange={(value: string) =>
-                                        setUserForm((prev) => ({
-                                            ...prev,
-                                            name: value,
-                                        }))
-                                    }
-                                    required
-                                />
-
-                                <InputField
-                                    label="Page ID"
-                                    type="text"
-                                    value={userForm.page_id}
-                                     onChange={(value: string) =>
-                                        setUserForm((prev) => ({
-                                            ...prev,
-                                            page_id: value,
-                                        }))
-                                    }
-                                />
-
-                                {!editingUser && (
-                                    <InputField
-                                        label="비밀번호"
-                                        type="password"
-                                        value={userForm.password}
-                                         onChange={(value: string) =>
-                                            setUserForm((prev) => ({
-                                                ...prev,
-                                                password: value,
-                                            }))
-                                        }
-                                        required
+                            </StyledFrame2117912733>
+                            <StyledFrame2117912731>
+                                <StyledSpan>Page ID</StyledSpan>
+                                <StyledName>
+                                    <StyledNameInput
+                                        value={pageId}
+                                        onChange={(e) => handlePageIdChange(user.id, e.target.value)}
+                                        placeholder="Page ID 입력"
                                     />
-                                )}
+                                </StyledName>
+                                <StyledFrame211791273501 onClick={() => handleSaveUser(user.id)}>
+                                    <StyledSpan>저장</StyledSpan>
+                                </StyledFrame211791273501>
+                            </StyledFrame2117912731>
+                        </StyledFrame2117912727>
+                    )
+                })}
 
-                                {editingUser && (
-                                    <InputField
-                                        label="새 비밀번호 (변경하지 않으려면 비워두세요)"
-                                        type="password"
-                                        value={userForm.newPassword}
-                                         onChange={(value: string) =>
-                                            setUserForm((prev) => ({
-                                                ...prev,
-                                                newPassword: value,
-                                            }))
-                                        }
-                                    />
-                                )}
-
-                                <div>
-                                    <label
-                                        style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "8px",
-                                            fontSize: "14px",
-                                            fontWeight: "500",
-                                            color: "#374151",
-                                            cursor: "pointer",
-                                        }}
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            checked={userForm.is_active}
-                                            onChange={(e) =>
-                                                setUserForm((prev) => ({
-                                                    ...prev,
-                                                    is_active: e.target.checked,
-                                                }))
-                                            }
-                                            style={{
-                                                width: "16px",
-                                                height: "16px",
-                                            }}
-                                        />
-                                        활성 사용자
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div
-                                style={{
-                                    display: "flex",
-                                    gap: "10px",
-                                    justifyContent: "flex-end",
-                                }}
-                            >
-                                <motion.button
-                                    onClick={() => setShowAddModal(false)}
-                                    style={{
-                                        padding: "10px 20px",
-                                        backgroundColor: "#6b7280",
-                                        color: "white",
-                                        border: "none",
-                                        borderRadius: "6px",
-                                        fontSize: "14px",
-                                        cursor: "pointer",
-                                    }}
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                >
-                                    취소
-                                </motion.button>
-                                <motion.button
-                                    onClick={handleSaveUser}
-                                    disabled={loading}
-                                    style={{
-                                        padding: "10px 20px",
-                                        backgroundColor: loading
-                                            ? "#9ca3af"
-                                            : "#10b981",
-                                        color: "white",
-                                        border: "none",
-                                        borderRadius: "6px",
-                                        fontSize: "14px",
-                                        cursor: loading
-                                            ? "not-allowed"
-                                            : "pointer",
-                                    }}
-                                    whileHover={!loading ? { scale: 1.05 } : {}}
-                                    whileTap={!loading ? { scale: 0.95 } : {}}
-                                >
-                                    {loading ? "저장 중..." : "저장"}
-                                </motion.button>
-                            </div>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-            {/* 승인 모달 */}
-            <AnimatePresence>
-                {showApprovalModal && approvingUser && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        style={{
-                            position: "fixed",
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            backgroundColor: "rgba(0, 0, 0, 0.5)",
-                            zIndex: 1000,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            padding: "20px",
-                        }}
-                    >
-                        <motion.div
-                            initial={{ scale: 0.8, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.8, opacity: 0 }}
-                            style={{
-                                backgroundColor: "white",
-                                borderRadius: "10px",
-                                padding: "30px",
-                                width: "100%",
-                                maxWidth: "450px",
-                            }}
-                        >
-                            <h2
-                                style={{
-                                    fontSize: "24px",
-                                    fontWeight: "600",
-                                    marginBottom: "20px",
-                                    color: "#1f2937",
-                                }}
-                            >
-                                사용자 승인
-                            </h2>
-
-                            <div style={{ marginBottom: "25px" }}>
-                                <p
-                                    style={{
-                                        fontSize: "16px",
-                                        color: "#374151",
-                                        margin: "0 0 10px 0",
-                                    }}
-                                >
-                                    <strong>{approvingUser.name}</strong> (
-                                    {approvingUser.username})님을
-                                    승인하시겠습니까?
-                                </p>
-                                <p
-                                    style={{
-                                        fontSize: "14px",
-                                        color: "#6b7280",
-                                        margin: 0,
-                                    }}
-                                >
-                                    승인 시 개인 웨딩 페이지 ID를 발급해주세요.
-                                </p>
-                            </div>
-
-                            <div style={{ marginBottom: "25px" }}>
-                                <InputField
-                                    label="Page ID (선택사항)"
-                                    type="text"
-                                    value={pageIdInput}
-                                     onChange={(value: string) => setPageIdInput(value)}
-                                />
-                                <p
-                                    style={{
-                                        fontSize: "12px",
-                                        color: "#6b7280",
-                                        margin: "5px 0 0 0",
-                                    }}
-                                >
-                                    예: wedding-kim-lee-2024
-                                </p>
-                            </div>
-
-                            <div
-                                style={{
-                                    display: "flex",
-                                    gap: "10px",
-                                    justifyContent: "flex-end",
-                                }}
-                            >
-                                <motion.button
-                                    onClick={() => setShowApprovalModal(false)}
-                                    style={{
-                                        padding: "10px 20px",
-                                        backgroundColor: "#6b7280",
-                                        color: "white",
-                                        border: "none",
-                                        borderRadius: "6px",
-                                        fontSize: "14px",
-                                        cursor: "pointer",
-                                    }}
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                >
-                                    취소
-                                </motion.button>
-                                <motion.button
-                                    onClick={() =>
-                                        handleApproveUser("rejected")
-                                    }
-                                    style={{
-                                        padding: "10px 20px",
-                                        backgroundColor: "#ef4444",
-                                        color: "white",
-                                        border: "none",
-                                        borderRadius: "6px",
-                                        fontSize: "14px",
-                                        cursor: "pointer",
-                                    }}
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                >
-                                    거부
-                                </motion.button>
-                                <motion.button
-                                    onClick={() =>
-                                        handleApproveUser("approved")
-                                    }
-                                    disabled={loading}
-                                    style={{
-                                        padding: "10px 20px",
-                                        backgroundColor: loading
-                                            ? "#9ca3af"
-                                            : "#10b981",
-                                        color: "white",
-                                        border: "none",
-                                        borderRadius: "6px",
-                                        fontSize: "14px",
-                                        cursor: loading
-                                            ? "not-allowed"
-                                            : "pointer",
-                                    }}
-                                    whileHover={!loading ? { scale: 1.05 } : {}}
-                                    whileTap={!loading ? { scale: 0.95 } : {}}
-                                >
-                                    {loading ? "승인 중..." : "승인"}
-                                </motion.button>
-                            </div>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-        </div>
-    )
-}
-
-// 입력 필드 컴포넌트
-interface InputFieldProps {
-    label: string
-    type?: string
-    value: string
-    onChange: (value: string) => void
-    required?: boolean
-}
-
-function InputField({
-    label,
-    type = "text",
-    value,
-    onChange,
-    required = false,
-}: InputFieldProps) {
-    return (
-        <div>
-            <label
-                style={{
-                    display: "block",
-                    fontSize: "14px",
-                    fontWeight: "500",
-                    color: "#374151",
-                    marginBottom: "5px",
-                }}
-            >
-                {label}{" "}
-                {required && <span style={{ color: "#ef4444" }}>*</span>}
-            </label>
-            <input
-                type={type}
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                required={required}
-                style={{
-                    width: "100%",
-                    padding: "10px",
-                    border: "1px solid #d1d5db",
-                    borderRadius: "6px",
-                    fontSize: "14px",
-                    outline: "none",
-                    boxSizing: "border-box",
-                }}
-            />
-        </div>
+                {/* 새 사용자 추가 폼 */}
+                <StyledFrame2117912727>
+                    <StyledFrame2117912733>
+                        <StyledFrame2117912734>
+                            <StyledNameInput
+                                value={newUserForm.name}
+                                onChange={(e) => setNewUserForm(prev => ({ ...prev, name: e.target.value }))}
+                                placeholder="이름 입력"
+                                style={{ border: "none", outline: "none", fontSize: "14px", fontFamily: "Pretendard", fontWeight: 600, color: "black" }}
+                            />
+                            <StyledNameInput
+                                value={newUserForm.username}
+                                onChange={(e) => setNewUserForm(prev => ({ ...prev, username: e.target.value }))}
+                                placeholder="아이디 입력"
+                                style={{ border: "none", outline: "none", fontSize: "12px", fontFamily: "Pretendard", fontWeight: 400, color: "#7F7F7F" }}
+                            />
+                        </StyledFrame2117912734>
+                        <StyledFrame2117912735>
+                            <StyledPwspan>PW변경</StyledPwspan>
+                        </StyledFrame2117912735>
+                    </StyledFrame2117912733>
+                    <StyledFrame2117912731>
+                        <StyledSpan>Page ID</StyledSpan>
+                        <StyledName>
+                            <StyledNameInput
+                                value={newUserForm.page_id || ""}
+                                onChange={(e) => setNewUserForm(prev => ({ ...prev, page_id: e.target.value }))}
+                                placeholder="Page ID 입력"
+                            />
+                        </StyledName>
+                        <StyledFrame211791273501 onClick={handleCreateUser}>
+                            <StyledSpan>생성</StyledSpan>
+                        </StyledFrame211791273501>
+                    </StyledFrame2117912731>
+                </StyledFrame2117912727>
+            </StyledFrame2117912732>
+        </StyledAdmin>
     )
 }
 
