@@ -637,7 +637,7 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
         }
     }, [error, success])
 
-    return (
+        return (
         <StyledAdmin>
             <StyledGap16 />
             <StyledUseradminspan>USER ADMIN</StyledUseradminspan>
@@ -669,7 +669,7 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
                 {users.map((user, index) => {
                     const pageId = userPageIds[user.id] || user.page_id || ""
 
-                    return (
+    return (
                         <StyledFrame2117912727 key={user.id}>
                             <StyledFrame2117912733>
                                 <StyledFrame2117912734>
@@ -683,7 +683,7 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
                                     <StyledDeleteButton onClick={() => handleDeleteUser(user.id)}>
                                         ✕
                                     </StyledDeleteButton>
-                                </div>
+                    </div>
                             </StyledFrame2117912733>
                             <StyledFrame2117912731>
                                 <StyledSpan>Page ID</StyledSpan>

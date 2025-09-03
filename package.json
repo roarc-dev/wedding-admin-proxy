@@ -4,10 +4,10 @@
   "description": "Proxy server for Framer wedding admin",
   "main": "index.js",
   "scripts": {
-    "dev": "vercel dev",
+    "dev": "echo 'Use npm run dev:qa for QA environment or direct vercel commands'",
     "deploy": "vercel --prod",
-    "deploy:qa": "vercel --prod --local-config=vercel.qa.json",
-    "dev:qa": "vercel dev --local-config=vercel.qa.json",
+    "deploy:qa": "VERCEL_CLI_SKIP_DEV_SCRIPT=true npx vercel --prod --local-config=vercel.qa.json",
+    "dev:qa": "VERCEL_CLI_SKIP_DEV_SCRIPT=true npx vercel dev --local-config=vercel.qa.json",
     "build": "vercel build",
     "preview": "vercel dev --listen 3001"
   },
@@ -28,6 +28,6 @@
     "@types/react-dom": "^18.2.7",
     "@types/styled-components": "^5.1.34",
     "typescript": "^5.0.2",
-    "vercel": "^44.5.0"
+    "vercel": "^47.0.1"
   }
 }

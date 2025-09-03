@@ -1,12 +1,6 @@
 {
   "version": 2,
   "name": "wedding-admin-proxy-qa",
-  "builds": [
-    {
-      "src": "api/**/*.js",
-      "use": "@vercel/node"
-    }
-  ],
   "routes": [
     {
       "src": "/api/(.*)",
