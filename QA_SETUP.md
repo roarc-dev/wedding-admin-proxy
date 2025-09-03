@@ -2,10 +2,9 @@
 
 ## 1. 새로운 GitHub 계정 연결
 
-### QA용 리모트 추가
+### QA용 리모트 추가 ✅ (완료됨)
 ```bash
-# 새로운 GitHub 계정의 레포지토리 URL로 변경하세요
-git remote add qa https://github.com/YOUR_QA_USERNAME/wedding-admin-proxy.git
+git remote add qa https://github.com/Craftheo/roarcQA.git
 ```
 
 ### 리모트 확인
@@ -15,12 +14,12 @@ git remote -v
 
 ## 2. QA 브랜치 관리
 
-### QA 브랜치 생성 및 전환
+### QA 브랜치 생성 및 전환 ✅ (완료됨)
 ```bash
-git checkout -b qa
+git checkout qa
 ```
 
-### QA 브랜치에 변경사항 적용
+### QA 브랜치에 변경사항 적용 ✅ (완료됨)
 ```bash
 git add .
 git commit -m "feat: QA 환경 설정 및 초기화"
@@ -40,8 +39,8 @@ DEBUG=true
 LOG_LEVEL=debug
 ```
 
-### Vercel QA 설정
-- `vercel.qa.json` 파일이 이미 생성되어 있습니다
+### Vercel QA 설정 ✅ (완료됨)
+- `vercel.qa.json` 파일이 생성되어 있습니다
 - QA 환경에 맞는 설정들이 포함되어 있습니다
 
 ## 4. QA 배포
@@ -56,11 +55,20 @@ npm run dev:qa
 npm run deploy:qa
 ```
 
-## 5. QA 브랜치 푸시
+## 5. QA 브랜치 푸시 🔄 (권한 설정 필요)
+
+### Personal Access Token 생성
+1. GitHub에서 Craftheo 계정으로 로그인
+2. Settings > Developer settings > Personal access tokens > Tokens (classic)
+3. "New token (classic)" 클릭
+4. Token 이름 입력 (예: "wedding-admin-proxy-qa")
+5. repo 권한 체크
+6. Token 생성 및 복사
 
 ### QA 브랜치를 QA 리모트에 푸시
 ```bash
-git push qa qa
+# Personal Access Token을 사용하여 푸시
+git push https://Craftheo:YOUR_TOKEN@github.com/Craftheo/roarcQA.git qa
 ```
 
 ## 6. 브랜치 간 전환
@@ -121,6 +129,7 @@ git commit
 
 QA 환경 구축 중 문제가 발생하면 다음 정보를 확인하세요:
 - GitHub 계정 권한
+- Personal Access Token 설정
 - Supabase 프로젝트 설정
 - Vercel 배포 설정
 - 환경 변수 설정
