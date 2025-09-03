@@ -1,0 +1,27 @@
+{
+  "version": 2,
+  "name": "wedding-admin-proxy-qa",
+  "builds": [
+    {
+      "src": "api/**/*.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "development",
+    "DEBUG": "true",
+    "LOG_LEVEL": "debug"
+  },
+  "regions": ["icn1"],
+  "functions": {
+    "api/**/*.js": {
+      "maxDuration": 30
+    }
+  }
+}

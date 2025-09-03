@@ -5,7 +5,11 @@
   "main": "index.js",
   "scripts": {
     "dev": "vercel dev",
-    "deploy": "vercel --prod"
+    "deploy": "vercel --prod",
+    "deploy:qa": "vercel --prod --local-config=vercel.qa.json",
+    "dev:qa": "vercel dev --local-config=vercel.qa.json",
+    "build": "vercel build",
+    "preview": "vercel dev --listen 3001"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
