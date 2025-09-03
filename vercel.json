@@ -1,5 +1,7 @@
 {
   "regions": ["icn1"],
+  "buildCommand": null,
+  "outputDirectory": null,
   "functions": {
     "api/*.js": {
       "maxDuration": 15,
