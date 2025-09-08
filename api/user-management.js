@@ -350,37 +350,53 @@ async function handleRegister(req, res, body) {
 
     // 사용자 생성 성공 후 invite_cards에 이름 정보 저장
     try {
-      console.log('Attempting to upsert invite_cards with:', {
+      console.log('Starting invite_cards upsert for page_id:', userPageId)
+      console.log('Names to save - groomName:', groomName, 'brideName:', brideName)
+
+      // 먼저 해당 page_id의 데이터가 있는지 확인
+      const { data: existingData, error: checkError } = await supabase
+        .from('invite_cards')
+        .select('id, groom_name, bride_name')
+        .eq('page_id', userPageId)
+        .maybeSingle()
+
+      if (checkError) {
+        console.error('Error checking existing data:', checkError)
+      } else {
+        console.log('Existing data check result:', existingData)
+      }
+
+      // upsert 수행
+      const upsertData = {
         page_id: userPageId,
         groom_name: groomName,
-        bride_name: brideName
-      })
+        bride_name: brideName,
+        invitation_text: `${groomName} ♥ ${brideName}의 결혼을 축하드립니다.`,
+        show_invitation_text: true,
+        updated_at: new Date().toISOString()
+      }
+
+      console.log('Upsert data:', upsertData)
 
       const { data: inviteData, error: inviteError } = await supabase
         .from('invite_cards')
-        .upsert({
-          page_id: userPageId,
-          groom_name: groomName,
-          bride_name: brideName,
-          invitation_text: `${groomName} ♥ ${brideName}의 결혼을 축하드립니다.`,
-          show_invitation_text: true,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'page_id' })
+        .upsert(upsertData, { onConflict: 'page_id' })
         .select()
         .single()
 
       if (inviteError) {
         console.error('Invite cards upsert error:', inviteError)
-        console.error('Error details:', JSON.stringify(inviteError, null, 2))
-        // invite_cards 생성 실패해도 사용자 생성은 성공으로 처리 (롤백하지 않음)
-        console.warn('invite_cards 생성 실패했지만 사용자 생성은 성공했습니다')
+        console.error('Error code:', inviteError.code)
+        console.error('Error message:', inviteError.message)
+        console.error('Error details:', inviteError.details)
       } else {
-        console.log('Invite cards upsert successful:', inviteData)
-        console.log('Saved data - groom_name:', inviteData?.groom_name, 'bride_name:', inviteData?.bride_name)
+        console.log('Invite cards upsert successful!')
+        console.log('Result data:', inviteData)
+        console.log('Final saved names - groom_name:', inviteData?.groom_name, 'bride_name:', inviteData?.bride_name)
       }
     } catch (inviteException) {
       console.error('Invite cards creation exception:', inviteException)
-      // 예외 발생해도 사용자 생성은 성공으로 처리
+      console.error('Exception stack:', inviteException.stack)
     }
 
     return res.status(201).json({
