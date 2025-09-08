@@ -288,8 +288,7 @@ async function handleTest(req, res, body) {
 async function handleRegister(req, res, body) {
   const { username, password, name, page_id, groomName, brideName } = body
 
-  console.log('=== REGISTER REQUEST ===')
-  console.log('Received data:', { username, name, groomName, brideName })
+  console.log('Processing register/signup request')
 
   if (!username || !password || !name || !groomName || !brideName) {
     return res.status(400).json({
@@ -324,9 +323,6 @@ async function handleRegister(req, res, body) {
     // 비밀번호 해싱
     const passwordHash = await bcrypt.hash(password, 10)
 
-    // page_id가 없으면 UUID 생성
-    const userPageId = page_id || crypto.randomUUID()
-
     const { data: newUser, error } = await supabase
       .from('admin_users')
       .insert([{
@@ -336,7 +332,7 @@ async function handleRegister(req, res, body) {
         is_active: false, // 승인 대기 상태
         role: 'admin',
         approval_status: 'pending',
-        page_id: userPageId
+        page_id: page_id || null
       }])
       .select('id, username, name, is_active, role, approval_status, page_id')
       .single()
@@ -347,78 +343,6 @@ async function handleRegister(req, res, body) {
         success: false,
         error: '회원가입 중 오류가 발생했습니다'
       })
-    }
-
-    // 사용자 생성 성공 후 invite_cards에 이름 정보 저장
-    try {
-      console.log('Starting invite_cards creation for page_id:', userPageId)
-      console.log('Names to save - groomName:', groomName, 'brideName:', brideName)
-
-      // 먼저 간단한 쿼리로 Supabase 연결 확인
-      const { data: testData, error: testError } = await supabase
-        .from('invite_cards')
-        .select('count')
-        .limit(1)
-
-      if (testError) {
-        console.error('Supabase connection test failed:', testError)
-        return res.status(201).json({
-          success: true,
-          message: '회원가입이 완료되었습니다. (invite_cards 저장은 나중에)',
-          data: newUser
-        })
-      }
-
-      console.log('Supabase connection OK, proceeding with invite_cards creation')
-
-      // invite_cards 테이블에 기본 데이터 생성
-      const { data: inviteData, error: inviteError } = await supabase
-        .from('invite_cards')
-        .insert({
-          page_id: userPageId,
-          groom_name: groomName,
-          bride_name: brideName,
-          invitation_text: `${groomName} ♥ ${brideName}의 결혼을 축하드립니다.`,
-          show_invitation_text: true
-        })
-        .select()
-        .single()
-
-      if (inviteError) {
-        console.error('Invite cards insert error:', inviteError)
-        console.error('Error code:', inviteError.code)
-        console.error('Error message:', inviteError.message)
-
-        // 중복 키 오류인 경우 업데이트 시도
-        if (inviteError.code === '23505') {
-          console.log('Duplicate key detected, trying update...')
-          const { data: updateData, error: updateError } = await supabase
-            .from('invite_cards')
-            .update({
-              groom_name: groomName,
-              bride_name: brideName,
-              invitation_text: `${groomName} ♥ ${brideName}의 결혼을 축하드립니다.`,
-              updated_at: new Date().toISOString()
-            })
-            .eq('page_id', userPageId)
-            .select()
-            .single()
-
-          if (updateError) {
-            console.error('Update also failed:', updateError)
-          } else {
-            console.log('Update successful:', updateData)
-            console.log('Final saved names - groom_name:', updateData?.groom_name, 'bride_name:', updateData?.bride_name)
-          }
-        }
-      } else {
-        console.log('Invite cards insert successful!')
-        console.log('Result data:', inviteData)
-        console.log('Final saved names - groom_name:', inviteData?.groom_name, 'bride_name:', inviteData?.bride_name)
-      }
-    } catch (inviteException) {
-      console.error('Invite cards creation exception:', inviteException)
-      console.error('Exception type:', inviteException.constructor.name)
     }
 
     return res.status(201).json({
