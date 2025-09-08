@@ -286,14 +286,14 @@ async function handleTest(req, res, body) {
 
 // 회원가입/등록 처리
 async function handleRegister(req, res, body) {
-  const { username, password, name, page_id } = body
+  const { username, password, name, page_id, groomName, brideName } = body
 
   console.log('Processing register/signup request')
 
-  if (!username || !password || !name) {
+  if (!username || !password || !name || !groomName || !brideName) {
     return res.status(400).json({
       success: false,
-      error: '사용자명, 비밀번호, 이름을 모두 입력하세요'
+      error: '사용자명, 비밀번호, 이름, 신랑 성함, 신부 성함을 모두 입력하세요'
     })
   }
 
@@ -323,6 +323,9 @@ async function handleRegister(req, res, body) {
     // 비밀번호 해싱
     const passwordHash = await bcrypt.hash(password, 10)
 
+    // page_id가 없으면 UUID 생성
+    const userPageId = page_id || crypto.randomUUID()
+
     const { data: newUser, error } = await supabase
       .from('admin_users')
       .insert([{
@@ -332,7 +335,7 @@ async function handleRegister(req, res, body) {
         is_active: false, // 승인 대기 상태
         role: 'admin',
         approval_status: 'pending',
-        page_id: page_id || null
+        page_id: userPageId
       }])
       .select('id, username, name, is_active, role, approval_status, page_id')
       .single()
@@ -343,6 +346,30 @@ async function handleRegister(req, res, body) {
         success: false,
         error: '회원가입 중 오류가 발생했습니다'
       })
+    }
+
+    // 사용자 생성 성공 후 invite_cards에 이름 정보 저장
+    try {
+      const { error: inviteError } = await supabase
+        .from('invite_cards')
+        .insert([{
+          page_id: userPageId,
+          groom_name: groomName,
+          bride_name: brideName,
+          invitation_text: `${groomName} ♥ ${brideName}의 결혼을 축하드립니다.`,
+          show_invitation_text: true
+        }])
+
+      if (inviteError) {
+        console.error('Invite cards creation error:', inviteError)
+        // invite_cards 생성 실패해도 사용자 생성은 성공으로 처리 (롤백하지 않음)
+        console.warn('invite_cards 생성 실패했지만 사용자 생성은 성공했습니다')
+      } else {
+        console.log('Invite cards created successfully for page_id:', userPageId)
+      }
+    } catch (inviteException) {
+      console.error('Invite cards creation exception:', inviteException)
+      // 예외 발생해도 사용자 생성은 성공으로 처리
     }
 
     return res.status(201).json({

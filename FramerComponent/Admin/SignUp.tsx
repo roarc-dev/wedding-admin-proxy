@@ -10,6 +10,8 @@ interface SignupUserData {
     username: string
     password: string
     name: string
+    groomName: string
+    brideName: string
 }
 
 async function signupUser(userData: SignupUserData): Promise<any> {
@@ -24,6 +26,8 @@ async function signupUser(userData: SignupUserData): Promise<any> {
                 username: userData.username,
                 password: userData.password,
                 name: userData.name,
+                groomName: userData.groomName,
+                brideName: userData.brideName,
             }),
         })
 
@@ -50,6 +54,8 @@ export default function UserSignup(props: { style?: React.CSSProperties }) {
         password: "",
         confirmPassword: "",
         name: "",
+        groomName: "",
+        brideName: "",
     })
     const [isSigningUp, setIsSigningUp] = useState(false)
     const [error, setError] = useState("")
@@ -81,6 +87,8 @@ export default function UserSignup(props: { style?: React.CSSProperties }) {
             username: signupForm.username,
             password: signupForm.password,
             name: signupForm.name,
+            groomName: signupForm.groomName,
+            brideName: signupForm.brideName,
         })
 
         if (result.success) {
@@ -90,6 +98,8 @@ export default function UserSignup(props: { style?: React.CSSProperties }) {
                 password: "",
                 confirmPassword: "",
                 name: "",
+                groomName: "",
+                brideName: "",
             })
         } else {
             setError(result.error)
@@ -223,6 +233,92 @@ export default function UserSignup(props: { style?: React.CSSProperties }) {
                                     }))
                                 }
                                 placeholder="실명을 입력하세요"
+                                style={{
+                                    width: "100%",
+                                    padding: "12px",
+                                    border: "2px solid #e0e0e0",
+                                    borderRadius: "8px",
+                                    boxSizing: "border-box",
+                                    fontSize: "16px",
+                                    outline: "none",
+                                    transition: "border-color 0.2s",
+                                }}
+                                onFocus={(e) =>
+                                    (e.target.style.borderColor = "#1a237e")
+                                }
+                                onBlur={(e) =>
+                                    (e.target.style.borderColor = "#e0e0e0")
+                                }
+                                required
+                            />
+                        </div>
+
+                        <div style={{ marginBottom: "20px" }}>
+                            <label
+                                style={{
+                                    display: "block",
+                                    marginBottom: "8px",
+                                    fontSize: "14px",
+                                    fontWeight: "600",
+                                    color: "#374151",
+                                }}
+                            >
+                                신랑 성함{" "}
+                                <span style={{ color: "#ef4444" }}>*</span>
+                            </label>
+                            <input
+                                type="text"
+                                value={signupForm.groomName}
+                                onChange={(e) =>
+                                    setSignupForm((prev) => ({
+                                        ...prev,
+                                        groomName: e.target.value,
+                                    }))
+                                }
+                                placeholder="신랑 이름 (예: 김철수)"
+                                style={{
+                                    width: "100%",
+                                    padding: "12px",
+                                    border: "2px solid #e0e0e0",
+                                    borderRadius: "8px",
+                                    boxSizing: "border-box",
+                                    fontSize: "16px",
+                                    outline: "none",
+                                    transition: "border-color 0.2s",
+                                }}
+                                onFocus={(e) =>
+                                    (e.target.style.borderColor = "#1a237e")
+                                }
+                                onBlur={(e) =>
+                                    (e.target.style.borderColor = "#e0e0e0")
+                                }
+                                required
+                            />
+                        </div>
+
+                        <div style={{ marginBottom: "20px" }}>
+                            <label
+                                style={{
+                                    display: "block",
+                                    marginBottom: "8px",
+                                    fontSize: "14px",
+                                    fontWeight: "600",
+                                    color: "#374151",
+                                }}
+                            >
+                                신부 성함{" "}
+                                <span style={{ color: "#ef4444" }}>*</span>
+                            </label>
+                            <input
+                                type="text"
+                                value={signupForm.brideName}
+                                onChange={(e) =>
+                                    setSignupForm((prev) => ({
+                                        ...prev,
+                                        brideName: e.target.value,
+                                    }))
+                                }
+                                placeholder="신부 이름 (예: 이영희)"
                                 style={{
                                     width: "100%",
                                     padding: "12px",
