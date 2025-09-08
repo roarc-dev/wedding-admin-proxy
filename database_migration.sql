@@ -8,7 +8,8 @@ ADD COLUMN IF NOT EXISTS bride_name_en TEXT DEFAULT '',
 ADD COLUMN IF NOT EXISTS wedding_hour TEXT DEFAULT '14',
 ADD COLUMN IF NOT EXISTS wedding_minute TEXT DEFAULT '00',
 ADD COLUMN IF NOT EXISTS venue_name TEXT DEFAULT '',
-ADD COLUMN IF NOT EXISTS venue_address TEXT DEFAULT '';
+ADD COLUMN IF NOT EXISTS venue_address TEXT DEFAULT '',
+ADD COLUMN IF NOT EXISTS photo_section_location TEXT DEFAULT '';
 
 -- 기존 컬럼들을 새로운 구조로 마이그레이션
 -- groom_name -> groom_name_kr로 이동
