@@ -350,47 +350,51 @@ async function handleRegister(req, res, body) {
 
     // 사용자 생성 성공 후 invite_cards에 이름 정보 저장
     try {
-      console.log('Starting invite_cards upsert for page_id:', userPageId)
+      console.log('Starting invite_cards creation for page_id:', userPageId)
       console.log('Names to save - groomName:', groomName, 'brideName:', brideName)
 
-      // 먼저 해당 page_id의 데이터가 있는지 확인
-      const { data: existingData, error: checkError } = await supabase
-        .from('invite_cards')
-        .select('id, groom_name, bride_name')
-        .eq('page_id', userPageId)
-        .maybeSingle()
-
-      if (checkError) {
-        console.error('Error checking existing data:', checkError)
-      } else {
-        console.log('Existing data check result:', existingData)
-      }
-
-      // upsert 수행
-      const upsertData = {
-        page_id: userPageId,
-        groom_name: groomName,
-        bride_name: brideName,
-        invitation_text: `${groomName} ♥ ${brideName}의 결혼을 축하드립니다.`,
-        show_invitation_text: true,
-        updated_at: new Date().toISOString()
-      }
-
-      console.log('Upsert data:', upsertData)
-
+      // invite_cards 테이블에 기본 데이터 생성
       const { data: inviteData, error: inviteError } = await supabase
         .from('invite_cards')
-        .upsert(upsertData, { onConflict: 'page_id' })
+        .insert({
+          page_id: userPageId,
+          groom_name: groomName,
+          bride_name: brideName,
+          invitation_text: `${groomName} ♥ ${brideName}의 결혼을 축하드립니다.`,
+          show_invitation_text: true
+        })
         .select()
         .single()
 
       if (inviteError) {
-        console.error('Invite cards upsert error:', inviteError)
+        console.error('Invite cards insert error:', inviteError)
         console.error('Error code:', inviteError.code)
         console.error('Error message:', inviteError.message)
         console.error('Error details:', inviteError.details)
+
+        // 중복 키 오류인 경우 업데이트 시도
+        if (inviteError.code === '23505') {
+          console.log('Duplicate key detected, trying update...')
+          const { data: updateData, error: updateError } = await supabase
+            .from('invite_cards')
+            .update({
+              groom_name: groomName,
+              bride_name: brideName,
+              invitation_text: `${groomName} ♥ ${brideName}의 결혼을 축하드립니다.`,
+              updated_at: new Date().toISOString()
+            })
+            .eq('page_id', userPageId)
+            .select()
+            .single()
+
+          if (updateError) {
+            console.error('Update also failed:', updateError)
+          } else {
+            console.log('Update successful:', updateData)
+          }
+        }
       } else {
-        console.log('Invite cards upsert successful!')
+        console.log('Invite cards insert successful!')
         console.log('Result data:', inviteData)
         console.log('Final saved names - groom_name:', inviteData?.groom_name, 'bride_name:', inviteData?.bride_name)
       }
