@@ -354,6 +354,23 @@ async function handleRegister(req, res, body) {
       console.log('Starting invite_cards creation for page_id:', userPageId)
       console.log('Names to save - groomName:', groomName, 'brideName:', brideName)
 
+      // 먼저 간단한 쿼리로 Supabase 연결 확인
+      const { data: testData, error: testError } = await supabase
+        .from('invite_cards')
+        .select('count')
+        .limit(1)
+
+      if (testError) {
+        console.error('Supabase connection test failed:', testError)
+        return res.status(201).json({
+          success: true,
+          message: '회원가입이 완료되었습니다. (invite_cards 저장은 나중에)',
+          data: newUser
+        })
+      }
+
+      console.log('Supabase connection OK, proceeding with invite_cards creation')
+
       // invite_cards 테이블에 기본 데이터 생성
       const { data: inviteData, error: inviteError } = await supabase
         .from('invite_cards')
@@ -371,7 +388,6 @@ async function handleRegister(req, res, body) {
         console.error('Invite cards insert error:', inviteError)
         console.error('Error code:', inviteError.code)
         console.error('Error message:', inviteError.message)
-        console.error('Error details:', inviteError.details)
 
         // 중복 키 오류인 경우 업데이트 시도
         if (inviteError.code === '23505') {
@@ -392,6 +408,7 @@ async function handleRegister(req, res, body) {
             console.error('Update also failed:', updateError)
           } else {
             console.log('Update successful:', updateData)
+            console.log('Final saved names - groom_name:', updateData?.groom_name, 'bride_name:', updateData?.bride_name)
           }
         }
       } else {
@@ -401,7 +418,7 @@ async function handleRegister(req, res, body) {
       }
     } catch (inviteException) {
       console.error('Invite cards creation exception:', inviteException)
-      console.error('Exception stack:', inviteException.stack)
+      console.error('Exception type:', inviteException.constructor.name)
     }
 
     return res.status(201).json({
