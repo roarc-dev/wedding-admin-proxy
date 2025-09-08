@@ -1,4 +1,4 @@
-import React, { useState, useEffect, SetStateAction } from "react"
+import React, { useState, useEffect, useCallback, useRef, SetStateAction } from "react"
 import ReactDOM from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { addPropertyControls, ControlType } from "framer"
@@ -222,14 +222,18 @@ function UiPhotoTile({
         input.style.visibility = "hidden"
 
         // DOM에 추가
-        document.body.appendChild(input)
+        if (typeof document !== 'undefined') {
+            document.body.appendChild(input)
+        }
 
         const handleFileSelect = async (e: Event) => {
             const target = e.target as HTMLInputElement
             const file = target.files?.[0]
 
             // 정리 작업
-            document.body.removeChild(input)
+            if (typeof document !== 'undefined') {
+                document.body.removeChild(input)
+            }
 
             if (!file) return
 
@@ -259,22 +263,28 @@ function UiPhotoTile({
         // 취소 시 정리
         const handleCancel = () => {
             setTimeout(() => {
-                if (document.body.contains(input)) {
+                if (typeof document !== 'undefined' && document.body.contains(input)) {
                     document.body.removeChild(input)
                 }
             }, 100)
         }
 
         input.addEventListener("cancel", handleCancel, { once: true })
-        window.addEventListener("focus", handleCancel, { once: true })
+        if (typeof window !== 'undefined') {
+            window.addEventListener("focus", handleCancel, { once: true })
+        }
 
         // 파일 대화상자 열기
         try {
             input.click()
         } catch (err) {
             console.error("파일 대화상자 열기 실패:", err)
-            document.body.removeChild(input)
-            alert("파일 선택 대화상자를 열 수 없습니다.")
+            if (typeof document !== 'undefined') {
+                document.body.removeChild(input)
+            }
+            if (typeof window !== 'undefined') {
+                alert("파일 선택 대화상자를 열 수 없습니다.")
+            }
         }
     }
 
@@ -420,6 +430,8 @@ function UiPhotoTile({
                 </div>
             </div>
 
+            {/* 이미지 순서 변경 함수 정의 */}
+
             {/* 하단 영역 - 파일명과 순서 드롭다운 */}
             <div
                 style={{
@@ -478,13 +490,14 @@ function UiPhotoTile({
                         <CustomOrderDropdown
                             value={index}
                             onChange={(newPosition) => {
-                                const moveImageToPosition = (window as any)
-                                    .moveImageToPosition
-                                if (moveImageToPosition) {
-                                    moveImageToPosition(
-                                        index - 1,
-                                        newPosition as number
-                                    )
+                                // AdminOld.tsx 방식으로 직접 함수 호출
+                                try {
+                                    const moveImageToPosition = (window as any).moveImageToPosition
+                                    if (moveImageToPosition) {
+                                        moveImageToPosition(index - 1, newPosition as number)
+                                    }
+                                } catch (error) {
+                                    console.warn('이미지 순서 변경 실패:', error)
                                 }
                             }}
                             options={orderOptions.map((num) => ({
@@ -1886,17 +1899,55 @@ function InlineCalendarPreview({
 // 프록시 서버 URL (고정된 Production URL)
 const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app"
 
+// 전역 헬퍼 함수 - 이미지 순서 변경
+function reorderImages(existingImages: any[], setExistingImages: (images: any[]) => void, setHasUnsavedChanges?: (value: boolean) => void) {
+    return (fromIndex: number, toIndex: number) => {
+        const newImages = [...existingImages]
+        const [movedImage] = newImages.splice(fromIndex, 1)
+        newImages.splice(toIndex, 0, movedImage)
+
+        // 로컬 상태만 업데이트 (서버 저장은 별도)
+        setExistingImages(newImages)
+
+        // 변경사항 표시
+        if (setHasUnsavedChanges) {
+            setHasUnsavedChanges(true)
+        }
+
+        console.log("로컬 순서 변경:", {
+            fromIndex,
+            toIndex,
+            newLength: newImages.length,
+        })
+    }
+}
+
 // 세션 토큰 관리
 function getAuthToken() {
-    return localStorage.getItem("admin_session")
+    if (typeof window === 'undefined') return null
+    try {
+        return localStorage.getItem("admin_session")
+    } catch {
+        return null
+    }
 }
 
 function setAuthToken(token: string): void {
-    localStorage.setItem("admin_session", token)
+    if (typeof window === 'undefined') return
+    try {
+        localStorage.setItem("admin_session", token)
+    } catch {
+        // localStorage 사용 불가 시 무시
+    }
 }
 
 function removeAuthToken() {
-    localStorage.removeItem("admin_session")
+    if (typeof window === 'undefined') return
+    try {
+        localStorage.removeItem("admin_session")
+    } catch {
+        // localStorage 사용 불가 시 무시
+    }
 }
 
 // 인증 관련 함수들
@@ -2334,6 +2385,10 @@ async function compressImage(
     quality = 0.8
 ): Promise<File> {
     return new Promise((resolve, reject) => {
+        if (typeof document === 'undefined') {
+            reject(new Error('Document not available'))
+            return
+        }
         const canvas = document.createElement("canvas")
         const ctx = canvas.getContext("2d")
         const img = new Image()
@@ -2601,12 +2656,12 @@ function AdminMainContent(props: any) {
                         d.groom_father_name ?? prev.groomFatherName,
                     groomMotherName:
                         d.groom_mother_name ?? prev.groomMotherName,
-                    groomName: d.groom_name || pageSettings.groom_name_kr || prev.groomName, // invite_cards.groom_name 우선 사용
+                    groomName: d.groom_name || pageSettings.groomName || prev.groomName, // invite_cards.groom_name 우선 사용
                     brideFatherName:
                         d.bride_father_name ?? prev.brideFatherName,
                     brideMotherName:
                         d.bride_mother_name ?? prev.brideMotherName,
-                    brideName: d.bride_name || pageSettings.bride_name_kr || prev.brideName, // invite_cards.bride_name 우선 사용
+                    brideName: d.bride_name || pageSettings.brideName || prev.brideName, // invite_cards.bride_name 우선 사용
                     showGroomFatherChrysanthemum:
                         !!d.show_groom_father_chrysanthemum,
                     showGroomMotherChrysanthemum:
@@ -2621,8 +2676,8 @@ function AdminMainContent(props: any) {
             } else {
                 setInviteData((prev) => ({
                     ...prev,
-                    groomName: pageSettings.groom_name_kr || prev.groomName, // invite_cards 데이터 없을 때 page_settings에서 가져옴
-                    brideName: pageSettings.bride_name_kr || prev.brideName, // invite_cards 데이터 없을 때 page_settings에서 가져옴
+                    groomName: pageSettings.groomName || prev.groomName, // invite_cards 데이터 없을 때 page_settings에서 가져옴
+                    brideName: pageSettings.brideName || prev.brideName, // invite_cards 데이터 없을 때 page_settings에서 가져옴
                 }))
             }
         } catch (_err) {
@@ -2706,9 +2761,9 @@ function AdminMainContent(props: any) {
 
     // 페이지 설정 관련 상태
     const [pageSettings, setPageSettings] = useState({
-        groom_name_kr: "",
+        groomName: "",
         groom_name_en: "",
-        bride_name_kr: "",
+        brideName: "",
         bride_name_en: "",
         wedding_date: "",
         wedding_hour: "14",
@@ -2777,9 +2832,9 @@ function AdminMainContent(props: any) {
 
     const buildNameSectionProps = () => ({
         groomName:
-            pageSettings.groom_name_en || pageSettings.groom_name_kr || "GROOM",
+            pageSettings.groom_name_en || pageSettings.groomName || "GROOM",
         brideName:
-            pageSettings.bride_name_en || pageSettings.bride_name_kr || "BRIDE",
+            pageSettings.bride_name_en || pageSettings.brideName || "BRIDE",
     })
 
     const [photoSectionPreviewUrl, setPhotoSectionPreviewUrl] = React.useState<
@@ -2828,6 +2883,7 @@ function AdminMainContent(props: any) {
 
     // 초대글 텍스트 포맷팅(볼드/인용) 삽입
     const insertInviteFormat = (format: "bold" | "quote") => {
+        if (typeof document === 'undefined') return
         const textarea = document.getElementById(
             "inviteTextArea"
         ) as HTMLTextAreaElement | null
@@ -3040,23 +3096,7 @@ function AdminMainContent(props: any) {
     // 임시 테스트 함수 (디버깅용)
     // 이미지 순서 테스트용 함수 제거됨
 
-    // 이미지 순서 변경 관련 함수들 (컴포넌트 내부로 이동)
-    // 이미지 순서 변경 (로컬 상태만 변경)
-    const handleReorderImages = (fromIndex: number, toIndex: number) => {
-        const newImages = [...existingImages]
-        const [movedImage] = newImages.splice(fromIndex, 1)
-        newImages.splice(toIndex, 0, movedImage)
-
-        // 로컬 상태만 업데이트 (서버 저장은 별도)
-        setExistingImages(newImages)
-        setHasUnsavedChanges(true)
-
-        console.log("로컬 순서 변경:", {
-            fromIndex,
-            toIndex,
-            newLength: newImages.length,
-        })
-    }
+    // 이미지 순서 변경 함수는 위쪽으로 이동됨
 
     // 서버에 순서 변경사항 저장
     const saveImageOrder = async () => {
@@ -3140,18 +3180,7 @@ function AdminMainContent(props: any) {
             handleReorderImages(index, index + 1)
     }
 
-    const moveImageToPosition = (fromIndex: number, toPosition: number) => {
-        if (
-            toPosition >= 1 &&
-            toPosition <= existingImages.length &&
-            toPosition !== fromIndex + 1
-        ) {
-            handleReorderImages(fromIndex, toPosition - 1)
-        }
-    }
-
-    // window 객체에 함수 추가하여 UiPhotoTile에서 호출 가능하도록 함
-    ;(window as any).moveImageToPosition = moveImageToPosition
+    // moveImageToPosition 함수는 이제 필요 없음 - 직접 로직 사용
 
     // 특정 위치의 이미지 교체 함수
     const handleReplaceImage = async (index: number, newFile: File) => {
@@ -3301,8 +3330,7 @@ function AdminMainContent(props: any) {
         }
     }
 
-    // window 객체에 함수 추가
-    ;(window as any).handleReplaceImage = handleReplaceImage
+    // handleReplaceImage 함수는 UiPhotoTile의 onReplace props를 통해 직접 전달되므로 window 객체 설정 불필요
 
     // 선택된 이미지들 상태 추가
     const [selectedImages, setSelectedImages] = useState<Set<string>>(
@@ -3313,6 +3341,30 @@ function AdminMainContent(props: any) {
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
     const [isSavingOrder, setIsSavingOrder] = useState(false)
     const [originalOrder, setOriginalOrder] = useState<ImageInfo[]>([])
+
+    // 이미지 순서 변경 함수
+    const handleReorderImages = useCallback(
+        reorderImages(existingImages, setExistingImages, setHasUnsavedChanges),
+        [existingImages, setHasUnsavedChanges]
+    )
+
+    // moveImageToPosition 함수 - AdminOld.tsx 방식으로 window 객체에 저장
+    const moveImageToPosition = useCallback((fromIndex: number, toPosition: number) => {
+        if (
+            toPosition >= 1 &&
+            toPosition <= existingImages.length &&
+            toPosition !== fromIndex + 1
+        ) {
+            handleReorderImages(fromIndex, toPosition - 1)
+        }
+    }, [existingImages.length, handleReorderImages])
+
+    // window 객체에 함수 저장 (클라이언트 사이드에서만)
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            ;(window as any).moveImageToPosition = moveImageToPosition
+        }
+    }, [moveImageToPosition])
 
     // 갤러리 액션바 컴포넌트
     const GallerySaveActionBar = ({
@@ -3545,23 +3597,29 @@ function AdminMainContent(props: any) {
 
     // 세션 확인
     useEffect(() => {
-        const token = localStorage.getItem("admin_session")
-        if (token) {
-            const tokenData = validateSessionToken(token)
-            if (tokenData) {
-                setIsAuthenticated(true)
-                setCurrentUser({ username: tokenData.username })
-                // 저장된 사전 할당 페이지 ID 적용 (관리자가 미리 설정한 경우)
-                const storedAssigned = localStorage.getItem("assigned_page_id")
-                if (storedAssigned && storedAssigned.trim().length > 0) {
-                    setAssignedPageId(storedAssigned)
-                    setCurrentPageId(storedAssigned)
+        if (typeof window === 'undefined') return
+
+        try {
+            const token = localStorage.getItem("admin_session")
+            if (token) {
+                const tokenData = validateSessionToken(token)
+                if (tokenData) {
+                    setIsAuthenticated(true)
+                    setCurrentUser({ username: tokenData.username })
+                    // 저장된 사전 할당 페이지 ID 적용 (관리자가 미리 설정한 경우)
+                    const storedAssigned = localStorage.getItem("assigned_page_id")
+                    if (storedAssigned && storedAssigned.trim().length > 0) {
+                        setAssignedPageId(storedAssigned)
+                        setCurrentPageId(storedAssigned)
+                    }
+                    loadAllPages()
+                    loadContactList()
+                } else {
+                    localStorage.removeItem("admin_session")
                 }
-                loadAllPages()
-                loadContactList()
-            } else {
-                localStorage.removeItem("admin_session")
             }
+        } catch (error) {
+            console.warn("localStorage 접근 실패:", error)
         }
     }, [])
 
@@ -3576,10 +3634,16 @@ function AdminMainContent(props: any) {
             loginForm.password
         )
         if (result.success) {
-            localStorage.setItem(
-                "admin_session",
-                generateSessionToken(result.user)
-            )
+            if (typeof window !== 'undefined') {
+                try {
+                    localStorage.setItem(
+                        "admin_session",
+                        generateSessionToken(result.user)
+                    )
+                } catch (error) {
+                    console.warn("localStorage 저장 실패:", error)
+                }
+            }
             setIsAuthenticated(true)
             setCurrentUser(result.user)
             // 로그인 사용자에 page_id가 할당되어 있으면 강제 적용 (비관리자용)
@@ -3592,10 +3656,22 @@ function AdminMainContent(props: any) {
             ) {
                 setAssignedPageId(assigned)
                 setCurrentPageId(assigned)
-                localStorage.setItem("assigned_page_id", assigned)
+                if (typeof window !== 'undefined') {
+                    try {
+                        localStorage.setItem("assigned_page_id", assigned)
+                    } catch (error) {
+                        console.warn("localStorage 저장 실패:", error)
+                    }
+                }
             } else {
                 setAssignedPageId(null)
-                localStorage.removeItem("assigned_page_id")
+                if (typeof window !== 'undefined') {
+                    try {
+                        localStorage.removeItem("assigned_page_id")
+                    } catch (error) {
+                        console.warn("localStorage 삭제 실패:", error)
+                    }
+                }
             }
             setLoginForm({ username: "", password: "" })
             loadAllPages()
@@ -3616,7 +3692,13 @@ function AdminMainContent(props: any) {
         // 페이지 리스트 사용 안함
         setExistingImages([])
         setContactList([])
-        localStorage.removeItem("assigned_page_id")
+        if (typeof window !== 'undefined') {
+            try {
+                localStorage.removeItem("assigned_page_id")
+            } catch (error) {
+                console.warn("localStorage 삭제 실패:", error)
+            }
+        }
     }
 
     // 데이터 로드
@@ -3676,9 +3758,9 @@ function AdminMainContent(props: any) {
     }
 
     const allowedSettingKeys = [
-        "groom_name_kr",
+        "groomName",
         "groom_name_en",
-        "bride_name_kr",
+        "brideName",
         "bride_name_en",
         "wedding_date",
         "wedding_hour",
@@ -4531,8 +4613,8 @@ function AdminMainContent(props: any) {
                         fontFamily: "Pretendard SemiBold",
                     }}
                 >
-                    {pageSettings.groom_name_kr || "신랑"} ♥{" "}
-                    {pageSettings.bride_name_kr || "신부"}
+                    {inviteData.groomName || "신랑"} ♥{" "}
+                    {inviteData.brideName || "신부"}
                 </span>
                 <button
                     onClick={handleLogout}
@@ -6106,6 +6188,49 @@ function AdminMainContent(props: any) {
                                     gap: theme.gap.md,
                                 }}
                             >
+                                {/* 초대글에서 이름 불러오기 버튼 */}
+                                {(inviteData.groomName || inviteData.brideName || inviteData.groomFatherName || inviteData.groomMotherName || inviteData.brideFatherName || inviteData.brideMotherName) && (
+                                    <div
+                                        style={{
+                                            width: "100%",
+                                            display: "flex",
+                                            justifyContent: "center",
+                                            marginBottom: theme.gap.sm,
+                                        }}
+                                    >
+                                        <button
+                                            onClick={() => {
+                                                // 초대글의 이름들을 연락처 필드로 복사
+                                                setSelectedContact((prev) => ({
+                                                    ...(prev || {}),
+                                                    page_id: prev?.page_id || currentPageId,
+                                                    groom_name: inviteData.groomName || prev?.groom_name || "",
+                                                    bride_name: inviteData.brideName || prev?.bride_name || "",
+                                                    groom_father_name: inviteData.groomFatherName || prev?.groom_father_name || "",
+                                                    groom_mother_name: inviteData.groomMotherName || prev?.groom_mother_name || "",
+                                                    bride_father_name: inviteData.brideFatherName || prev?.bride_father_name || "",
+                                                    bride_mother_name: inviteData.brideMotherName || prev?.bride_mother_name || "",
+                                                } as ContactInfo));
+                                            }}
+                                            style={{
+                                                padding: "8px 16px",
+                                                backgroundColor: theme.color.surface,
+                                                color: theme.color.text,
+                                                border: `1px solid ${theme.color.border}`,
+                                                borderRadius: theme.radius.sm,
+                                                fontSize: theme.text.sm,
+                                                fontFamily: theme.font.bodyBold,
+                                                cursor: "pointer",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: theme.gap.sm,
+                                            }}
+                                        >
+                                            초대글에서 입력한 이름 불러오기
+                                        </button>
+                                    </div>
+                                )}
+
                                 {/* 신랑 */}
                                 <div
                                     style={{
@@ -6125,11 +6250,45 @@ function AdminMainContent(props: any) {
                                             gap: theme.gap.sm,
                                         }}
                                     >
-                                        {/* 이름 표시 */}
-                                        <NameDisplay
-                                            name={inviteData.groomName}
-                                            placeholder="초대글에서 신랑 이름을 입력해주세요"
-                                        />
+                                        {/* 이름 입력 */}
+                                        <div
+                                            style={{
+                                                width: "100%",
+                                                height: 40,
+                                                padding: 12,
+                                                background: "white",
+                                                border: "0.5px solid #E5E6E8",
+                                                outlineOffset: -0.25,
+                                                display: "flex",
+                                                alignItems: "center",
+                                            }}
+                                        >
+                                            <input
+                                                type="text"
+                                                value={
+                                                    selectedContact?.groom_name ||
+                                                    ""
+                                                }
+                                                onChange={(e) =>
+                                                    handleContactInputChange(
+                                                        "groom_name",
+                                                        e.target.value
+                                                    )
+                                                }
+                                                placeholder="신랑 이름"
+                                                style={{
+                                                    width: "100%",
+                                                    border: "none",
+                                                    outline: "none",
+                                                    fontSize: 14,
+                                                    fontFamily:
+                                                        "Pretendard Regular",
+                                                    color: selectedContact?.groom_name
+                                                        ? "black"
+                                                        : "#ADADAD",
+                                                }}
+                                            />
+                                        </div>
                                         {/* 전화번호 입력 */}
                                         <div
                                             style={{
@@ -6191,11 +6350,45 @@ function AdminMainContent(props: any) {
                                             gap: theme.gap.sm,
                                         }}
                                     >
-                                        {/* 이름 표시 */}
-                                        <NameDisplay
-                                            name={inviteData.groomFatherName}
-                                            placeholder="초대글에서 신랑 아버지 이름을 입력해주세요"
-                                        />
+                                        {/* 이름 입력 */}
+                                        <div
+                                            style={{
+                                                width: "100%",
+                                                height: 40,
+                                                padding: 12,
+                                                background: "white",
+                                                border: "0.5px solid #E5E6E8",
+                                                outlineOffset: -0.25,
+                                                display: "flex",
+                                                alignItems: "center",
+                                            }}
+                                        >
+                                            <input
+                                                type="text"
+                                                value={
+                                                    selectedContact?.groom_father_name ||
+                                                    ""
+                                                }
+                                                onChange={(e) =>
+                                                    handleContactInputChange(
+                                                        "groom_father_name",
+                                                        e.target.value
+                                                    )
+                                                }
+                                                placeholder="신랑 아버지 이름"
+                                                style={{
+                                                    width: "100%",
+                                                    border: "none",
+                                                    outline: "none",
+                                                    fontSize: 14,
+                                                    fontFamily:
+                                                        "Pretendard Regular",
+                                                    color: selectedContact?.groom_father_name
+                                                        ? "black"
+                                                        : "#ADADAD",
+                                                }}
+                                            />
+                                        </div>
                                         {/* 전화번호 입력 */}
                                         <div
                                             style={{
@@ -6257,11 +6450,45 @@ function AdminMainContent(props: any) {
                                             gap: theme.gap.sm,
                                         }}
                                     >
-                                        {/* 이름 표시 */}
-                                        <NameDisplay
-                                            name={inviteData.groomMotherName}
-                                            placeholder="초대글에서 신랑 어머니 이름을 입력해주세요"
-                                        />
+                                        {/* 이름 입력 */}
+                                        <div
+                                            style={{
+                                                width: "100%",
+                                                height: 40,
+                                                padding: 12,
+                                                background: "white",
+                                                border: "0.5px solid #E5E6E8",
+                                                outlineOffset: -0.25,
+                                                display: "flex",
+                                                alignItems: "center",
+                                            }}
+                                        >
+                                            <input
+                                                type="text"
+                                                value={
+                                                    selectedContact?.groom_mother_name ||
+                                                    ""
+                                                }
+                                                onChange={(e) =>
+                                                    handleContactInputChange(
+                                                        "groom_mother_name",
+                                                        e.target.value
+                                                    )
+                                                }
+                                                placeholder="신랑 어머니 이름"
+                                                style={{
+                                                    width: "100%",
+                                                    border: "none",
+                                                    outline: "none",
+                                                    fontSize: 14,
+                                                    fontFamily:
+                                                        "Pretendard Regular",
+                                                    color: selectedContact?.groom_mother_name
+                                                        ? "black"
+                                                        : "#ADADAD",
+                                                }}
+                                            />
+                                        </div>
                                         {/* 전화번호 입력 */}
                                         <div
                                             style={{
@@ -6324,11 +6551,45 @@ function AdminMainContent(props: any) {
                                             gap: theme.gap.sm,
                                         }}
                                     >
-                                        {/* 이름 표시 */}
-                                        <NameDisplay
-                                            name={inviteData.brideName}
-                                            placeholder="초대글에서 신부 이름을 입력해주세요"
-                                        />
+                                        {/* 이름 입력 */}
+                                        <div
+                                            style={{
+                                                width: "100%",
+                                                height: 40,
+                                                padding: 12,
+                                                background: "white",
+                                                border: "0.5px solid #E5E6E8",
+                                                outlineOffset: -0.25,
+                                                display: "flex",
+                                                alignItems: "center",
+                                            }}
+                                        >
+                                            <input
+                                                type="text"
+                                                value={
+                                                    selectedContact?.bride_name ||
+                                                    ""
+                                                }
+                                                onChange={(e) =>
+                                                    handleContactInputChange(
+                                                        "bride_name",
+                                                        e.target.value
+                                                    )
+                                                }
+                                                placeholder="신부 이름"
+                                                style={{
+                                                    width: "100%",
+                                                    border: "none",
+                                                    outline: "none",
+                                                    fontSize: 14,
+                                                    fontFamily:
+                                                        "Pretendard Regular",
+                                                    color: selectedContact?.bride_name
+                                                        ? "black"
+                                                        : "#ADADAD",
+                                                }}
+                                            />
+                                        </div>
                                         {/* 전화번호 입력 */}
                                         <div
                                             style={{
@@ -6390,11 +6651,45 @@ function AdminMainContent(props: any) {
                                             gap: theme.gap.sm,
                                         }}
                                     >
-                                        {/* 이름 표시 */}
-                                        <NameDisplay
-                                            name={inviteData.brideFatherName}
-                                            placeholder="초대글에서 신부 아버지 이름을 입력해주세요"
-                                        />
+                                        {/* 이름 입력 */}
+                                        <div
+                                            style={{
+                                                width: "100%",
+                                                height: 40,
+                                                padding: 12,
+                                                background: "white",
+                                                border: "0.5px solid #E5E6E8",
+                                                outlineOffset: -0.25,
+                                                display: "flex",
+                                                alignItems: "center",
+                                            }}
+                                        >
+                                            <input
+                                                type="text"
+                                                value={
+                                                    selectedContact?.bride_father_name ||
+                                                    ""
+                                                }
+                                                onChange={(e) =>
+                                                    handleContactInputChange(
+                                                        "bride_father_name",
+                                                        e.target.value
+                                                    )
+                                                }
+                                                placeholder="신부 아버지 이름"
+                                                style={{
+                                                    width: "100%",
+                                                    border: "none",
+                                                    outline: "none",
+                                                    fontSize: 14,
+                                                    fontFamily:
+                                                        "Pretendard Regular",
+                                                    color: selectedContact?.bride_father_name
+                                                        ? "black"
+                                                        : "#ADADAD",
+                                                }}
+                                            />
+                                        </div>
                                         {/* 전화번호 입력 */}
                                         <div
                                             style={{
@@ -6456,11 +6751,45 @@ function AdminMainContent(props: any) {
                                             gap: theme.gap.sm,
                                         }}
                                     >
-                                        {/* 이름 표시 */}
-                                        <NameDisplay
-                                            name={inviteData.brideMotherName}
-                                            placeholder="초대글에서 신부 어머니 이름을 입력해주세요"
-                                        />
+                                        {/* 이름 입력 */}
+                                        <div
+                                            style={{
+                                                width: "100%",
+                                                height: 40,
+                                                padding: 12,
+                                                background: "white",
+                                                border: "0.5px solid #E5E6E8",
+                                                outlineOffset: -0.25,
+                                                display: "flex",
+                                                alignItems: "center",
+                                            }}
+                                        >
+                                            <input
+                                                type="text"
+                                                value={
+                                                    selectedContact?.bride_mother_name ||
+                                                    ""
+                                                }
+                                                onChange={(e) =>
+                                                    handleContactInputChange(
+                                                        "bride_mother_name",
+                                                        e.target.value
+                                                    )
+                                                }
+                                                placeholder="신부 어머니 이름"
+                                                style={{
+                                                    width: "100%",
+                                                    border: "none",
+                                                    outline: "none",
+                                                    fontSize: 14,
+                                                    fontFamily:
+                                                        "Pretendard Regular",
+                                                    color: selectedContact?.bride_mother_name
+                                                        ? "black"
+                                                        : "#ADADAD",
+                                                }}
+                                            />
+                                        </div>
                                         {/* 전화번호 입력 */}
                                         <div
                                             style={{
@@ -6565,10 +6894,10 @@ function AdminMainContent(props: any) {
                                             hour={pageSettings.wedding_hour}
                                             minute={pageSettings.wedding_minute}
                                             groomName={
-                                                pageSettings.groom_name_kr
+                                                pageSettings.groomName
                                             }
                                             brideName={
-                                                pageSettings.bride_name_kr
+                                                pageSettings.brideName
                                             }
                                             highlightColor={
                                                 pageSettings.highlight_color ||
@@ -7090,13 +7419,56 @@ function AdminMainContent(props: any) {
                                     gap: "36px",
                                 }}
                             >
+                                {/* 초대글에서 이름 불러오기 버튼 */}
+                                {(inviteData.groomName || inviteData.brideName || inviteData.groomFatherName || inviteData.groomMotherName || inviteData.brideFatherName || inviteData.brideMotherName) && (
+                                    <div
+                                        style={{
+                                            width: "100%",
+                                            display: "flex",
+                                            justifyContent: "center",
+                                            marginBottom: theme.gap.sm,
+                                        }}
+                                    >
+                                        <button
+                                            onClick={() => {
+                                                // 초대글의 이름들을 계좌번호 필드로 복사
+                                                setSelectedContact((prev) => ({
+                                                    ...(prev || {}),
+                                                    page_id: prev?.page_id || currentPageId,
+                                                    groom_name: inviteData.groomName || prev?.groom_name || "",
+                                                    bride_name: inviteData.brideName || prev?.bride_name || "",
+                                                    groom_father_name: inviteData.groomFatherName || prev?.groom_father_name || "",
+                                                    groom_mother_name: inviteData.groomMotherName || prev?.groom_mother_name || "",
+                                                    bride_father_name: inviteData.brideFatherName || prev?.bride_father_name || "",
+                                                    bride_mother_name: inviteData.brideMotherName || prev?.bride_mother_name || "",
+                                                } as ContactInfo));
+                                            }}
+                                            style={{
+                                                padding: "8px 16px",
+                                                backgroundColor: theme.color.surface,
+                                                color: theme.color.text,
+                                                border: `1px solid ${theme.color.border}`,
+                                                borderRadius: theme.radius.sm,
+                                                fontSize: theme.text.sm,
+                                                fontFamily: theme.font.bodyBold,
+                                                cursor: "pointer",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: theme.gap.sm,
+                                            }}
+                                        >
+                                            초대글에서 입력한 이름 불러오기
+                                        </button>
+                                    </div>
+                                )}
+
                                 {/* 계좌번호 입력 폼들 */}
                                 {/* 신랑측 계좌 */}
                                 <div
                                     style={{
                                         display: "flex",
                                         flexDirection: "column",
-                                        gap: theme.gap.md,
+                                        gap: theme.gap.sm,
                                     }}
                                 >
                                     {/* 신랑 */}
@@ -7104,24 +7476,51 @@ function AdminMainContent(props: any) {
                                         style={{
                                             display: "flex",
                                             flexDirection: "column",
-                                            gap: theme.gap.md,
+                                            gap: theme.gap.sm,
                                         }}
                                     >
-                                        <div
-                                            style={{
-                                                color: "black",
-                                                fontSize: 14,
-                                                fontFamily:
-                                                    "Pretendard SemiBold",
-                                            }}
-                                        >
+                                        <div style={theme.typography.label}>
                                             신랑
                                         </div>
-                                        {/* 이름 표시 */}
-                                        <NameDisplay
-                                            name={inviteData.groomName}
-                                            placeholder="초대글에서 신랑 이름을 입력해주세요"
-                                        />
+                                        {/* 이름 입력 */}
+                                        <div
+                                            style={{
+                                                width: "100%",
+                                                height: 40,
+                                                padding: 12,
+                                                background: "white",
+                                                border: "0.5px solid #E5E6E8",
+                                                outlineOffset: -0.25,
+                                                display: "flex",
+                                                alignItems: "center",
+                                            }}
+                                        >
+                                            <input
+                                                type="text"
+                                                value={
+                                                    selectedContact?.groom_name ||
+                                                    ""
+                                                }
+                                                onChange={(e) =>
+                                                    handleContactInputChange(
+                                                        "groom_name",
+                                                        e.target.value
+                                                    )
+                                                }
+                                                placeholder="신랑 이름"
+                                                style={{
+                                                    width: "100%",
+                                                    border: "none",
+                                                    outline: "none",
+                                                fontSize: 14,
+                                                fontFamily:
+                                                    "Pretendard Regular",
+                                                    color: selectedContact?.groom_name
+                                                        ? "black"
+                                                        : "#ADADAD",
+                                                }}
+                                            />
+                                        </div>
                                         <div
                                             style={{
                                                 display: "flex",
@@ -7213,24 +7612,51 @@ function AdminMainContent(props: any) {
                                         style={{
                                             display: "flex",
                                             flexDirection: "column",
-                                            gap: theme.gap.md,
+                                            gap: theme.gap.sm,
                                         }}
                                     >
-                                        <div
-                                            style={{
-                                                color: "black",
-                                                fontSize: 14,
-                                                fontFamily:
-                                                    "Pretendard SemiBold",
-                                            }}
-                                        >
+                                        <div style={theme.typography.label}>
                                             신랑 아버지
                                         </div>
-                                        {/* 이름 표시 */}
-                                        <NameDisplay
-                                            name={inviteData.groomFatherName}
-                                            placeholder="초대글에서 신랑 아버지 이름을 입력해주세요"
-                                        />
+                                        {/* 이름 입력 */}
+                                        <div
+                                            style={{
+                                                width: "100%",
+                                                height: 40,
+                                                padding: 12,
+                                                background: "white",
+                                                border: "0.5px solid #E5E6E8",
+                                                outlineOffset: -0.25,
+                                                display: "flex",
+                                                alignItems: "center",
+                                            }}
+                                        >
+                                            <input
+                                                type="text"
+                                                value={
+                                                    selectedContact?.groom_father_name ||
+                                                    ""
+                                                }
+                                                onChange={(e) =>
+                                                    handleContactInputChange(
+                                                        "groom_father_name",
+                                                        e.target.value
+                                                    )
+                                                }
+                                                placeholder="신랑 아버지 이름"
+                                                style={{
+                                                    width: "100%",
+                                                    border: "none",
+                                                    outline: "none",
+                                                fontSize: 14,
+                                                fontFamily:
+                                                    "Pretendard Regular",
+                                                    color: selectedContact?.groom_father_name
+                                                        ? "black"
+                                                        : "#ADADAD",
+                                                }}
+                                            />
+                                        </div>
                                         <div
                                             style={{
                                                 display: "flex",
@@ -7322,18 +7748,50 @@ function AdminMainContent(props: any) {
                                         style={{
                                             display: "flex",
                                             flexDirection: "column",
-                                            gap: theme.gap.md,
+                                            gap: theme.gap.sm,
                                         }}
                                     >
+                                        <div style={theme.typography.label}>
+                                            신랑 어머니
+                                        </div>
+                                        {/* 이름 입력 */}
                                         <div
                                             style={{
-                                                color: "black",
-                                                fontSize: 14,
-                                                fontFamily:
-                                                    "Pretendard SemiBold",
+                                                width: "100%",
+                                                height: 40,
+                                                padding: 12,
+                                                background: "white",
+                                                border: "0.5px solid #E5E6E8",
+                                                outlineOffset: -0.25,
+                                                display: "flex",
+                                                alignItems: "center",
                                             }}
                                         >
-                                            신랑 어머니
+                                            <input
+                                                type="text"
+                                                value={
+                                                    selectedContact?.groom_mother_name ||
+                                                    ""
+                                                }
+                                                onChange={(e) =>
+                                                    handleContactInputChange(
+                                                        "groom_mother_name",
+                                                        e.target.value
+                                                    )
+                                                }
+                                                placeholder="신랑 어머니 이름"
+                                                style={{
+                                                    width: "100%",
+                                                    border: "none",
+                                                    outline: "none",
+                                                    fontSize: 14,
+                                                    fontFamily:
+                                                        "Pretendard Regular",
+                                                    color: selectedContact?.groom_mother_name
+                                                        ? "black"
+                                                        : "#ADADAD",
+                                                }}
+                                            />
                                         </div>
                                         <div
                                             style={{
@@ -7427,7 +7885,7 @@ function AdminMainContent(props: any) {
                                     style={{
                                         display: "flex",
                                         flexDirection: "column",
-                                        gap: theme.gap.md,
+                                        gap: theme.gap.sm,
                                     }}
                                 >
                                     {/* 신부 */}
@@ -7435,24 +7893,51 @@ function AdminMainContent(props: any) {
                                         style={{
                                             display: "flex",
                                             flexDirection: "column",
-                                            gap: theme.gap.md,
+                                            gap: theme.gap.sm,
                                         }}
                                     >
-                                        <div
-                                            style={{
-                                                color: "black",
-                                                fontSize: 14,
-                                                fontFamily:
-                                                    "Pretendard SemiBold",
-                                            }}
-                                        >
+                                        <div style={theme.typography.label}>
                                             신부
                                         </div>
-                                        {/* 이름 표시 */}
-                                        <NameDisplay
-                                            name={inviteData.brideName}
-                                            placeholder="초대글에서 신부 이름을 입력해주세요"
-                                        />
+                                        {/* 이름 입력 */}
+                                        <div
+                                            style={{
+                                                width: "100%",
+                                                height: 40,
+                                                padding: 12,
+                                                background: "white",
+                                                border: "0.5px solid #E5E6E8",
+                                                outlineOffset: -0.25,
+                                                display: "flex",
+                                                alignItems: "center",
+                                            }}
+                                        >
+                                            <input
+                                                type="text"
+                                                value={
+                                                    selectedContact?.bride_name ||
+                                                    ""
+                                                }
+                                                onChange={(e) =>
+                                                    handleContactInputChange(
+                                                        "bride_name",
+                                                        e.target.value
+                                                    )
+                                                }
+                                                placeholder="신부 이름"
+                                                style={{
+                                                    width: "100%",
+                                                    border: "none",
+                                                    outline: "none",
+                                                fontSize: 14,
+                                                fontFamily:
+                                                    "Pretendard Regular",
+                                                    color: selectedContact?.bride_name
+                                                        ? "black"
+                                                        : "#ADADAD",
+                                                }}
+                                            />
+                                        </div>
                                         <div
                                             style={{
                                                 display: "flex",
@@ -7544,39 +8029,50 @@ function AdminMainContent(props: any) {
                                         style={{
                                             display: "flex",
                                             flexDirection: "column",
-                                            gap: theme.gap.md,
+                                            gap: theme.gap.sm,
                                         }}
                                     >
-                                        <div
-                                            style={{
-                                                color: "black",
-                                                fontSize: 14,
-                                                fontFamily:
-                                                    "Pretendard SemiBold",
-                                            }}
-                                        >
+                                        <div style={theme.typography.label}>
                                             신부 아버지
                                         </div>
-                                        {/* 이름 표시 */}
+                                        {/* 이름 입력 */}
                                         <div
                                             style={{
                                                 width: "100%",
                                                 height: 40,
                                                 padding: 12,
-                                                background: "#F8F9FA",
+                                                background: "white",
                                                 border: "0.5px solid #E5E6E8",
+                                                outlineOffset: -0.25,
                                                 display: "flex",
                                                 alignItems: "center",
+                                            }}
+                                        >
+                                            <input
+                                                type="text"
+                                                value={
+                                                    selectedContact?.bride_father_name ||
+                                                    ""
+                                                }
+                                                onChange={(e) =>
+                                                    handleContactInputChange(
+                                                        "bride_father_name",
+                                                        e.target.value
+                                                    )
+                                                }
+                                                placeholder="신부 아버지 이름"
+                                                style={{
+                                                    width: "100%",
+                                                    border: "none",
+                                                    outline: "none",
                                                 fontSize: 14,
                                                 fontFamily:
                                                     "Pretendard Regular",
-                                                color: inviteData.brideFatherName
+                                                    color: selectedContact?.bride_father_name
                                                     ? "black"
                                                     : "#ADADAD",
                                             }}
-                                        >
-                                            {inviteData.brideFatherName ||
-                                                "초대글에서 신부 아버지 이름을 입력해주세요"}
+                                            />
                                         </div>
                                         <div
                                             style={{
@@ -7669,39 +8165,50 @@ function AdminMainContent(props: any) {
                                         style={{
                                             display: "flex",
                                             flexDirection: "column",
-                                            gap: theme.gap.md,
+                                            gap: theme.gap.sm,
                                         }}
                                     >
-                                        <div
-                                            style={{
-                                                color: "black",
-                                                fontSize: 14,
-                                                fontFamily:
-                                                    "Pretendard SemiBold",
-                                            }}
-                                        >
+                                        <div style={theme.typography.label}>
                                             신부 어머니
                                         </div>
-                                        {/* 이름 표시 */}
+                                        {/* 이름 입력 */}
                                         <div
                                             style={{
                                                 width: "100%",
                                                 height: 40,
                                                 padding: 12,
-                                                background: "#F8F9FA",
+                                                background: "white",
                                                 border: "0.5px solid #E5E6E8",
+                                                outlineOffset: -0.25,
                                                 display: "flex",
                                                 alignItems: "center",
+                                            }}
+                                        >
+                                            <input
+                                                type="text"
+                                                value={
+                                                    selectedContact?.bride_mother_name ||
+                                                    ""
+                                                }
+                                                onChange={(e) =>
+                                                    handleContactInputChange(
+                                                        "bride_mother_name",
+                                                        e.target.value
+                                                    )
+                                                }
+                                                placeholder="신부 어머니 이름"
+                                                style={{
+                                                    width: "100%",
+                                                    border: "none",
+                                                    outline: "none",
                                                 fontSize: 14,
                                                 fontFamily:
                                                     "Pretendard Regular",
-                                                color: inviteData.brideMotherName
+                                                    color: selectedContact?.bride_mother_name
                                                     ? "black"
                                                     : "#ADADAD",
                                             }}
-                                        >
-                                            {inviteData.brideMotherName ||
-                                                "초대글에서 신부 어머니 이름을 입력해주세요"}
+                                            />
                                         </div>
                                         <div
                                             style={{
@@ -8145,7 +8652,7 @@ function AdminMainContent(props: any) {
                                 >
                                     <button
                                         onClick={() => {
-                                            if (currentPageId) {
+                                            if (currentPageId && typeof document !== 'undefined') {
                                                 const input =
                                                     document.getElementById(
                                                         "fileInput"
@@ -8478,7 +8985,9 @@ function TransportTab({
                 if (typeof window !== "undefined" && window.location?.origin) {
                     bases.push(window.location.origin)
                 }
-            } catch {}
+            } catch {
+                // window.location 접근 실패 시 무시
+            }
             bases.push(PROXY_BASE_URL)
             return Array.from(new Set(bases.filter(Boolean)))
         }
@@ -8579,6 +9088,7 @@ function TransportTab({
 
     // 텍스트 포맷팅 함수들
     const insertFormat = (index: number, format: "bold" | "small") => {
+        if (typeof document === 'undefined') return
         const textareaId = `description-${index}`
         const textarea = document.getElementById(
             textareaId
@@ -8617,12 +9127,14 @@ function TransportTab({
 
         // 커서 위치 복원 (다음 렌더링 이후)
         setTimeout(() => {
-            const updatedTextarea = document.getElementById(
-                textareaId
-            ) as HTMLTextAreaElement
-            if (updatedTextarea) {
-                updatedTextarea.focus()
-                updatedTextarea.setSelectionRange(cursorOffset, cursorOffset)
+            if (typeof document !== 'undefined') {
+                const updatedTextarea = document.getElementById(
+                    textareaId
+                ) as HTMLTextAreaElement
+                if (updatedTextarea) {
+                    updatedTextarea.focus()
+                    updatedTextarea.setSelectionRange(cursorOffset, cursorOffset)
+                }
             }
         }, 0)
     }
@@ -8672,8 +9184,8 @@ function TransportTab({
                                 venue_address,
                             })
                         }
-                        console.log("TransportTab 저장 - venue_address:", venue_address)
                     )
+                    console.log("TransportTab 저장 - venue_address:", venue_address)
                     res = tryRes
                     text = await tryRes.text()
                     if (tryRes.ok) break
@@ -8755,7 +9267,7 @@ function TransportTab({
                         outlineOffset: -0.25,
                         fontSize: 14,
                         fontFamily: "Pretendard Regular",
-                        color: "#ADADAD",
+                        color: locationName ? "black" : "#ADADAD",
                         width: "100%",
                     }}
                     placeholder="그랜드볼룸, 사파이어홀"
@@ -8795,7 +9307,7 @@ function TransportTab({
                         outlineOffset: -0.25,
                         fontSize: 14,
                         fontFamily: "Pretendard Regular",
-                        color: "#ADADAD",
+                        color: venue_address ? "black" : "#ADADAD",
                         width: "100%",
                         marginTop: 0,
                     }}
@@ -9335,13 +9847,17 @@ function CustomOrderDropdown({
         if (!isOpen) {
             setFocusedIndex(0)
             // 스크롤 잠금
-            document.body.style.overflow = "hidden"
+            if (typeof document !== 'undefined') {
+                document.body.style.overflow = "hidden"
+            }
             // 위치 계산
             requestAnimationFrame(() => updateMenuPosition())
         } else {
             setFocusedIndex(-1)
             // 스크롤 복원
-            document.body.style.overflow = ""
+            if (typeof document !== 'undefined') {
+                document.body.style.overflow = ""
+            }
             setMenuStyle(null)
         }
     }
@@ -9351,7 +9867,9 @@ function CustomOrderDropdown({
         onChange(selectedValue)
         setIsOpen(false)
         setFocusedIndex(-1)
-        document.body.style.overflow = ""
+        if (typeof document !== 'undefined') {
+            document.body.style.overflow = ""
+        }
         buttonRef.current?.focus()
     }
 
@@ -9370,7 +9888,9 @@ function CustomOrderDropdown({
                 e.preventDefault()
                 setIsOpen(false)
                 setFocusedIndex(-1)
-                document.body.style.overflow = ""
+                if (typeof document !== 'undefined') {
+                    document.body.style.overflow = ""
+                }
                 buttonRef.current?.focus()
                 break
             case "Enter":
@@ -9409,19 +9929,23 @@ function CustomOrderDropdown({
             if (clickedInsideButton || clickedInsideMenu) return
             setIsOpen(false)
             setFocusedIndex(-1)
-            document.body.style.overflow = ""
+            if (typeof document !== 'undefined') {
+                document.body.style.overflow = ""
+            }
         }
 
-        if (isOpen) {
+        if (isOpen && typeof document !== 'undefined' && typeof window !== 'undefined') {
             document.addEventListener("mousedown", handleClickOutside)
             window.addEventListener("scroll", updateMenuPosition, true)
             window.addEventListener("resize", updateMenuPosition)
         }
 
         return () => {
-            document.removeEventListener("mousedown", handleClickOutside)
-            window.removeEventListener("scroll", updateMenuPosition, true)
-            window.removeEventListener("resize", updateMenuPosition)
+            if (typeof document !== 'undefined' && typeof window !== 'undefined') {
+                document.removeEventListener("mousedown", handleClickOutside)
+                window.removeEventListener("scroll", updateMenuPosition, true)
+                window.removeEventListener("resize", updateMenuPosition)
+            }
         }
     }, [isOpen])
 
@@ -9443,7 +9967,9 @@ function CustomOrderDropdown({
     // 컴포넌트 언마운트 시 스크롤 복원
     React.useEffect(() => {
         return () => {
-            document.body.style.overflow = ""
+            if (typeof document !== 'undefined') {
+                document.body.style.overflow = ""
+            }
         }
     }, [])
 
@@ -9456,7 +9982,7 @@ function CustomOrderDropdown({
         const width = rect.width
         let left = rect.left
         // 우측 경계 보정
-        const maxLeft = window.innerWidth - width - 8
+        const maxLeft = (typeof window !== 'undefined' ? window.innerWidth : 800) - width - 8
         if (left > maxLeft) left = Math.max(8, maxLeft)
         // 메뉴 높이 추정 (아이템 1개당 ~40px, 최대 240)
         const itemHeight = 40
@@ -9464,7 +9990,7 @@ function CustomOrderDropdown({
             240,
             Math.max(1, options.length) * itemHeight
         )
-        const spaceBelow = window.innerHeight - rect.bottom - gap
+        const spaceBelow = (typeof window !== 'undefined' ? window.innerHeight : 600) - rect.bottom - gap
         const spaceAbove = rect.top - gap
         let top = rect.bottom + gap
         if (
@@ -9549,6 +10075,7 @@ function CustomOrderDropdown({
 
             {isOpen &&
                 menuStyle &&
+                typeof document !== 'undefined' &&
                 ReactDOM.createPortal(
                     <div
                         ref={listRef}
