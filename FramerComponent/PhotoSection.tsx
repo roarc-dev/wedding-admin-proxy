@@ -17,6 +17,7 @@ interface PageSettings {
     venue_address?: string | null
     photo_section_image_url?: string | null
     photo_section_image_path?: string | null
+    photo_section_location?: string | null
     photo_section_overlay_position?: "top" | "bottom" | null
     photo_section_overlay_color?: "#ffffff" | "#000000" | null
     photo_section_locale?: "en" | "kr" | null
@@ -174,7 +175,7 @@ export default function PhotoSection(props: PhotoSectionProps) {
         : buildDisplayDateTimeFromSettings(settings, effectiveLocale)
     const effectiveLocation = useOverrideLocation
         ? (location || undefined)
-        : (settings?.venue_name || undefined)
+        : (settings?.photo_section_location || settings?.venue_name || undefined)
     // overlayPosition 우선순위: 수동 입력 Yes일 때만 props 사용, 그 외에는 settings > 기본값
     const effectiveOverlayPosition = useOverrideOverlayPosition
         ? (overlayPosition || "bottom")

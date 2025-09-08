@@ -2772,6 +2772,7 @@ function AdminMainContent(props: any) {
         venue_address: "",
         photo_section_image_url: "",
         photo_section_image_path: "",
+        photo_section_location: "",
         photo_section_overlay_position: "bottom",
         photo_section_overlay_color: "#ffffff",
         photo_section_locale: "en",
@@ -3769,6 +3770,7 @@ function AdminMainContent(props: any) {
         "venue_address",
         "photo_section_image_url",
         "photo_section_image_path",
+        "photo_section_location",
         "photo_section_overlay_position",
         "photo_section_overlay_color",
         "photo_section_locale",
@@ -4952,6 +4954,22 @@ function AdminMainContent(props: any) {
                                             placeholder="연도. 월. 일."
                                         />
                                     </Field>
+
+                                    {/* 식장 이름 */}
+                                    <Field label="식장 이름">
+                                        <Input
+                                            type="text"
+                                            value={pageSettings.photo_section_location || ""}
+                                            onChange={(e) =>
+                                                setPageSettings({
+                                                    ...pageSettings,
+                                                    photo_section_location: e.target.value,
+                                                })
+                                            }
+                                            placeholder="식장 이름을 입력하세요"
+                                        />
+                                    </Field>
+
                                     {/* 언어 토글 (영문/국문) */}
                                     <div
                                         style={{
