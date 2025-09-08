@@ -36,7 +36,7 @@ export default async function handler(req, res) {
     validatedUser = validateToken(token)
     
     if (!validatedUser) {
-      return res.status(401).json({ 
+      return res.status(401).json({  
         success: false, 
         error: '유효하지 않은 토큰입니다' 
       })
@@ -117,6 +117,8 @@ async function handleGetSettings(req, res) {
         venue_name: '',
         venue_address: '',
         photo_section_image_url: '',
+        photo_section_image_path: '',
+        photo_section_location: '',
         photo_section_overlay_position: 'bottom',
         photo_section_overlay_color: '#ffffff',
         photo_section_locale: 'en',
@@ -208,6 +210,7 @@ async function handleUpdateSettings(req, res, validatedUser) {
       'venue_address',
       'photo_section_image_url',
       'photo_section_image_path',
+      'photo_section_location',
       'photo_section_overlay_position',
       'photo_section_overlay_color',
       'photo_section_locale',
