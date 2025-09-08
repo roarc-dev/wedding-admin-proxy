@@ -4903,22 +4903,52 @@ function AdminMainContent(props: any) {
                                             }
                                             style={{
                                                 width: "100%",
-                                                height: 40,
-                                                padding: 12,
-                                                background: "#818181",
-                                                color: "white",
-                                                border: "none",
-                                                display: "inline-flex",
+                                                height: 50,
+                                                paddingLeft: 12,
+                                                paddingRight: 12,
+                                                paddingTop: 8,
+                                                paddingBottom: 8,
+                                                background: "white",
+                                                outline:
+                                                    "0.50px var(--roarc-grey-500, #AEAEAE) solid",
+                                                outlineOffset: "-0.50px",
                                                 justifyContent: "center",
                                                 alignItems: "center",
-                                                gap: 10,
+                                                gap: 8,
+                                                display: "flex",
+                                                border: "none",
+                                                borderRadius: "2px",
                                                 cursor: "pointer",
-                                                fontSize: 14,
-                                                fontFamily:
-                                                    "Pretendard Regular",
+                                                opacity: 1,
                                             }}
                                         >
-                                            업로드
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                width="13"
+                                                height="12"
+                                                viewBox="0 0 13 12"
+                                                fill="none"
+                                                style={{
+                                                    width: 13,
+                                                    height: 12,
+                                                }}
+                                            >
+                                                <path
+                                                    d="M5.75 9V2.8875L3.8 4.8375L2.75 3.75L6.5 0L10.25 3.75L9.2 4.8375L7.25 2.8875V9H5.75ZM0.5 12V8.25H2V10.5H11V8.25H12.5V12H0.5Z"
+                                                    fill="#818181"
+                                                />
+                                            </svg>
+                                            <div
+                                                style={{
+                                                    color: "var(--Black, black)",
+                                                    fontSize: 14,
+                                                    fontFamily:
+                                                        "Pretendard Regular",
+                                                    wordWrap: "break-word",
+                                                }}
+                                            >
+                                                사진 업로드
+                                            </div>
                                         </button>
                                         <input
                                             id="photoSectionFileInput_acdn"
