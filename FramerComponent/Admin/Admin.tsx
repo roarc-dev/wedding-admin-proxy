@@ -2870,7 +2870,7 @@ function AdminMainContent(props: any) {
         return {
             imageUrl: getPhotoSectionDisplayUrl(),
             displayDateTime: formatPhotoDisplayDateTime(),
-            location: pageSettings.venue_name || undefined,
+            location: pageSettings.photo_section_location || pageSettings.venue_name || undefined,
             overlayPosition:
                 (pageSettings.photo_section_overlay_position as
                     | "top"
