@@ -352,13 +352,16 @@ async function handleRegister(req, res, body) {
     try {
       const { error: inviteError } = await supabase
         .from('invite_cards')
-        .insert([{
+        .upsert({
           page_id: userPageId,
           groom_name: groomName,
           bride_name: brideName,
           invitation_text: `${groomName} ♥ ${brideName}의 결혼을 축하드립니다.`,
-          show_invitation_text: true
-        }])
+          show_invitation_text: true,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'page_id' })
+        .select()
+        .single()
 
       if (inviteError) {
         console.error('Invite cards creation error:', inviteError)
