@@ -288,7 +288,8 @@ async function handleTest(req, res, body) {
 async function handleRegister(req, res, body) {
   const { username, password, name, page_id, groomName, brideName } = body
 
-  console.log('Processing register/signup request')
+  console.log('=== REGISTER REQUEST ===')
+  console.log('Received data:', { username, name, groomName, brideName })
 
   if (!username || !password || !name || !groomName || !brideName) {
     return res.status(400).json({
