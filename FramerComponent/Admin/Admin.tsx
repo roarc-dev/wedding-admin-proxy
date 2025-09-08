@@ -6894,10 +6894,10 @@ function AdminMainContent(props: any) {
                                             hour={pageSettings.wedding_hour}
                                             minute={pageSettings.wedding_minute}
                                             groomName={
-                                                pageSettings.groomName
+                                                inviteData.groomName
                                             }
                                             brideName={
-                                                pageSettings.brideName
+                                                inviteData.brideName
                                             }
                                             highlightColor={
                                                 pageSettings.highlight_color ||
