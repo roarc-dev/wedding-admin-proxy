@@ -350,7 +350,13 @@ async function handleRegister(req, res, body) {
 
     // 사용자 생성 성공 후 invite_cards에 이름 정보 저장
     try {
-      const { error: inviteError } = await supabase
+      console.log('Attempting to upsert invite_cards with:', {
+        page_id: userPageId,
+        groom_name: groomName,
+        bride_name: brideName
+      })
+
+      const { data: inviteData, error: inviteError } = await supabase
         .from('invite_cards')
         .upsert({
           page_id: userPageId,
@@ -364,11 +370,13 @@ async function handleRegister(req, res, body) {
         .single()
 
       if (inviteError) {
-        console.error('Invite cards creation error:', inviteError)
+        console.error('Invite cards upsert error:', inviteError)
+        console.error('Error details:', JSON.stringify(inviteError, null, 2))
         // invite_cards 생성 실패해도 사용자 생성은 성공으로 처리 (롤백하지 않음)
         console.warn('invite_cards 생성 실패했지만 사용자 생성은 성공했습니다')
       } else {
-        console.log('Invite cards created successfully for page_id:', userPageId)
+        console.log('Invite cards upsert successful:', inviteData)
+        console.log('Saved data - groom_name:', inviteData?.groom_name, 'bride_name:', inviteData?.bride_name)
       }
     } catch (inviteException) {
       console.error('Invite cards creation exception:', inviteException)
