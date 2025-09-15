@@ -26,7 +26,7 @@ const { v4: uuidv4 } = require('uuid')
 // Initialize Supabase client for auth validation
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
+  process.env.SUPABASE_SERVICE_KEY
 )
 
 // Allowed MIME types
