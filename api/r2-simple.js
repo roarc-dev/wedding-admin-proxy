@@ -17,8 +17,8 @@ const r2Client = new S3Client({
 })
 
 function getPublicUrl(key) {
-  // 임시 해결책: Custom Domain DNS 문제로 인해 R2 직접 엔드포인트 사용
-  const base = `${process.env.R2_ENDPOINT}/${process.env.R2_BUCKET}`
+  // Custom Domain 사용: cdn.roarc.kr
+  const base = process.env.R2_PUBLIC_BASE_URL || `${process.env.R2_ENDPOINT}/${process.env.R2_BUCKET}`
   return `${base}/${key}`
 }
 
@@ -27,6 +27,16 @@ function safeFileName(name) {
 }
 
 module.exports = async (req, res) => {
+  // CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-File-Size')
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate')
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end()
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ 
       success: false, 
