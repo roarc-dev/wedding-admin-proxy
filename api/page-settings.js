@@ -125,7 +125,10 @@ async function handleGetSettings(req, res) {
         highlight_shape: 'circle',
         highlight_color: '#e0e0e0',
         highlight_text_color: 'black',
-        gallery_type: 'thumbnail'
+        gallery_type: 'thumbnail',
+        bgm_url: '',
+        bgm_type: '',
+        bgm_autoplay: false
       }
 
       const { data: newData, error: insertError } = await supabase
@@ -218,6 +221,9 @@ async function handleUpdateSettings(req, res, validatedUser) {
       'highlight_color',
       'highlight_text_color',
       'gallery_type',
+      'bgm_url',
+      'bgm_type',
+      'bgm_autoplay',
     ]
 
     let sanitized = Object.fromEntries(
