@@ -193,17 +193,33 @@ async function handleImageOperation(req, res) {
         })
       }
 
-      // 공개 URL 생성
-      const { data: { publicUrl } } = supabase.storage
-        .from('images')
-        .getPublicUrl(storagePath)
+      // R2 호환성: storagePath가 이미 완전한 URL인지 확인
+      let publicUrl
+      let filename
+      
+      if (storagePath.startsWith('https://')) {
+        // R2 방식: storagePath가 이미 완전한 public URL
+        publicUrl = storagePath
+        // URL에서 key 부분만 추출 (예: "page-id/files/timestamp-image.jpg")
+        const urlParts = storagePath.split('/')
+        filename = urlParts.slice(-3).join('/')  // "page-id/files/filename.jpg"
+      } else {
+        // 기존 Supabase 방식
+        const { data: { publicUrl: supabaseUrl } } = supabase.storage
+          .from('images')
+          .getPublicUrl(storagePath)
+        publicUrl = supabaseUrl
+        filename = storagePath
+      }
+
+      console.log(`saveMeta: pageId=${pageId}, filename=${filename}, publicUrl=${publicUrl}`)
 
       // 데이터베이스에 메타데이터 저장
       const { data, error } = await supabase
         .from('images')
         .insert({
           page_id: pageId,
-          filename: storagePath,
+          filename: filename,
           original_name: fileName,
           file_size: fileSize || 0,
           mime_type: 'image/jpeg',
