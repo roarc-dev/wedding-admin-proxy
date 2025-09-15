@@ -20,6 +20,7 @@ const { PutObjectCommand } = require('@aws-sdk/client-s3')
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner')
 const { createClient } = require('@supabase/supabase-js')
 const { r2Client, getPublicUrl, safeFileName } = require('../lib/r2')
+const { validateSessionToken } = require('../lib/auth')
 const { v4: uuidv4 } = require('uuid')
 
 // Initialize Supabase client for auth validation
@@ -80,13 +81,13 @@ module.exports = async (req, res) => {
       })
     }
 
-    // Validate user session (stub for now - implement based on your auth system)
+    // Validate user session (optional for now)
     const authHeader = req.headers.authorization
     if (authHeader) {
       const token = authHeader.replace('Bearer ', '')
-      const { data: { user }, error } = await supabase.auth.getUser(token)
+      const userSession = validateSessionToken(token)
       
-      if (error || !user) {
+      if (!userSession) {
         return res.status(401).json({
           success: false,
           error: 'Invalid or expired token'
