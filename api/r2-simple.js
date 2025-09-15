@@ -17,7 +17,8 @@ const r2Client = new S3Client({
 })
 
 function getPublicUrl(key) {
-  const base = process.env.R2_PUBLIC_BASE_URL || `${process.env.R2_ENDPOINT}/${process.env.R2_BUCKET}`
+  // 임시 해결책: Custom Domain DNS 문제로 인해 R2 직접 엔드포인트 사용
+  const base = `${process.env.R2_ENDPOINT}/${process.env.R2_BUCKET}`
   return `${base}/${key}`
 }
 
