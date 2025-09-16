@@ -12,8 +12,8 @@
     "preview": "vercel dev --listen 3001"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.888.0",
-    "@aws-sdk/s3-request-presigner": "^3.888.0",
+    "@aws-sdk/client-s3": "^3.645.0",
+    "@aws-sdk/s3-request-presigner": "^3.645.0",
     "@supabase/supabase-js": "^2.39.0",
     "@tanstack/react-query": "^5.83.0",
     "bcryptjs": "^2.4.3",
@@ -24,7 +24,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "styled-components": "^6.1.19",
-    "uuid": "^13.0.0"
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/react": "^18.2.15",
@@ -34,3 +34,5 @@
     "vercel": "^47.0.1"
   }
 }
+
+
