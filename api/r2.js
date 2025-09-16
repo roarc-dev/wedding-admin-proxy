@@ -9,7 +9,6 @@
  */
 
 const { v4: uuidv4 } = require('uuid')
-const { r2Client, getPublicUrl, safeFileName } = require('../lib/r2')
 
 // Optional auth (used by presign advanced)
 let validateSessionToken = null
@@ -78,6 +77,7 @@ async function handleTest(req, res) {
 async function handlePresign(req, res) {
   const { PutObjectCommand } = require('@aws-sdk/client-s3')
   const { getSignedUrl } = require('@aws-sdk/s3-request-presigner')
+  const { r2Client, getPublicUrl, safeFileName } = require('../lib/r2')
   const { pageId, fileName, contentType } = req.body || {}
   if (!pageId || !fileName || !contentType) {
     return res.status(400).json({ success: false, error: 'Missing required fields: pageId, fileName, contentType' })
@@ -129,6 +129,7 @@ async function handlePresign(req, res) {
 async function handleSimple(req, res) {
   const { PutObjectCommand } = require('@aws-sdk/client-s3')
   const { getSignedUrl } = require('@aws-sdk/s3-request-presigner')
+  const { r2Client, getPublicUrl, safeFileName } = require('../lib/r2')
   const { pageId, fileName, contentType, key: providedKey } = req.body || {}
   if (!pageId || !fileName || !contentType) {
     return res.status(400).json({ success: false, error: 'Missing required fields: pageId, fileName, contentType' })
@@ -151,6 +152,7 @@ async function handleSimple(req, res) {
 
 async function handleDelete(req, res) {
   const { DeleteObjectCommand } = require('@aws-sdk/client-s3')
+  const { r2Client } = require('../lib/r2')
   const { key } = req.body || {}
   if (!key) {
     return res.status(400).json({ success: false, error: 'Key is required' })
