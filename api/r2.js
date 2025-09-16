@@ -10,7 +10,6 @@
 
 const { PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3')
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner')
-const { createClient } = require('@supabase/supabase-js')
 const { v4: uuidv4 } = require('uuid')
 const { r2Client, getPublicUrl, safeFileName } = require('../lib/r2')
 
@@ -22,11 +21,7 @@ try {
   // optional
 }
 
-// Supabase client (optional use for auth validation parity with old presign)
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
-)
+// Note: Supabase client is not required here; auth is handled by validateSessionToken if provided
 
 const ALLOWED_MIMES = [
   'image/jpeg',
