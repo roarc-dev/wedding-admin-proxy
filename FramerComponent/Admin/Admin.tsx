@@ -4373,7 +4373,7 @@ function AdminMainContent(props: any) {
             
             console.log(`[BGM] R2 파일 삭제 시작: ${key}`)
             
-            const response = await fetch(`${PROXY_BASE_URL}/api/r2-delete`, {
+            const response = await fetch(`${PROXY_BASE_URL}/api/r2?action=delete`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -4404,8 +4404,8 @@ function AdminMainContent(props: any) {
             const key = customKey || makeGalleryKey(pageId, file)
             console.log('[R2] PRESIGN_REQ', { key })
             
-            // 1. Get presigned URL (using r2-simple endpoint)
-            const presignResponse = await fetch(`${PROXY_BASE_URL}/api/r2-simple`, {
+            // 1. Get presigned URL (using unified r2 endpoint)
+            const presignResponse = await fetch(`${PROXY_BASE_URL}/api/r2?action=simple`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
