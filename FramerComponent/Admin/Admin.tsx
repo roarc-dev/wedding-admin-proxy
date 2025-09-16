@@ -1,10 +1,32 @@
-import React, { useState, useEffect, useCallback, useRef, SetStateAction } from "react"
+import React, {
+    useState,
+    useEffect,
+    useCallback,
+    useRef,
+    SetStateAction,
+} from "react"
 import ReactDOM from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { addPropertyControls, ControlType } from "framer"
 
 // ======= Gallery Minis (single-file, inline styles) =======
-// Supabase public object URL → render transform URL
+// Key generation utilities for R2
+function slugifyName(name: string): string {
+    const idx = name.lastIndexOf('.')
+    const base = idx >= 0 ? name.slice(0, idx) : name
+    const ext = idx >= 0 ? name.slice(idx) : ''
+    return base
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        + ext.toLowerCase()
+}
+
+function makeGalleryKey(pageId: string, file: File): string {
+    return `gallery/${pageId}/${Date.now()}-${slugifyName(file.name)}` // no leading slash
+}
+
+// Legacy Supabase transform function (for fallback display only)
 function toTransformedUrl(
     publicUrl: string,
     opts: {
@@ -190,11 +212,11 @@ function UiPhotoTile({
     // Admin 썸네일은 작은 변환 이미지를 우선 사용 (가능한 경우)
     const thumbSrc = React.useMemo(() => {
         if (!src) return src
-        // 변환이 가능한 Supabase public object URL만 변환 시도
+        
         try {
             const u = new URL(src)
+            // Supabase URL인 경우 썸네일 변환 시도
             if (u.pathname.includes("/storage/v1/object/public/")) {
-                // Admin 썸네일은 호환성을 위해 JPG 사용
                 return toTransformedUrl(src, {
                     width: 160,
                     quality: 75,
@@ -202,10 +224,13 @@ function UiPhotoTile({
                     resize: "cover",
                 })
             }
+            // R2 URL인 경우 원본 이미지 사용 (변환 불가)
+            // Note: 큰 이미지의 경우 로딩이 느릴 수 있음
+            return src
         } catch {
-            // src가 절대 URL이 아니라면 변환하지 않음
-        }
+            // URL 파싱 실패 시 원본 사용
         return src
+        }
     }, [src])
 
     const handleReplaceClick = () => {
@@ -222,8 +247,8 @@ function UiPhotoTile({
         input.style.visibility = "hidden"
 
         // DOM에 추가
-        if (typeof document !== 'undefined') {
-            document.body.appendChild(input)
+        if (typeof document !== "undefined") {
+        document.body.appendChild(input)
         }
 
         const handleFileSelect = async (e: Event) => {
@@ -231,8 +256,8 @@ function UiPhotoTile({
             const file = target.files?.[0]
 
             // 정리 작업
-            if (typeof document !== 'undefined') {
-                document.body.removeChild(input)
+            if (typeof document !== "undefined") {
+            document.body.removeChild(input)
             }
 
             if (!file) return
@@ -263,15 +288,18 @@ function UiPhotoTile({
         // 취소 시 정리
         const handleCancel = () => {
             setTimeout(() => {
-                if (typeof document !== 'undefined' && document.body.contains(input)) {
+                if (
+                    typeof document !== "undefined" &&
+                    document.body.contains(input)
+                ) {
                     document.body.removeChild(input)
                 }
             }, 100)
         }
 
         input.addEventListener("cancel", handleCancel, { once: true })
-        if (typeof window !== 'undefined') {
-            window.addEventListener("focus", handleCancel, { once: true })
+        if (typeof window !== "undefined") {
+        window.addEventListener("focus", handleCancel, { once: true })
         }
 
         // 파일 대화상자 열기
@@ -279,11 +307,11 @@ function UiPhotoTile({
             input.click()
         } catch (err) {
             console.error("파일 대화상자 열기 실패:", err)
-            if (typeof document !== 'undefined') {
-                document.body.removeChild(input)
+            if (typeof document !== "undefined") {
+            document.body.removeChild(input)
             }
-            if (typeof window !== 'undefined') {
-                alert("파일 선택 대화상자를 열 수 없습니다.")
+            if (typeof window !== "undefined") {
+            alert("파일 선택 대화상자를 열 수 없습니다.")
             }
         }
     }
@@ -492,12 +520,19 @@ function UiPhotoTile({
                             onChange={(newPosition) => {
                                 // AdminOld.tsx 방식으로 직접 함수 호출
                                 try {
-                                    const moveImageToPosition = (window as any).moveImageToPosition
-                                    if (moveImageToPosition) {
-                                        moveImageToPosition(index - 1, newPosition as number)
+                                const moveImageToPosition = (window as any)
+                                    .moveImageToPosition
+                                if (moveImageToPosition) {
+                                    moveImageToPosition(
+                                        index - 1,
+                                        newPosition as number
+                                        )
                                     }
                                 } catch (error) {
-                                    console.warn('이미지 순서 변경 실패:', error)
+                                    console.warn(
+                                        "이미지 순서 변경 실패:",
+                                        error
+                                    )
                                 }
                             }}
                             options={orderOptions.map((num) => ({
@@ -656,12 +691,139 @@ const theme: any = {
             textAlign: "center" as const,
         },
     },
+    // UI Primitives 테마 확장
+    border: {
+        width: 1,           // 모든 컴포넌트가 참조할 전역 테두리 굵기
+        radius: 0           // 기존 디자인 유지
+    },
+    formSpace: {
+        fieldGroupGap: 16,  // FormField 묶음 간 간격
+        fieldLabelGap: 8    // 라벨과 입력 사이 간격
+    },
 } as const
 
 function mergeStyles(
     ...styles: Array<React.CSSProperties | undefined>
 ): React.CSSProperties {
     return Object.assign({}, ...styles)
+}
+
+// UI Primitives 컴포넌트들
+type FormFieldProps = {
+    label: string
+    htmlFor?: string
+    helpText?: string
+    required?: boolean
+    gap?: number // 묶음 간격 override
+    labelGap?: number // 라벨-입력 간격 override
+    style?: React.CSSProperties
+    labelStyle?: React.CSSProperties
+    children: React.ReactNode
+}
+
+function FormField({
+    label,
+    htmlFor,
+    helpText,
+    required,
+    gap,
+    labelGap,
+    style,
+    labelStyle,
+    children
+}: FormFieldProps) {
+    return (
+        <div
+            style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: labelGap ?? theme.formSpace.fieldLabelGap,
+                marginBottom: gap ?? theme.formSpace.fieldGroupGap,
+                ...style
+            }}
+        >
+            <label
+                htmlFor={htmlFor}
+                style={{
+                    color: theme.color.text,
+                    fontSize: 14,
+                    fontFamily: "Pretendard SemiBold",
+                    ...labelStyle
+                }}
+            >
+                {label} {required ? <span aria-hidden="true" style={{ color: theme.color.danger }}>*</span> : null}
+            </label>
+            {children}
+            {helpText ? (
+                <div style={{ color: theme.color.muted, fontSize: 12, marginTop: 4 }}>{helpText}</div>
+            ) : null}
+        </div>
+    )
+}
+
+type InputBaseProps = React.InputHTMLAttributes<HTMLInputElement> & {
+    invalid?: boolean
+}
+
+const InputBase = React.forwardRef<HTMLInputElement, InputBaseProps>(function InputBase(
+    { style, invalid, ...props },
+    ref
+) {
+    return (
+        <input
+            ref={ref}
+            {...props}
+            style={{
+                width: "100%",
+                height: 40,
+                padding: "10px 12px",
+                borderStyle: "solid",
+                borderWidth: theme.border.width,               // ✅ 1로 통일 (토큰)
+                borderColor: invalid ? theme.color.danger : theme.color.border,
+                borderRadius: theme.border.radius,
+                outline: "none",
+                background: theme.color.surface,
+                color: theme.color.text,
+                fontFamily: "Pretendard Regular",
+                fontSize: 14,
+                ...style
+            }}
+        />
+    )
+})
+
+type ButtonBaseProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
+    variant?: "primary" | "default"
+}
+
+const ButtonBase: React.FC<ButtonBaseProps> = ({
+    variant = "default",
+    style,
+    ...props
+}) => {
+    const isPrimary = variant === "primary"
+    return (
+        <button
+            {...props}
+            style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                height: 40,
+                padding: "0 14px",
+                borderStyle: "solid",
+                borderWidth: theme.border.width,               // ✅ 1로 통일 (토큰)
+                borderColor: isPrimary ? theme.color.primary : theme.color.border,
+                borderRadius: theme.border.radius,
+                background: isPrimary ? theme.color.primary : theme.color.bg,
+                color: isPrimary ? theme.color.primaryText : theme.color.text,
+                cursor: "pointer",
+                fontFamily: "Pretendard Regular",
+                fontSize: 14,
+                ...style
+            }}
+        />
+    )
 }
 
 // Button
@@ -1034,7 +1196,7 @@ const getInputBase = (): React.CSSProperties => ({
     width: "100%",
     borderRadius: theme.radius.md,
     border: `1px solid ${theme.color.border}`,
-    padding: `${theme.space(2.5)}px ${theme.space(3)}px`,
+    padding: `${theme.space(2.5)}px ${theme.space(2)}px`,
     fontFamily: theme.font.body,
     fontSize: theme.text.base,
     outline: "none",
@@ -1230,7 +1392,7 @@ function Switch({
                     position: "relative",
                     width: theme.space(4),
                     height: theme.space(4),
-                    border: `0.5px solid ${checked ? theme.color.primary : theme.color.border}`,
+                    border: `${theme.border.width}px solid ${checked ? theme.color.primary : theme.color.border}`,
                     borderRadius: theme.radius.sm,
                     background: checked ? theme.color.primary : "transparent",
                     display: "flex",
@@ -1386,7 +1548,7 @@ function NameDisplay({
                 height: 40,
                 padding: 12,
                 background: "#F8F9FA",
-                border: "0.5px solid #E5E6E8",
+                border: `1px solid ${theme.color.border}`,
                 display: "flex",
                 alignItems: "center",
                 fontSize: 14,
@@ -1900,7 +2062,11 @@ function InlineCalendarPreview({
 const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app"
 
 // 전역 헬퍼 함수 - 이미지 순서 변경
-function reorderImages(existingImages: any[], setExistingImages: (images: any[]) => void, setHasUnsavedChanges?: (value: boolean) => void) {
+function reorderImages(
+    existingImages: any[],
+    setExistingImages: (images: any[]) => void,
+    setHasUnsavedChanges?: (value: boolean) => void
+) {
     return (fromIndex: number, toIndex: number) => {
         const newImages = [...existingImages]
         const [movedImage] = newImages.splice(fromIndex, 1)
@@ -1924,27 +2090,27 @@ function reorderImages(existingImages: any[], setExistingImages: (images: any[])
 
 // 세션 토큰 관리
 function getAuthToken() {
-    if (typeof window === 'undefined') return null
+    if (typeof window === "undefined") return null
     try {
-        return localStorage.getItem("admin_session")
+    return localStorage.getItem("admin_session")
     } catch {
         return null
     }
 }
 
 function setAuthToken(token: string): void {
-    if (typeof window === 'undefined') return
+    if (typeof window === "undefined") return
     try {
-        localStorage.setItem("admin_session", token)
+    localStorage.setItem("admin_session", token)
     } catch {
         // localStorage 사용 불가 시 무시
     }
 }
 
 function removeAuthToken() {
-    if (typeof window === 'undefined') return
+    if (typeof window === "undefined") return
     try {
-        localStorage.removeItem("admin_session")
+    localStorage.removeItem("admin_session")
     } catch {
         // localStorage 사용 불가 시 무시
     }
@@ -2334,23 +2500,39 @@ async function saveImageMeta(
     fileSize: number
 ): Promise<any> {
     try {
-        const response = await fetch(`${PROXY_BASE_URL}/api/images`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${getAuthToken()}`,
-            },
-            body: JSON.stringify({
+        const token = getAuthToken()
+        console.log(`saveImageMeta 시작: pageId=${pageId}, fileName=${fileName}, order=${order}, storagePath=${storagePath}, hasToken=${!!token}`)
+        
+        const requestBody = {
                 action: "saveMeta",
                 pageId,
                 fileName,
                 displayOrder: order,
                 storagePath,
                 fileSize,
-            }),
+        }
+        console.log('saveImageMeta 요청 body:', requestBody)
+        
+        const response = await fetch(`${PROXY_BASE_URL}/api/images`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(requestBody),
         })
 
+        console.log(`saveImageMeta 응답 status: ${response.status}`)
+        
+        if (!response.ok) {
+            const errorText = await response.text()
+            console.error('saveImageMeta HTTP 오류:', errorText)
+            throw new Error(`HTTP ${response.status}: ${errorText}`)
+        }
+
         const result = await response.json()
+        console.log('saveImageMeta 응답 result:', result)
+        
         if (!result.success) throw new Error(result.error)
         return result.data
     } catch (error: unknown) {
@@ -2385,8 +2567,8 @@ async function compressImage(
     quality = 0.8
 ): Promise<File> {
     return new Promise((resolve, reject) => {
-        if (typeof document === 'undefined') {
-            reject(new Error('Document not available'))
+        if (typeof document === "undefined") {
+            reject(new Error("Document not available"))
             return
         }
         const canvas = document.createElement("canvas")
@@ -2566,6 +2748,57 @@ async function progressiveCompress(
     }
 }
 
+// 음원 압축 함수
+async function compressAudio(
+    file: File,
+    maxSizeKB = 5120, // 5MB
+    onProgress?: (progress: number) => void
+): Promise<File> {
+    return new Promise((resolve, reject) => {
+        try {
+            const originalSize = file.size / 1024 // KB
+
+            onProgress?.(10)
+
+            // 파일이 이미 충분히 작다면 압축하지 않음
+            if (originalSize <= maxSizeKB) {
+                onProgress?.(100)
+                resolve(file)
+                return
+            }
+
+            onProgress?.(30)
+
+            // 실제 음원 압축은 복잡하므로, 여기서는 파일 크기 체크만 수행
+            // 실제 환경에서는 FFmpeg 등을 사용해야 함
+            console.log(`음원 파일 크기: ${originalSize.toFixed(2)}KB`)
+            
+            if (originalSize > maxSizeKB) {
+                console.warn(`음원 파일이 ${maxSizeKB}KB를 초과합니다. 실제 압축이 필요합니다.`)
+            }
+
+            onProgress?.(100)
+            resolve(file)
+        } catch (error) {
+            reject(error)
+        }
+    })
+}
+
+// 무료 음원 데이터
+const FREE_BGM_LIST = [
+    { id: '1', name: '01', url: 'https://cdn.roarc.kr/bgm/free/01.m4a' },
+    { id: '2', name: '02', url: 'https://cdn.roarc.kr/bgm/free/02.m4a' },
+    { id: '3', name: '03', url: 'https://cdn.roarc.kr/bgm/free/03.m4a' },
+    { id: '4', name: '04', url: 'https://cdn.roarc.kr/bgm/free/04.m4a' },
+    { id: '5', name: '05', url: 'https://cdn.roarc.kr/bgm/free/05.m4a' },
+    { id: '6', name: '06', url: 'https://cdn.roarc.kr/bgm/free/06.m4a' },
+    { id: '7', name: '07', url: 'https://cdn.roarc.kr/bgm/free/07.m4a' },
+    { id: '8', name: '08', url: 'https://cdn.roarc.kr/bgm/free/08.m4a' },
+    { id: '9', name: '09', url: 'https://cdn.roarc.kr/bgm/free/09.m4a' },
+    { id: '10', name: '10', url: 'https://cdn.roarc.kr/bgm/free/10.m4a' },
+]
+
 // 메인 Admin 컴포넌트 (내부 로직)
 function AdminMainContent(props: any) {
     const { maxSizeKB = 1024, style, updateSaveState } = props
@@ -2595,6 +2828,7 @@ function AdminMainContent(props: any) {
         contacts: false,
         account: false,
         kakaoShare: false,
+        bgm: false,
     })
     const [currentPageId, setCurrentPageId] = useState("")
     // 페이지 선택/리스트 관련 로직 제거 (사전 부여된 page_id만 사용)
@@ -2656,12 +2890,18 @@ function AdminMainContent(props: any) {
                         d.groom_father_name ?? prev.groomFatherName,
                     groomMotherName:
                         d.groom_mother_name ?? prev.groomMotherName,
-                    groomName: d.groom_name || pageSettings.groomName || prev.groomName, // invite_cards.groom_name 우선 사용
+                    groomName:
+                        d.groom_name ||
+                        pageSettings.groomName ||
+                        prev.groomName, // invite_cards.groom_name 우선 사용
                     brideFatherName:
                         d.bride_father_name ?? prev.brideFatherName,
                     brideMotherName:
                         d.bride_mother_name ?? prev.brideMotherName,
-                    brideName: d.bride_name || pageSettings.brideName || prev.brideName, // invite_cards.bride_name 우선 사용
+                    brideName:
+                        d.bride_name ||
+                        pageSettings.brideName ||
+                        prev.brideName, // invite_cards.bride_name 우선 사용
                     showGroomFatherChrysanthemum:
                         !!d.show_groom_father_chrysanthemum,
                     showGroomMotherChrysanthemum:
@@ -2780,6 +3020,9 @@ function AdminMainContent(props: any) {
         highlight_color: "#e0e0e0",
         highlight_text_color: "black",
         gallery_type: "thumbnail",
+        bgm_url: "",
+        bgm_type: "",
+        bgm_autoplay: false,
     })
     const [settingsLoading, setSettingsLoading] = useState(false)
     const [compressProgress, setCompressProgress] = useState<number | null>(
@@ -2870,7 +3113,10 @@ function AdminMainContent(props: any) {
         return {
             imageUrl: getPhotoSectionDisplayUrl(),
             displayDateTime: formatPhotoDisplayDateTime(),
-            location: pageSettings.photo_section_location || pageSettings.venue_name || undefined,
+            location:
+                pageSettings.photo_section_location ||
+                pageSettings.venue_name ||
+                undefined,
             overlayPosition:
                 (pageSettings.photo_section_overlay_position as
                     | "top"
@@ -2884,7 +3130,7 @@ function AdminMainContent(props: any) {
 
     // 초대글 텍스트 포맷팅(볼드/인용) 삽입
     const insertInviteFormat = (format: "bold" | "quote") => {
-        if (typeof document === 'undefined') return
+        if (typeof document === "undefined") return
         const textarea = document.getElementById(
             "inviteTextArea"
         ) as HTMLTextAreaElement | null
@@ -3241,47 +3487,35 @@ function AdminMainContent(props: any) {
                 console.log(`압축 완료: ${processedFile.size / 1024}KB`)
             }
 
-            // 3. 이미지 업로드
+            // 3. 이미지 업로드 (R2 사용)
             const fileName = processedFile.name || oldImage.filename
             let saved: any = null
 
-            console.log("이미지 업로드 시작...")
+            console.log("이미지 업로드 시작... (R2)")
             try {
-                // presigned URL 방식 시도
-                console.log("presigned URL 업로드 시도")
-                const { signedUrl, path } = await getPresignedUrl(
-                    fileName,
-                    currentPageId
-                )
-                console.log("presigned URL 획득:", path)
+                // R2 업로드 시도
+                console.log('[R2] REPLACE_START', { name: processedFile.name, type: processedFile.type, size: processedFile.size })
+                const key = makeGalleryKey(currentPageId, processedFile)
+                console.log('[R2] PRESIGN_REQ', { key })
+                
+                const uploadRes = await uploadToR2(processedFile, currentPageId, key)
+                console.log('[R2] PUBLIC_URL', uploadRes.publicUrl)
+                console.log("R2 업로드 완료:", { key: uploadRes.key, publicUrl: uploadRes.publicUrl })
 
-                await uploadToPresignedUrl(signedUrl, processedFile)
-                console.log("presigned URL 업로드 완료")
-
+                // 메타데이터 저장 (R2 public URL을 path로 저장)
                 saved = await saveImageMeta(
                     currentPageId,
                     processedFile.name,
                     oldImage.display_order ?? index + 1,
-                    path,
+                    uploadRes.publicUrl,
                     processedFile.size
                 )
                 console.log("이미지 메타데이터 저장 완료:", saved)
             } catch (e) {
-                // presigned 업로드 실패 시 프록시 업로드로 폴백
-                console.warn("Presigned 업로드 실패, 프록시로 폴백:", e)
-                try {
-                    saved = await uploadViaProxy(
-                        currentPageId,
-                        processedFile,
-                        oldImage.display_order ?? index + 1
-                    )
-                    console.log("프록시 업로드 완료:", saved)
-                } catch (proxyError) {
-                    console.error("프록시 업로드도 실패:", proxyError)
+                console.error("R2 업로드 실패:", e)
                     throw new Error(
-                        `업로드 실패: ${proxyError instanceof Error ? proxyError.message : String(proxyError)}`
+                    `이미지 업로드 실패: ${e instanceof Error ? e.message : String(e)}`
                     )
-                }
             }
 
             // 4. 기존 이미지 삭제 (스토리지 + DB)
@@ -3303,7 +3537,7 @@ function AdminMainContent(props: any) {
                 filename:
                     saved.filename || saved.storage_path || saved.path || "",
                 original_name: saved.original_name || processedFile.name,
-                public_url: saved.public_url || oldImage.public_url,
+                public_url: saved.public_url, // Use R2 public URL from saved metadata
                 display_order: oldImage.display_order ?? index + 1,
                 page_id: currentPageId as any,
                 mime_type: saved.mime_type || processedFile.type,
@@ -3350,19 +3584,22 @@ function AdminMainContent(props: any) {
     )
 
     // moveImageToPosition 함수 - AdminOld.tsx 방식으로 window 객체에 저장
-    const moveImageToPosition = useCallback((fromIndex: number, toPosition: number) => {
-        if (
-            toPosition >= 1 &&
-            toPosition <= existingImages.length &&
-            toPosition !== fromIndex + 1
-        ) {
-            handleReorderImages(fromIndex, toPosition - 1)
-        }
-    }, [existingImages.length, handleReorderImages])
+    const moveImageToPosition = useCallback(
+        (fromIndex: number, toPosition: number) => {
+            if (
+                toPosition >= 1 &&
+                toPosition <= existingImages.length &&
+                toPosition !== fromIndex + 1
+            ) {
+                handleReorderImages(fromIndex, toPosition - 1)
+            }
+        },
+        [existingImages.length, handleReorderImages]
+    )
 
     // window 객체에 함수 저장 (클라이언트 사이드에서만)
     useEffect(() => {
-        if (typeof window !== 'undefined') {
+        if (typeof window !== "undefined") {
             ;(window as any).moveImageToPosition = moveImageToPosition
         }
     }, [moveImageToPosition])
@@ -3387,7 +3624,7 @@ function AdminMainContent(props: any) {
                     right: 0,
                     bottom: 0,
                     backgroundColor: "white",
-                    borderTop: "1px solid #e5e7eb",
+                    borderTop: `1px solid ${theme.color.border}`,
                     padding: "16px",
                     paddingBottom:
                         "calc(env(safe-area-inset-bottom, 0px) + 16px)",
@@ -3598,26 +3835,27 @@ function AdminMainContent(props: any) {
 
     // 세션 확인
     useEffect(() => {
-        if (typeof window === 'undefined') return
+        if (typeof window === "undefined") return
 
         try {
-            const token = localStorage.getItem("admin_session")
-            if (token) {
-                const tokenData = validateSessionToken(token)
-                if (tokenData) {
-                    setIsAuthenticated(true)
-                    setCurrentUser({ username: tokenData.username })
-                    // 저장된 사전 할당 페이지 ID 적용 (관리자가 미리 설정한 경우)
-                    const storedAssigned = localStorage.getItem("assigned_page_id")
-                    if (storedAssigned && storedAssigned.trim().length > 0) {
-                        setAssignedPageId(storedAssigned)
-                        setCurrentPageId(storedAssigned)
-                    }
-                    loadAllPages()
-                    loadContactList()
-                } else {
-                    localStorage.removeItem("admin_session")
+        const token = localStorage.getItem("admin_session")
+        if (token) {
+            const tokenData = validateSessionToken(token)
+            if (tokenData) {
+                setIsAuthenticated(true)
+                setCurrentUser({ username: tokenData.username })
+                // 저장된 사전 할당 페이지 ID 적용 (관리자가 미리 설정한 경우)
+                    const storedAssigned =
+                        localStorage.getItem("assigned_page_id")
+                if (storedAssigned && storedAssigned.trim().length > 0) {
+                    setAssignedPageId(storedAssigned)
+                    setCurrentPageId(storedAssigned)
                 }
+                loadAllPages()
+                loadContactList()
+            } else {
+                localStorage.removeItem("admin_session")
+            }
             }
         } catch (error) {
             console.warn("localStorage 접근 실패:", error)
@@ -3635,12 +3873,12 @@ function AdminMainContent(props: any) {
             loginForm.password
         )
         if (result.success) {
-            if (typeof window !== 'undefined') {
+            if (typeof window !== "undefined") {
                 try {
-                    localStorage.setItem(
-                        "admin_session",
-                        generateSessionToken(result.user)
-                    )
+            localStorage.setItem(
+                "admin_session",
+                generateSessionToken(result.user)
+            )
                 } catch (error) {
                     console.warn("localStorage 저장 실패:", error)
                 }
@@ -3657,18 +3895,18 @@ function AdminMainContent(props: any) {
             ) {
                 setAssignedPageId(assigned)
                 setCurrentPageId(assigned)
-                if (typeof window !== 'undefined') {
+                if (typeof window !== "undefined") {
                     try {
-                        localStorage.setItem("assigned_page_id", assigned)
+                localStorage.setItem("assigned_page_id", assigned)
                     } catch (error) {
                         console.warn("localStorage 저장 실패:", error)
                     }
                 }
             } else {
                 setAssignedPageId(null)
-                if (typeof window !== 'undefined') {
+                if (typeof window !== "undefined") {
                     try {
-                        localStorage.removeItem("assigned_page_id")
+                localStorage.removeItem("assigned_page_id")
                     } catch (error) {
                         console.warn("localStorage 삭제 실패:", error)
                     }
@@ -3693,9 +3931,9 @@ function AdminMainContent(props: any) {
         // 페이지 리스트 사용 안함
         setExistingImages([])
         setContactList([])
-        if (typeof window !== 'undefined') {
+        if (typeof window !== "undefined") {
             try {
-                localStorage.removeItem("assigned_page_id")
+        localStorage.removeItem("assigned_page_id")
             } catch (error) {
                 console.warn("localStorage 삭제 실패:", error)
             }
@@ -3778,6 +4016,9 @@ function AdminMainContent(props: any) {
         "highlight_color",
         "highlight_text_color",
         "gallery_type",
+        "bgm_url",
+        "bgm_type",
+        "bgm_autoplay",
     ] as const
 
     type AllowedSettingKey = (typeof allowedSettingKeys)[number]
@@ -3843,15 +4084,18 @@ function AdminMainContent(props: any) {
                 setSuccess("설정이 저장되었습니다.")
                 // 저장 후 다시 로드해서 동기화
                 setTimeout(() => loadPageSettings(), 500)
+                return result
             } else {
                 setError(
                     `설정 저장에 실패했습니다: ${result.error || "알 수 없는 오류"}`
                 )
+                throw new Error(result.error || "설정 저장 실패")
             }
         } catch (err) {
             console.error("Save page settings error:", err)
             const message = err instanceof Error ? err.message : String(err)
             setError(`설정 저장 중 오류가 발생했습니다: ${message}`)
+            throw err
         } finally {
             setSettingsLoading(false)
         }
@@ -3947,33 +4191,23 @@ function AdminMainContent(props: any) {
                     : file
             setCompressProgress(null)
 
-            // 3~5. 업로드 (presigned 실패 시 프록시 업로드로 폴백)
+            // 3~5. R2 업로드
+            let imageUrl: string = ""
             let imagePath: string = ""
             try {
-                const { signedUrl, path } = await getPresignedUrl(
-                    `photosection_${file.name}`,
-                    currentPageId
-                )
-                await uploadToPresignedUrl(signedUrl, finalFile)
-                imagePath = path
+                const { publicUrl, key } = await uploadToR2(finalFile, currentPageId)
+                imageUrl = publicUrl
+                imagePath = key
             } catch (e) {
-                console.warn(
-                    "포토섹션 presigned 업로드 실패, 프록시로 폴백:",
-                    e
-                )
-                const uploaded = await uploadViaProxy(
-                    currentPageId,
-                    finalFile,
-                    1
-                )
-                imagePath = uploaded?.filename || uploaded?.storage_path || ""
+                console.error("포토섹션 R2 업로드 실패:", e)
+                throw e
             }
 
             // 로컬 상태 선반영
             setPageSettings((prev: any) => ({
                 ...prev,
                 photo_section_image_path: imagePath,
-                photo_section_image_url: "",
+                photo_section_image_url: imageUrl,
             }))
             // CDN 캐시 무효화를 위한 버전 업데이트
             setPhotoSectionImageVersion((v) => v + 1)
@@ -4047,57 +4281,59 @@ function AdminMainContent(props: any) {
                         )
                     }
 
-                    // 3~5. 업로드 (presigned 실패 시 프록시 업로드로 폴백)
+                    // 3~5. R2 업로드
                     let saved: any = null
+                    let publicUrl: string = ""
+                    let key: string = ""
+                    
                     try {
-                        const { signedUrl, path, originalName } =
-                            await getPresignedUrl(
-                                processedFile.name,
-                                currentPageId
-                            )
-                        await uploadToPresignedUrl(signedUrl, processedFile)
+                        // R2에 업로드
+                console.log('[R2] GALLERY_UPLOAD_START', { name: processedFile.name, type: processedFile.type, size: processedFile.size })
+                const galleryKey = makeGalleryKey(currentPageId, processedFile)
+                console.log('[R2] GALLERY_PRESIGN_REQ', { key: galleryKey })
+                        const uploadResult = await uploadToR2(processedFile, currentPageId, galleryKey)
+                        publicUrl = uploadResult.publicUrl
+                        key = uploadResult.key
+                        console.log('[R2] PUBLIC_URL', publicUrl)
+                        console.log(`R2 업로드 성공: ${processedFile.name}, publicUrl: ${publicUrl}`)
+                        
+                        // 메타데이터 저장 (publicUrl을 path 대신 사용)
+                        console.log(`메타데이터 저장 시작: ${processedFile.name}`)
                         saved = await saveImageMeta(
                             currentPageId,
-                            originalName,
+                            processedFile.name,
                             existingImages.length + i + 1,
-                            path,
+                            publicUrl, // R2 public URL을 path로 사용
                             processedFile.size
                         )
+                        console.log(`메타데이터 저장 성공: ${processedFile.name}, saved:`, saved)
                     } catch (e) {
-                        console.warn(
-                            "Presigned 업로드 실패, 프록시로 폴백:",
+                        console.error(
+                            "업로드 또는 메타데이터 저장 실패:",
                             processedFile.name,
                             e
                         )
-                        saved = await uploadViaProxy(
-                            currentPageId,
-                            processedFile,
-                            existingImages.length + i + 1
-                        )
+                        throw e // 업로드 또는 메타데이터 저장 실패 시 전체 업로드 중단
                     }
 
                     completed++
                     setProgress(Math.round((completed / totalFiles) * 100))
 
-                    // 낙관적 반영: 방금 업로드한 이미지 그리드에 즉시 추가 (캐시 무효화 파라미터 포함)
+                    // 낙관적 반영: 방금 업로드한 이미지 그리드에 즉시 추가 (R2 URL 사용)
                     const newImg: ImageInfo = {
                         id: saved.id || saved?.id || `${Date.now()}_${i}`,
-                        filename:
-                            saved.filename ||
-                            saved.storage_path ||
-                            saved.path ||
-                            "",
-                        public_url: ((): string => {
-                            const base =
-                                saved.public_url ||
-                                (saved.storage_path ? saved.storage_path : "")
-                            const url = base || ""
-                            const sep = url.includes("?") ? "&" : "?"
-                            return url ? `${url}${sep}v=${Date.now()}` : url
-                        })(),
+                        filename: saved.filename || key || processedFile.name,
+                        public_url: publicUrl, // R2 public URL 직접 사용
                         original_name: saved.original_name || file.name,
+                        display_order: existingImages.length + i + 1,
                     }
-                    setExistingImages((prev) => [...prev, newImg])
+                    console.log('[GALLERY] 새 이미지 추가:', newImg)
+                    setExistingImages((prev) => {
+                        console.log('[GALLERY] 이전 이미지 수:', prev.length)
+                        const updated = [...prev, newImg]
+                        console.log('[GALLERY] 업데이트 후 이미지 수:', updated.length)
+                        return updated
+                    })
                     setImagesVersion((v) => v + 1)
                 } catch (error) {
                     console.error(`파일 ${file.name} 처리 실패:`, error)
@@ -4123,6 +4359,277 @@ function AdminMainContent(props: any) {
             alert("업로드 중 오류가 발생했습니다: " + message)
             setUploading(false)
             setProgress(0)
+        }
+    }
+
+    // R2 업로드 함수
+    // R2에서 파일 삭제 함수
+    const deleteFromR2 = async (publicUrl: string): Promise<void> => {
+        try {
+            // publicUrl에서 키 추출
+            // 예: https://cdn.roarc.kr/bgm/kim4bun/1234567890-song.mp3 -> bgm/kim4bun/1234567890-song.mp3
+            const url = new URL(publicUrl)
+            const key = url.pathname.substring(1) // 첫 번째 '/' 제거
+            
+            console.log(`[BGM] R2 파일 삭제 시작: ${key}`)
+            
+            const response = await fetch(`${PROXY_BASE_URL}/api/r2-delete`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ key }),
+            })
+            
+            console.log(`[BGM] R2 삭제 응답: ${response.status}`)
+            
+            if (!response.ok) {
+                const errorText = await response.text()
+                console.warn(`[BGM] R2 파일 삭제 실패: ${errorText}`)
+                // 삭제 실패해도 업로드는 계속 진행
+            } else {
+                console.log(`[BGM] R2 파일 삭제 완료: ${key}`)
+            }
+        } catch (error) {
+            console.warn(`[BGM] R2 파일 삭제 중 오류:`, error)
+            // 삭제 실패해도 업로드는 계속 진행
+        }
+    }
+
+    const uploadToR2 = async (file: File, pageId: string, customKey?: string): Promise<{ publicUrl: string; key: string }> => {
+        try {
+            console.log(`uploadToR2 시작: ${file.name}, pageId: ${pageId}, size: ${file.size}, type: ${file.type}`)
+            
+            // Use custom key if provided, otherwise generate one
+            const key = customKey || makeGalleryKey(pageId, file)
+            console.log('[R2] PRESIGN_REQ', { key })
+            
+            // 1. Get presigned URL (using r2-simple endpoint)
+            const presignResponse = await fetch(`${PROXY_BASE_URL}/api/r2-simple`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    pageId,
+                    fileName: file.name,
+                    contentType: file.type,
+                    key, // Pass the custom key to API
+                }),
+            })
+
+            console.log(`[R2] PRESIGN_RES ${presignResponse.status}`)
+            
+            if (!presignResponse.ok) {
+                const errorText = await presignResponse.text()
+                console.error('Presigned URL 요청 실패:', errorText)
+                throw new Error(`Failed to get presigned URL: ${errorText}`)
+            }
+
+            const presignData = await presignResponse.json()
+            const { uploadUrl, key: serverKey, publicUrl } = presignData
+            console.log('[R2] PRESIGN_RES', presignData?.uploadUrl?.slice?.(0, 120))
+
+            // 2. Upload file to R2
+            console.log(`R2 직접 업로드 시작: ${uploadUrl?.slice?.(0, 120)}...`)
+            const uploadResponse = await fetch(uploadUrl, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': file.type,
+                },
+                body: file,
+            })
+
+            const putText = await uploadResponse.text().catch(() => '')
+            console.log('[R2] PUT_RES', uploadResponse.status, putText.slice(0, 200))
+            
+            if (!uploadResponse.ok) {
+                console.error('R2 업로드 실패:', putText)
+                throw new Error(`Failed to upload file to R2: ${putText}`)
+            }
+
+            console.log('[R2] PUBLIC_URL', publicUrl)
+            console.log(`uploadToR2 완료: publicUrl=${publicUrl}, key=${serverKey}`)
+            return { publicUrl, key: serverKey }
+        } catch (error) {
+            console.error('R2 upload failed:', error)
+            throw error
+        }
+    }
+
+    // 음원 업로드 핸들러 (R2 사용)
+    const handleAudioUpload = async (
+        event: React.ChangeEvent<HTMLInputElement>
+    ) => {
+        console.log('[BGM] handleAudioUpload 함수 호출됨')
+        console.log('[BGM] event:', event)
+        console.log('[BGM] event.target:', event.target)
+        console.log('[BGM] event.target.files:', event.target.files)
+        
+        const file = event.target.files?.[0]
+        console.log('[BGM] 추출된 파일:', file)
+        console.log('[BGM] currentPageId:', currentPageId)
+        
+        if (!file) {
+            console.log('[BGM] 파일이 없어서 함수 종료')
+            return
+        }
+        if (!currentPageId) {
+            console.log('[BGM] currentPageId가 없어서 함수 종료')
+            return
+        }
+
+        // 오디오 파일 타입 검증
+        const allowedAudioTypes = ['audio/mpeg', 'audio/mp3', 'audio/m4a', 'audio/mp4']
+        if (!allowedAudioTypes.includes(file.type) && !file.name.toLowerCase().match(/\.(mp3|m4a|mp4)$/)) {
+            alert('MP3, M4A 파일만 업로드 가능합니다.')
+            return
+        }
+
+        setSettingsLoading(true)
+
+        try {
+            console.log(`[BGM] 음원 업로드 시작: ${file.name}, 크기: ${(file.size / 1024).toFixed(2)}KB, 타입: ${file.type}`)
+            console.log(`[BGM] currentPageId: ${currentPageId}`)
+
+            // 1. 음원 압축 (5MB 이상인 경우)
+            let processedFile = file
+            if (file.size / 1024 > 5120) { // 5MB
+                console.log(`[BGM] 음원 압축 시작: ${(file.size / 1024).toFixed(2)}KB`)
+                processedFile = await compressAudio(file, 5120)
+                console.log(`[BGM] 음원 압축 완료: ${(processedFile.size / 1024).toFixed(2)}KB`)
+            } else {
+                console.log(`[BGM] 음원 크기가 5MB 미만이므로 압축 생략`)
+            }
+
+            // 2. 기존 BGM 파일 삭제 (있다면)
+            if (pageSettings.bgm_url && pageSettings.bgm_type === 'custom') {
+                console.log(`[BGM] 기존 커스텀 BGM 파일 삭제 시작: ${pageSettings.bgm_url}`)
+                await deleteFromR2(pageSettings.bgm_url)
+            } else {
+                console.log(`[BGM] 기존 커스텀 BGM 파일 없음, 삭제 생략`)
+            }
+
+            // 3. R2에 업로드
+            const audioKey = `bgm/${currentPageId}/${Date.now()}-${slugifyName(processedFile.name)}`
+            console.log(`[BGM] R2 업로드 시작, 키: ${audioKey}`)
+            console.log(`[BGM] 파일 정보:`, {
+                name: processedFile.name,
+                type: processedFile.type,
+                size: processedFile.size,
+                lastModified: processedFile.lastModified
+            })
+            
+            const uploadResult = await uploadToR2(processedFile, currentPageId, audioKey)
+            console.log(`[BGM] R2 업로드 결과:`, uploadResult)
+            const { publicUrl } = uploadResult
+            console.log(`[BGM] R2 업로드 완료, 공개 URL: ${publicUrl}`)
+            
+            // R2 업로드 검증: HEAD 요청으로 파일 존재 확인
+            try {
+                console.log(`[BGM] R2 파일 존재 확인 시작: ${publicUrl}`)
+                const headResponse = await fetch(publicUrl, { method: 'HEAD' })
+                console.log(`[BGM] R2 파일 확인 응답: ${headResponse.status}`)
+                if (headResponse.ok) {
+                    console.log(`[BGM] R2 파일 존재 확인됨`)
+                } else {
+                    console.warn(`[BGM] R2 파일 접근 불가: ${headResponse.status}`)
+                }
+            } catch (headError) {
+                console.warn(`[BGM] R2 파일 확인 중 오류:`, headError)
+            }
+            
+            // 4. 페이지 설정에 저장
+            const updatedSettings = {
+                ...pageSettings,
+                bgm_url: publicUrl,
+                bgm_type: 'custom'
+            }
+
+            console.log(`[BGM] 저장할 설정:`, updatedSettings)
+            console.log(`[BGM] sanitized 설정:`, sanitizeSettingsForSave(updatedSettings))
+            console.log(`[BGM] 페이지 설정 저장 시작`)
+            
+            const saveResult = await savePageSettings(updatedSettings)
+            console.log(`[BGM] 페이지 설정 저장 결과:`, saveResult)
+            
+            setPageSettings(updatedSettings)
+            console.log(`[BGM] 로컬 상태 업데이트 완료`)
+
+            setSuccess('음원이 성공적으로 업로드되었습니다!')
+            setTimeout(() => setSuccess(null), 3000)
+
+        } catch (error: unknown) {
+            console.error('음원 업로드 실패:', error)
+            const message = error instanceof Error ? error.message : String(error)
+            setError(`음원 업로드에 실패했습니다: ${message}`)
+        } finally {
+            setSettingsLoading(false)
+        }
+    }
+
+    // 무료 음원 선택 핸들러
+    const handleFreeBgmSelect = async (bgmId: string) => {
+        const selectedBgm = FREE_BGM_LIST.find(bgm => bgm.id === bgmId)
+        if (!selectedBgm) {
+            console.error(`[BGM] 무료 음원을 찾을 수 없음: ${bgmId}`)
+            return
+        }
+
+        console.log(`[BGM] 무료 음원 선택: ${selectedBgm.name} (${selectedBgm.url})`)
+        setSettingsLoading(true)
+
+        try {
+            // 기존 커스텀 BGM 파일 삭제 (있다면)
+            if (pageSettings.bgm_url && pageSettings.bgm_type === 'custom') {
+                console.log(`[BGM] 무료 음원 선택 시 기존 커스텀 BGM 파일 삭제 시작: ${pageSettings.bgm_url}`)
+                await deleteFromR2(pageSettings.bgm_url)
+            } else {
+                console.log(`[BGM] 기존 커스텀 BGM 파일 없음, 삭제 생략`)
+            }
+
+            const updatedSettings = {
+                ...pageSettings,
+                bgm_url: selectedBgm.url,
+                bgm_type: 'free'
+            }
+
+            console.log(`[BGM] 무료 음원 페이지 설정 저장 시작`)
+            await savePageSettings(updatedSettings)
+            setPageSettings(updatedSettings)
+            console.log(`[BGM] 무료 음원 페이지 설정 저장 완료`)
+
+            setSuccess(`무료 음원 "${selectedBgm.name}"이 선택되었습니다!`)
+            setTimeout(() => setSuccess(null), 3000)
+
+        } catch (error: unknown) {
+            console.error('[BGM] 무료 음원 선택 실패:', error)
+            const message = error instanceof Error ? error.message : String(error)
+            setError(`무료 음원 선택에 실패했습니다: ${message}`)
+        } finally {
+            setSettingsLoading(false)
+        }
+    }
+
+    // 자동재생 설정 변경
+    const handleAutoplayToggle = async (autoplay: boolean) => {
+        setSettingsLoading(true)
+
+        try {
+            const updatedSettings = {
+                ...pageSettings,
+                bgm_autoplay: autoplay
+            }
+
+            await savePageSettings(updatedSettings)
+            setPageSettings(updatedSettings)
+
+        } catch (error: unknown) {
+            console.error('자동재생 설정 실패:', error)
+            const message = error instanceof Error ? error.message : String(error)
+            setError(`자동재생 설정에 실패했습니다: ${message}`)
+        } finally {
+            setSettingsLoading(false)
         }
     }
 
@@ -4586,7 +5093,7 @@ function AdminMainContent(props: any) {
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
-                    borderBottom: "0.5px solid #E5E6E8",
+                    borderBottom: `1px solid ${theme.color.border}`,
                     position: "sticky",
                     top: 0,
                     left: 0,
@@ -4624,7 +5131,7 @@ function AdminMainContent(props: any) {
                         padding: "6px 8px",
                         backgroundColor: "white",
                         color: "#7F7F7F",
-                        border: "0.5px solid #E5E6E8",
+                        border: `1px solid ${theme.color.border}`,
                         fontSize: "10px",
                         fontFamily: "Pretendard Regular",
                         cursor: "pointer",
@@ -4639,7 +5146,7 @@ function AdminMainContent(props: any) {
                     display: "flex",
                     height: "48px",
                     backgroundColor: "white",
-                    borderBottom: "0.5px solid #E5E6E8",
+                    borderBottom: `1px solid ${theme.color.border}`,
                     position: "sticky",
                     top: "62px", // 헤더 높이만큼 아래로
                     left: 0,
@@ -4722,7 +5229,7 @@ function AdminMainContent(props: any) {
                                     width: "100%",
                                     flexDirection: "column",
                                     display: "flex",
-                                    gap: theme.gap.md,
+                                    gap: theme.gap.sm,
                                 }}
                             >
                                 {/* NameSection 미리보기 */}
@@ -4754,18 +5261,11 @@ function AdminMainContent(props: any) {
                                     style={{
                                         flexDirection: "column",
                                         display: "flex",
-                                        gap: theme.gap.md,
+                                        gap: theme.gap.sm,
                                     }}
                                 >
-                                    <div
-                                        style={{
-                                            flexDirection: "column",
-                                            display: "flex",
-                                            gap: "8px",
-                                        }}
-                                    >
-                                        <Label>신랑 영문 성함</Label>
-                                        <Input
+                                    <FormField label="신랑 영문 성함">
+                                        <InputBase
                                             type="text"
                                             value={
                                                 pageSettings.groom_name_en || ""
@@ -4780,17 +5280,10 @@ function AdminMainContent(props: any) {
                                             }
                                             placeholder="MIN JUN"
                                         />
-                                    </div>
+                                    </FormField>
 
-                                    <div
-                                        style={{
-                                            flexDirection: "column",
-                                            display: "flex",
-                                            gap: theme.space(2),
-                                        }}
-                                    >
-                                        <Label>신부 영문 성함</Label>
-                                        <Input
+                                    <FormField label="신부 영문 성함">
+                                        <InputBase
                                             type="text"
                                             value={
                                                 pageSettings.bride_name_en || ""
@@ -4805,7 +5298,7 @@ function AdminMainContent(props: any) {
                                             }
                                             placeholder="SEO YUN"
                                         />
-                                    </div>
+                                    </FormField>
 
                                     {/* 저장 버튼 */}
                                     <SaveBar
@@ -4839,7 +5332,7 @@ function AdminMainContent(props: any) {
                                     width: "100%",
                                     display: "flex",
                                     flexDirection: "column",
-                                    gap: theme.gap.md,
+                                    gap: theme.gap.sm,
                                 }}
                             >
                                 {/* 미리보기 박스 */}
@@ -4847,7 +5340,7 @@ function AdminMainContent(props: any) {
                                     style={{
                                         width: "100%",
                                         background: "#FAFAFA",
-                                        border: "0.5px solid #E5E6E8",
+                                        border: `1px solid ${theme.color.border}`,
                                         outlineOffset: "-0.25px",
                                     }}
                                 >
@@ -4880,7 +5373,7 @@ function AdminMainContent(props: any) {
                                     style={{
                                         display: "flex",
                                         flexDirection: "column",
-                                        gap: theme.gap.md,
+                                        gap: theme.gap.sm,
                                     }}
                                 >
                                     <span style={theme.typography.label}>
@@ -4889,7 +5382,7 @@ function AdminMainContent(props: any) {
                                     <div
                                         style={{
                                             display: "flex",
-                                            gap: theme.gap.md,
+                                            gap: theme.gap.sm,
                                             width: "100%",
                                         }}
                                     >
@@ -4909,8 +5402,7 @@ function AdminMainContent(props: any) {
                                                 paddingTop: 8,
                                                 paddingBottom: 8,
                                                 background: "white",
-                                                outline:
-                                                    "0.50px var(--roarc-grey-500, #AEAEAE) solid",
+                                                outline: `${theme.border.width}px #AEAEAE solid`,
                                                 outlineOffset: "-0.50px",
                                                 justifyContent: "center",
                                                 alignItems: "center",
@@ -4941,12 +5433,12 @@ function AdminMainContent(props: any) {
                                             <div
                                                 style={{
                                                     color: "var(--Black, black)",
-                                                    fontSize: 14,
-                                                    fontFamily:
-                                                        "Pretendard Regular",
+                                                fontSize: 14,
+                                                fontFamily:
+                                                    "Pretendard Regular",
                                                     wordWrap: "break-word",
-                                                }}
-                                            >
+                                            }}
+                                        >
                                                 사진 업로드
                                             </div>
                                         </button>
@@ -4967,7 +5459,7 @@ function AdminMainContent(props: any) {
                                     style={{
                                         display: "flex",
                                         flexDirection: "column",
-                                        gap: theme.gap.md,
+                                        gap: theme.gap.sm,
                                     }}
                                 >
                                     <Field label="예식 일시">
@@ -4982,23 +5474,46 @@ function AdminMainContent(props: any) {
                                                 })
                                             }
                                             placeholder="연도. 월. 일."
+                                            style={{
+                                                width: "100%",
+                                                height: 40,
+                                                padding: 12,
+                                                backgroundColor: "#ffffff",
+                                                border: "none",
+                                                outline: `${theme.border.width}px #E5E6E8 solid`,
+                                                outlineOffset: -0.25,
+                                                borderRadius: 0,
+                                                fontSize: 16,
+                                                fontFamily:
+                                                    "Pretendard Regular",
+                                                color: "#000",
+                                                cursor: "pointer",
+                                                appearance: "none",
+                                                WebkitAppearance: "none",
+                                                MozAppearance: "none",
+                                                boxSizing: "border-box",
+                                            }}
                                         />
                                     </Field>
 
                                     {/* 식장 이름 */}
-                                    <Field label="식장 이름">
-                                        <Input
+                                    <FormField label="식장 이름">
+                                        <InputBase
                                             type="text"
-                                            value={pageSettings.photo_section_location || ""}
+                                            value={
+                                                pageSettings.photo_section_location ||
+                                                ""
+                                            }
                                             onChange={(e) =>
                                                 setPageSettings({
                                                     ...pageSettings,
-                                                    photo_section_location: e.target.value,
+                                                    photo_section_location:
+                                                        e.target.value,
                                                 })
                                             }
                                             placeholder="식장 이름을 입력하세요"
                                         />
-                                    </Field>
+                                    </FormField>
 
                                     {/* 언어 토글 (영문/국문) */}
                                     <div
@@ -5027,7 +5542,7 @@ function AdminMainContent(props: any) {
                                                         loc
                                                             ? "#ECECEC"
                                                             : "white",
-                                                    border: "0.5px solid #E5E6E8",
+                                                    border: `1px solid ${theme.color.border}`,
                                                     display: "flex",
                                                     justifyContent: "center",
                                                     alignItems: "center",
@@ -5048,7 +5563,7 @@ function AdminMainContent(props: any) {
                                         style={{
                                             width: "100%",
                                             display: "inline-flex",
-                                            gap: theme.gap.sm,
+                                            gap: 12,
                                             alignItems: "center",
                                         }}
                                     >
@@ -5122,7 +5637,7 @@ function AdminMainContent(props: any) {
                                                                     selected
                                                                         ? "#ECECEC"
                                                                         : "white",
-                                                                border: "0.5px solid #E5E6E8",
+                                                                border: `1px solid ${theme.color.border}`,
                                                                 display: "flex",
                                                                 justifyContent:
                                                                     "center",
@@ -5156,15 +5671,8 @@ function AdminMainContent(props: any) {
                                         >
                                             <div
                                                 style={{
-                                                    flex: 1,
-                                                    height: 40,
-                                                    padding: 12,
-                                                    background: "white",
-                                                    border: "0.5px solid #E5E6E8",
-                                                    display: "flex",
-                                                    justifyContent:
-                                                        "space-between",
-                                                    alignItems: "center",
+                                                    flex: "1 1 0%",
+                                                    position: "relative",
                                                 }}
                                             >
                                                 <select
@@ -5210,11 +5718,22 @@ function AdminMainContent(props: any) {
                                                     }}
                                                     style={{
                                                         width: "100%",
-                                                        border: "none",
-                                                        outline: "none",
-                                                        background:
-                                                            "transparent",
+                                                        minHeight: 40,
+                                                        padding: "10px 12px",
+                                                        backgroundColor:
+                                                            "#ffffff",
+                                                        border: `1px solid ${theme.color.border}`,
+                                                        borderRadius: 0,
                                                         fontSize: 12,
+                                                        fontFamily:
+                                                            "Pretendard Regular",
+                                                        color: "#000",
+                                                        cursor: "pointer",
+                                                        appearance: "none",
+                                                        WebkitAppearance:
+                                                            "none",
+                                                        MozAppearance: "none",
+                                                        boxSizing: "border-box",
                                                     }}
                                                 >
                                                     {Array.from(
@@ -5236,16 +5755,30 @@ function AdminMainContent(props: any) {
                                                 </select>
                                                 <div
                                                     style={{
-                                                        width: 7.5,
-                                                        height: 3.44,
+                                                        position: "absolute",
+                                                        right: 12,
+                                                        top: "50%",
                                                         transform:
-                                                            "rotate(180deg)",
-                                                        outline:
-                                                            "0.94px #757575 solid",
-                                                        outlineOffset:
-                                                            "-0.47px",
+                                                            "translateY(-50%)",
+                                                        pointerEvents: "none",
                                                     }}
-                                                />
+                                                >
+                                                    <svg
+                                                        width="12"
+                                                        height="12"
+                                                        viewBox="0 0 12 12"
+                                                        fill="none"
+                                                        xmlns="http://www.w3.org/2000/svg"
+                                                    >
+                                                        <path
+                                                            d="M3 4.5L6 7.5L9 4.5"
+                                                            stroke="#757575"
+                                                            strokeWidth="1"
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                        />
+                                                    </svg>
+                                                </div>
                                             </div>
                                             <span
                                                 style={{
@@ -5257,15 +5790,8 @@ function AdminMainContent(props: any) {
                                             </span>
                                             <div
                                                 style={{
-                                                    flex: 1,
-                                                    height: 40,
-                                                    padding: 12,
-                                                    background: "white",
-                                                    border: "0.5px solid #E5E6E8",
-                                                    display: "flex",
-                                                    justifyContent:
-                                                        "space-between",
-                                                    alignItems: "center",
+                                                    flex: "1 1 0%",
+                                                    position: "relative",
                                                 }}
                                             >
                                                 <select
@@ -5281,11 +5807,22 @@ function AdminMainContent(props: any) {
                                                     }
                                                     style={{
                                                         width: "100%",
-                                                        border: "none",
-                                                        outline: "none",
-                                                        background:
-                                                            "transparent",
+                                                        minHeight: 40,
+                                                        padding: "10px 12px",
+                                                        backgroundColor:
+                                                            "#ffffff",
+                                                        border: `1px solid ${theme.color.border}`,
+                                                        borderRadius: 0,
                                                         fontSize: 12,
+                                                        fontFamily:
+                                                            "Pretendard Regular",
+                                                        color: "#000",
+                                                        cursor: "pointer",
+                                                        appearance: "none",
+                                                        WebkitAppearance:
+                                                            "none",
+                                                        MozAppearance: "none",
+                                                        boxSizing: "border-box",
                                                     }}
                                                 >
                                                     {[
@@ -5312,16 +5849,30 @@ function AdminMainContent(props: any) {
                                                 </select>
                                                 <div
                                                     style={{
-                                                        width: 7.5,
-                                                        height: 3.44,
+                                                        position: "absolute",
+                                                        right: 12,
+                                                        top: "50%",
                                                         transform:
-                                                            "rotate(180deg)",
-                                                        outline:
-                                                            "0.94px #757575 solid",
-                                                        outlineOffset:
-                                                            "-0.47px",
+                                                            "translateY(-50%)",
+                                                        pointerEvents: "none",
                                                     }}
-                                                />
+                                                >
+                                                    <svg
+                                                        width="12"
+                                                        height="12"
+                                                        viewBox="0 0 12 12"
+                                                        fill="none"
+                                                        xmlns="http://www.w3.org/2000/svg"
+                                                    >
+                                                        <path
+                                                            d="M3 4.5L6 7.5L9 4.5"
+                                                            stroke="#757575"
+                                                            strokeWidth="1"
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                        />
+                                                    </svg>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -5366,7 +5917,7 @@ function AdminMainContent(props: any) {
                                                             pos
                                                                 ? "#ECECEC"
                                                                 : "white",
-                                                        border: "0.5px solid #E5E6E8",
+                                                        border: `1px solid ${theme.color.border}`,
                                                         display: "flex",
                                                         justifyContent:
                                                             "center",
@@ -5414,7 +5965,7 @@ function AdminMainContent(props: any) {
                                                             color
                                                                 ? "#ECECEC"
                                                                 : "white",
-                                                        border: "0.5px solid #E5E6E8",
+                                                        border: `1px solid ${theme.color.border}`,
                                                         display: "flex",
                                                         justifyContent:
                                                             "center",
@@ -5467,7 +6018,7 @@ function AdminMainContent(props: any) {
                                     width: "100%",
                                     display: "flex",
                                     flexDirection: "column",
-                                    gap: theme.gap.md,
+                                    gap: theme.gap.sm,
                                 }}
                             >
                                 {/* 미리보기 */}
@@ -5476,7 +6027,7 @@ function AdminMainContent(props: any) {
                                         width: "100%",
                                         padding: 20,
                                         background: "#FAFAFA",
-                                        border: "0.5px solid #E5E6E8",
+                                        border: `1px solid ${theme.color.border}`,
                                     }}
                                 >
                                     {/* InviteName.tsx의 렌더링을 반영한 미리보기 */}
@@ -5780,7 +6331,7 @@ function AdminMainContent(props: any) {
                                             width: "100%",
                                             padding: 12,
                                             background: "#FAFAFA",
-                                            border: "0.5px solid #E5E6E8",
+                                            border: `1px solid ${theme.color.border}`,
                                         }}
                                     >
                                         <textarea
@@ -5825,7 +6376,7 @@ function AdminMainContent(props: any) {
                                             style={{
                                                 padding: "4px 8px",
                                                 background: "white",
-                                                border: "0.5px solid #E5E6E8",
+                                                border: `1px solid ${theme.color.border}`,
                                                 fontFamily:
                                                     "Pretendard SemiBold",
                                                 fontSize: 12,
@@ -5843,7 +6394,7 @@ function AdminMainContent(props: any) {
                                                 padding: "4px 8px",
                                                 background: "white",
                                                 color: "#7f7f7f",
-                                                border: "0.5px solid #E5E6E8",
+                                                border: `1px solid ${theme.color.border}`,
                                                 fontFamily:
                                                     "Pretendard Regular",
                                                 fontSize: 12,
@@ -5886,7 +6437,7 @@ function AdminMainContent(props: any) {
                                                 style={{
                                                     height: 40,
                                                     padding: 12,
-                                                    border: "0.5px solid #E5E6E8",
+                                                    border: `1px solid ${theme.color.border}`,
                                                     display: "inline-flex",
                                                     alignItems: "center",
                                                     gap: 10,
@@ -5937,7 +6488,7 @@ function AdminMainContent(props: any) {
                                                 style={{
                                                     height: 40,
                                                     padding: 12,
-                                                    border: "0.5px solid #E5E6E8",
+                                                    border: `1px solid ${theme.color.border}`,
                                                     display: "inline-flex",
                                                     alignItems: "center",
                                                     gap: 10,
@@ -6002,7 +6553,7 @@ function AdminMainContent(props: any) {
                                         style={{
                                             height: 40,
                                             padding: 12,
-                                            border: "0.5px solid #E5E6E8",
+                                            border: `1px solid ${theme.color.border}`,
                                             display: "inline-flex",
                                             alignItems: "center",
                                             gap: 10,
@@ -6060,7 +6611,7 @@ function AdminMainContent(props: any) {
                                                 style={{
                                                     height: 40,
                                                     padding: 12,
-                                                    border: "0.5px solid #E5E6E8",
+                                                    border: `1px solid ${theme.color.border}`,
                                                     display: "inline-flex",
                                                     alignItems: "center",
                                                     gap: 10,
@@ -6111,7 +6662,7 @@ function AdminMainContent(props: any) {
                                                 style={{
                                                     height: 40,
                                                     padding: 12,
-                                                    border: "0.5px solid #E5E6E8",
+                                                    border: `1px solid ${theme.color.border}`,
                                                     display: "inline-flex",
                                                     alignItems: "center",
                                                     gap: 10,
@@ -6176,7 +6727,7 @@ function AdminMainContent(props: any) {
                                         style={{
                                             height: 40,
                                             padding: 12,
-                                            border: "0.5px solid #E5E6E8",
+                                            border: `1px solid ${theme.color.border}`,
                                             display: "inline-flex",
                                             alignItems: "center",
                                             gap: 10,
@@ -6233,11 +6784,16 @@ function AdminMainContent(props: any) {
                                     width: "100%",
                                     display: "flex",
                                     flexDirection: "column",
-                                    gap: theme.gap.md,
+                                    gap: theme.gap.sm,
                                 }}
                             >
                                 {/* 초대글에서 이름 불러오기 버튼 */}
-                                {(inviteData.groomName || inviteData.brideName || inviteData.groomFatherName || inviteData.groomMotherName || inviteData.brideFatherName || inviteData.brideMotherName) && (
+                                {(inviteData.groomName ||
+                                    inviteData.brideName ||
+                                    inviteData.groomFatherName ||
+                                    inviteData.groomMotherName ||
+                                    inviteData.brideFatherName ||
+                                    inviteData.brideMotherName) && (
                                     <div
                                         style={{
                                             width: "100%",
@@ -6249,20 +6805,44 @@ function AdminMainContent(props: any) {
                                         <button
                                             onClick={() => {
                                                 // 초대글의 이름들을 연락처 필드로 복사
-                                                setSelectedContact((prev) => ({
-                                                    ...(prev || {}),
-                                                    page_id: prev?.page_id || currentPageId,
-                                                    groom_name: inviteData.groomName || prev?.groom_name || "",
-                                                    bride_name: inviteData.brideName || prev?.bride_name || "",
-                                                    groom_father_name: inviteData.groomFatherName || prev?.groom_father_name || "",
-                                                    groom_mother_name: inviteData.groomMotherName || prev?.groom_mother_name || "",
-                                                    bride_father_name: inviteData.brideFatherName || prev?.bride_father_name || "",
-                                                    bride_mother_name: inviteData.brideMotherName || prev?.bride_mother_name || "",
-                                                } as ContactInfo));
+                                                setSelectedContact(
+                                                    (prev) =>
+                                                        ({
+                                                            ...(prev || {}),
+                                                            page_id:
+                                                                prev?.page_id ||
+                                                                currentPageId,
+                                                            groom_name:
+                                                                inviteData.groomName ||
+                                                                prev?.groom_name ||
+                                                                "",
+                                                            bride_name:
+                                                                inviteData.brideName ||
+                                                                prev?.bride_name ||
+                                                                "",
+                                                            groom_father_name:
+                                                                inviteData.groomFatherName ||
+                                                                prev?.groom_father_name ||
+                                                                "",
+                                                            groom_mother_name:
+                                                                inviteData.groomMotherName ||
+                                                                prev?.groom_mother_name ||
+                                                                "",
+                                                            bride_father_name:
+                                                                inviteData.brideFatherName ||
+                                                                prev?.bride_father_name ||
+                                                                "",
+                                                            bride_mother_name:
+                                                                inviteData.brideMotherName ||
+                                                                prev?.bride_mother_name ||
+                                                                "",
+                                                        }) as ContactInfo
+                                                )
                                             }}
                                             style={{
                                                 padding: "8px 16px",
-                                                backgroundColor: theme.color.surface,
+                                                backgroundColor:
+                                                    theme.color.surface,
                                                 color: theme.color.text,
                                                 border: `1px solid ${theme.color.border}`,
                                                 borderRadius: theme.radius.sm,
@@ -6284,7 +6864,7 @@ function AdminMainContent(props: any) {
                                     style={{
                                         display: "flex",
                                         flexDirection: "column",
-                                        gap: theme.gap.md,
+                                        gap: theme.gap.sm,
                                     }}
                                 >
                                     <div style={theme.typography.label}>
@@ -6305,7 +6885,7 @@ function AdminMainContent(props: any) {
                                                 height: 40,
                                                 padding: 12,
                                                 background: "white",
-                                                border: "0.5px solid #E5E6E8",
+                                                border: `1px solid ${theme.color.border}`,
                                                 outlineOffset: -0.25,
                                                 display: "flex",
                                                 alignItems: "center",
@@ -6344,7 +6924,7 @@ function AdminMainContent(props: any) {
                                                 height: 40,
                                                 padding: 12,
                                                 background: "white",
-                                                border: "0.5px solid #E5E6E8",
+                                                border: `1px solid ${theme.color.border}`,
                                                 outlineOffset: -0.25,
                                                 display: "flex",
                                                 alignItems: "center",
@@ -6405,7 +6985,7 @@ function AdminMainContent(props: any) {
                                                 height: 40,
                                                 padding: 12,
                                                 background: "white",
-                                                border: "0.5px solid #E5E6E8",
+                                                border: `1px solid ${theme.color.border}`,
                                                 outlineOffset: -0.25,
                                                 display: "flex",
                                                 alignItems: "center",
@@ -6444,7 +7024,7 @@ function AdminMainContent(props: any) {
                                                 height: 40,
                                                 padding: 12,
                                                 background: "white",
-                                                border: "0.5px solid #E5E6E8",
+                                                border: `1px solid ${theme.color.border}`,
                                                 outlineOffset: -0.25,
                                                 display: "flex",
                                                 alignItems: "center",
@@ -6505,7 +7085,7 @@ function AdminMainContent(props: any) {
                                                 height: 40,
                                                 padding: 12,
                                                 background: "white",
-                                                border: "0.5px solid #E5E6E8",
+                                                border: `1px solid ${theme.color.border}`,
                                                 outlineOffset: -0.25,
                                                 display: "flex",
                                                 alignItems: "center",
@@ -6544,7 +7124,7 @@ function AdminMainContent(props: any) {
                                                 height: 40,
                                                 padding: 12,
                                                 background: "white",
-                                                border: "0.5px solid #E5E6E8",
+                                                border: `1px solid ${theme.color.border}`,
                                                 outlineOffset: -0.25,
                                                 display: "flex",
                                                 alignItems: "center",
@@ -6585,7 +7165,7 @@ function AdminMainContent(props: any) {
                                         padding: "24px 0px 0px 0px",
                                         display: "flex",
                                         flexDirection: "column",
-                                        gap: theme.gap.md,
+                                        gap: theme.gap.sm,
                                     }}
                                 >
                                     <div style={theme.typography.label}>
@@ -6606,7 +7186,7 @@ function AdminMainContent(props: any) {
                                                 height: 40,
                                                 padding: 12,
                                                 background: "white",
-                                                border: "0.5px solid #E5E6E8",
+                                                border: `1px solid ${theme.color.border}`,
                                                 outlineOffset: -0.25,
                                                 display: "flex",
                                                 alignItems: "center",
@@ -6645,7 +7225,7 @@ function AdminMainContent(props: any) {
                                                 height: 40,
                                                 padding: 12,
                                                 background: "white",
-                                                border: "0.5px solid #E5E6E8",
+                                                border: `1px solid ${theme.color.border}`,
                                                 outlineOffset: -0.25,
                                                 display: "flex",
                                                 alignItems: "center",
@@ -6706,7 +7286,7 @@ function AdminMainContent(props: any) {
                                                 height: 40,
                                                 padding: 12,
                                                 background: "white",
-                                                border: "0.5px solid #E5E6E8",
+                                                border: `1px solid ${theme.color.border}`,
                                                 outlineOffset: -0.25,
                                                 display: "flex",
                                                 alignItems: "center",
@@ -6745,7 +7325,7 @@ function AdminMainContent(props: any) {
                                                 height: 40,
                                                 padding: 12,
                                                 background: "white",
-                                                border: "0.5px solid #E5E6E8",
+                                                border: `1px solid ${theme.color.border}`,
                                                 outlineOffset: -0.25,
                                                 display: "flex",
                                                 alignItems: "center",
@@ -6806,7 +7386,7 @@ function AdminMainContent(props: any) {
                                                 height: 40,
                                                 padding: 12,
                                                 background: "white",
-                                                border: "0.5px solid #E5E6E8",
+                                                border: `1px solid ${theme.color.border}`,
                                                 outlineOffset: -0.25,
                                                 display: "flex",
                                                 alignItems: "center",
@@ -6845,7 +7425,7 @@ function AdminMainContent(props: any) {
                                                 height: 40,
                                                 padding: 12,
                                                 background: "white",
-                                                border: "0.5px solid #E5E6E8",
+                                                border: `1px solid ${theme.color.border}`,
                                                 outlineOffset: -0.25,
                                                 display: "flex",
                                                 alignItems: "center",
@@ -6910,7 +7490,7 @@ function AdminMainContent(props: any) {
                                     width: "100%",
                                     display: "flex",
                                     flexDirection: "column",
-                                    gap: theme.gap.md,
+                                    gap: theme.gap.sm,
                                     alignItems: "flex-start",
                                 }}
                             >
@@ -6921,7 +7501,7 @@ function AdminMainContent(props: any) {
                                         display: "flex",
                                         flexDirection: "column",
                                         alignItems: "center",
-                                        gap: theme.gap.md,
+                                        gap: theme.gap.sm,
                                     }}
                                 >
                                     <div
@@ -6929,7 +7509,7 @@ function AdminMainContent(props: any) {
                                             width: "100%",
                                             height: 480,
                                             background: "#FAFAFA",
-                                            border: "0.5px solid #E5E6E8",
+                                            border: `1px solid ${theme.color.border}`,
                                             outlineOffset: -0.25,
                                             display: "flex",
                                             alignItems: "flex-start",
@@ -6941,12 +7521,8 @@ function AdminMainContent(props: any) {
                                             date={pageSettings.wedding_date}
                                             hour={pageSettings.wedding_hour}
                                             minute={pageSettings.wedding_minute}
-                                            groomName={
-                                                inviteData.groomName
-                                            }
-                                            brideName={
-                                                inviteData.brideName
-                                            }
+                                            groomName={inviteData.groomName}
+                                            brideName={inviteData.brideName}
                                             highlightColor={
                                                 pageSettings.highlight_color ||
                                                 "#e0e0e0"
@@ -6994,7 +7570,7 @@ function AdminMainContent(props: any) {
                                             width: "100%",
                                             display: "flex",
                                             flexDirection: "column",
-                                            gap: theme.gap.md,
+                                            gap: theme.gap.sm,
                                             alignItems: "flex-start",
                                         }}
                                     >
@@ -7037,7 +7613,7 @@ function AdminMainContent(props: any) {
                                                         width: 16,
                                                         height: 16,
                                                         borderRadius: "50%",
-                                                        border: "1px solid #E5E6E8",
+                                                        border: `1px solid ${theme.color.border}`,
                                                         display: "flex",
                                                         alignItems: "center",
                                                         justifyContent:
@@ -7092,7 +7668,7 @@ function AdminMainContent(props: any) {
                                                         width: 16,
                                                         height: 16,
                                                         borderRadius: "50%",
-                                                        border: "1px solid #E5E6E8",
+                                                        border: `1px solid ${theme.color.border}`,
                                                         display: "flex",
                                                         alignItems: "center",
                                                         justifyContent:
@@ -7233,7 +7809,7 @@ function AdminMainContent(props: any) {
                                                 style={{
                                                     width: "100%",
                                                     padding: 6,
-                                                    border: "1px solid #E5E6E8",
+                                                    border: `1px solid ${theme.color.border}`,
                                                     borderRadius: 4,
                                                     display: "flex",
                                                     alignItems: "center",
@@ -7258,7 +7834,7 @@ function AdminMainContent(props: any) {
                                             width: "100%",
                                             display: "flex",
                                             flexDirection: "column",
-                                            gap: theme.gap.md,
+                                            gap: theme.gap.sm,
                                             alignItems: "flex-start",
                                         }}
                                     >
@@ -7301,7 +7877,7 @@ function AdminMainContent(props: any) {
                                                         width: 16,
                                                         height: 16,
                                                         borderRadius: "50%",
-                                                        border: "1px solid #E5E6E8",
+                                                        border: `1px solid ${theme.color.border}`,
                                                         display: "flex",
                                                         alignItems: "center",
                                                         justifyContent:
@@ -7356,7 +7932,7 @@ function AdminMainContent(props: any) {
                                                         width: 16,
                                                         height: 16,
                                                         borderRadius: "50%",
-                                                        border: "1px solid #E5E6E8",
+                                                        border: `1px solid ${theme.color.border}`,
                                                         display: "flex",
                                                         alignItems: "center",
                                                         justifyContent:
@@ -7424,7 +8000,7 @@ function AdminMainContent(props: any) {
                                     width: "100%",
                                     display: "flex",
                                     flexDirection: "column",
-                                    gap: theme.gap.md,
+                                    gap: theme.gap.sm,
                                     alignItems: "flex-start",
                                 }}
                             >
@@ -7468,7 +8044,12 @@ function AdminMainContent(props: any) {
                                 }}
                             >
                                 {/* 초대글에서 이름 불러오기 버튼 */}
-                                {(inviteData.groomName || inviteData.brideName || inviteData.groomFatherName || inviteData.groomMotherName || inviteData.brideFatherName || inviteData.brideMotherName) && (
+                                {(inviteData.groomName ||
+                                    inviteData.brideName ||
+                                    inviteData.groomFatherName ||
+                                    inviteData.groomMotherName ||
+                                    inviteData.brideFatherName ||
+                                    inviteData.brideMotherName) && (
                                     <div
                                         style={{
                                             width: "100%",
@@ -7480,20 +8061,44 @@ function AdminMainContent(props: any) {
                                         <button
                                             onClick={() => {
                                                 // 초대글의 이름들을 계좌번호 필드로 복사
-                                                setSelectedContact((prev) => ({
-                                                    ...(prev || {}),
-                                                    page_id: prev?.page_id || currentPageId,
-                                                    groom_name: inviteData.groomName || prev?.groom_name || "",
-                                                    bride_name: inviteData.brideName || prev?.bride_name || "",
-                                                    groom_father_name: inviteData.groomFatherName || prev?.groom_father_name || "",
-                                                    groom_mother_name: inviteData.groomMotherName || prev?.groom_mother_name || "",
-                                                    bride_father_name: inviteData.brideFatherName || prev?.bride_father_name || "",
-                                                    bride_mother_name: inviteData.brideMotherName || prev?.bride_mother_name || "",
-                                                } as ContactInfo));
+                                                setSelectedContact(
+                                                    (prev) =>
+                                                        ({
+                                                            ...(prev || {}),
+                                                            page_id:
+                                                                prev?.page_id ||
+                                                                currentPageId,
+                                                            groom_name:
+                                                                inviteData.groomName ||
+                                                                prev?.groom_name ||
+                                                                "",
+                                                            bride_name:
+                                                                inviteData.brideName ||
+                                                                prev?.bride_name ||
+                                                                "",
+                                                            groom_father_name:
+                                                                inviteData.groomFatherName ||
+                                                                prev?.groom_father_name ||
+                                                                "",
+                                                            groom_mother_name:
+                                                                inviteData.groomMotherName ||
+                                                                prev?.groom_mother_name ||
+                                                                "",
+                                                            bride_father_name:
+                                                                inviteData.brideFatherName ||
+                                                                prev?.bride_father_name ||
+                                                                "",
+                                                            bride_mother_name:
+                                                                inviteData.brideMotherName ||
+                                                                prev?.bride_mother_name ||
+                                                                "",
+                                                        }) as ContactInfo
+                                                )
                                             }}
                                             style={{
                                                 padding: "8px 16px",
-                                                backgroundColor: theme.color.surface,
+                                                backgroundColor:
+                                                    theme.color.surface,
                                                 color: theme.color.text,
                                                 border: `1px solid ${theme.color.border}`,
                                                 borderRadius: theme.radius.sm,
@@ -7516,7 +8121,7 @@ function AdminMainContent(props: any) {
                                     style={{
                                         display: "flex",
                                         flexDirection: "column",
-                                        gap: theme.gap.sm,
+                                                gap: theme.gap.sm,
                                     }}
                                 >
                                     {/* 신랑 */}
@@ -7537,7 +8142,7 @@ function AdminMainContent(props: any) {
                                                 height: 40,
                                                 padding: 12,
                                                 background: "white",
-                                                border: "0.5px solid #E5E6E8",
+                                                border: `1px solid ${theme.color.border}`,
                                                 outlineOffset: -0.25,
                                                 display: "flex",
                                                 alignItems: "center",
@@ -7562,7 +8167,7 @@ function AdminMainContent(props: any) {
                                                     outline: "none",
                                                 fontSize: 14,
                                                 fontFamily:
-                                                    "Pretendard Regular",
+                                                        "Pretendard Regular",
                                                     color: selectedContact?.groom_name
                                                         ? "black"
                                                         : "#ADADAD",
@@ -7582,7 +8187,7 @@ function AdminMainContent(props: any) {
                                                     height: 40,
                                                     padding: 12,
                                                     background: "white",
-                                                    border: "0.5px solid #E5E6E8",
+                                                    border: `1px solid ${theme.color.border}`,
                                                     outlineOffset: -0.25,
                                                     display: "flex",
                                                     alignItems: "center",
@@ -7620,7 +8225,7 @@ function AdminMainContent(props: any) {
                                                     height: 40,
                                                     padding: 12,
                                                     background: "white",
-                                                    border: "0.5px solid #E5E6E8",
+                                                    border: `1px solid ${theme.color.border}`,
                                                     outlineOffset: -0.25,
                                                     display: "flex",
                                                     alignItems: "center",
@@ -7673,7 +8278,7 @@ function AdminMainContent(props: any) {
                                                 height: 40,
                                                 padding: 12,
                                                 background: "white",
-                                                border: "0.5px solid #E5E6E8",
+                                                border: `1px solid ${theme.color.border}`,
                                                 outlineOffset: -0.25,
                                                 display: "flex",
                                                 alignItems: "center",
@@ -7698,7 +8303,7 @@ function AdminMainContent(props: any) {
                                                     outline: "none",
                                                 fontSize: 14,
                                                 fontFamily:
-                                                    "Pretendard Regular",
+                                                        "Pretendard Regular",
                                                     color: selectedContact?.groom_father_name
                                                         ? "black"
                                                         : "#ADADAD",
@@ -7718,7 +8323,7 @@ function AdminMainContent(props: any) {
                                                     height: 40,
                                                     padding: 12,
                                                     background: "white",
-                                                    border: "0.5px solid #E5E6E8",
+                                                    border: `1px solid ${theme.color.border}`,
                                                     outlineOffset: -0.25,
                                                     display: "flex",
                                                     alignItems: "center",
@@ -7756,7 +8361,7 @@ function AdminMainContent(props: any) {
                                                     height: 40,
                                                     padding: 12,
                                                     background: "white",
-                                                    border: "0.5px solid #E5E6E8",
+                                                    border: `1px solid ${theme.color.border}`,
                                                     outlineOffset: -0.25,
                                                     display: "flex",
                                                     alignItems: "center",
@@ -7809,7 +8414,7 @@ function AdminMainContent(props: any) {
                                                 height: 40,
                                                 padding: 12,
                                                 background: "white",
-                                                border: "0.5px solid #E5E6E8",
+                                                border: `1px solid ${theme.color.border}`,
                                                 outlineOffset: -0.25,
                                                 display: "flex",
                                                 alignItems: "center",
@@ -7832,13 +8437,13 @@ function AdminMainContent(props: any) {
                                                     width: "100%",
                                                     border: "none",
                                                     outline: "none",
-                                                    fontSize: 14,
-                                                    fontFamily:
+                                                fontSize: 14,
+                                                fontFamily:
                                                         "Pretendard Regular",
                                                     color: selectedContact?.groom_mother_name
                                                         ? "black"
                                                         : "#ADADAD",
-                                                }}
+                                            }}
                                             />
                                         </div>
                                         <div
@@ -7854,7 +8459,7 @@ function AdminMainContent(props: any) {
                                                     height: 40,
                                                     padding: 12,
                                                     background: "white",
-                                                    border: "0.5px solid #E5E6E8",
+                                                    border: `1px solid ${theme.color.border}`,
                                                     outlineOffset: -0.25,
                                                     display: "flex",
                                                     alignItems: "center",
@@ -7892,7 +8497,7 @@ function AdminMainContent(props: any) {
                                                     height: 40,
                                                     padding: 12,
                                                     background: "white",
-                                                    border: "0.5px solid #E5E6E8",
+                                                    border: `1px solid ${theme.color.border}`,
                                                     outlineOffset: -0.25,
                                                     display: "flex",
                                                     alignItems: "center",
@@ -7933,7 +8538,7 @@ function AdminMainContent(props: any) {
                                     style={{
                                         display: "flex",
                                         flexDirection: "column",
-                                        gap: theme.gap.sm,
+                                                gap: theme.gap.sm,
                                     }}
                                 >
                                     {/* 신부 */}
@@ -7954,7 +8559,7 @@ function AdminMainContent(props: any) {
                                                 height: 40,
                                                 padding: 12,
                                                 background: "white",
-                                                border: "0.5px solid #E5E6E8",
+                                                border: `1px solid ${theme.color.border}`,
                                                 outlineOffset: -0.25,
                                                 display: "flex",
                                                 alignItems: "center",
@@ -7979,7 +8584,7 @@ function AdminMainContent(props: any) {
                                                     outline: "none",
                                                 fontSize: 14,
                                                 fontFamily:
-                                                    "Pretendard Regular",
+                                                        "Pretendard Regular",
                                                     color: selectedContact?.bride_name
                                                         ? "black"
                                                         : "#ADADAD",
@@ -7999,7 +8604,7 @@ function AdminMainContent(props: any) {
                                                     height: 40,
                                                     padding: 12,
                                                     background: "white",
-                                                    border: "0.5px solid #E5E6E8",
+                                                    border: `1px solid ${theme.color.border}`,
                                                     outlineOffset: -0.25,
                                                     display: "flex",
                                                     alignItems: "center",
@@ -8037,7 +8642,7 @@ function AdminMainContent(props: any) {
                                                     height: 40,
                                                     padding: 12,
                                                     background: "white",
-                                                    border: "0.5px solid #E5E6E8",
+                                                    border: `1px solid ${theme.color.border}`,
                                                     outlineOffset: -0.25,
                                                     display: "flex",
                                                     alignItems: "center",
@@ -8090,7 +8695,7 @@ function AdminMainContent(props: any) {
                                                 height: 40,
                                                 padding: 12,
                                                 background: "white",
-                                                border: "0.5px solid #E5E6E8",
+                                                border: `1px solid ${theme.color.border}`,
                                                 outlineOffset: -0.25,
                                                 display: "flex",
                                                 alignItems: "center",
@@ -8135,7 +8740,7 @@ function AdminMainContent(props: any) {
                                                     height: 40,
                                                     padding: 12,
                                                     background: "white",
-                                                    border: "0.5px solid #E5E6E8",
+                                                    border: `1px solid ${theme.color.border}`,
                                                     outlineOffset: -0.25,
                                                     display: "flex",
                                                     alignItems: "center",
@@ -8173,7 +8778,7 @@ function AdminMainContent(props: any) {
                                                     height: 40,
                                                     padding: 12,
                                                     background: "white",
-                                                    border: "0.5px solid #E5E6E8",
+                                                    border: `1px solid ${theme.color.border}`,
                                                     outlineOffset: -0.25,
                                                     display: "flex",
                                                     alignItems: "center",
@@ -8226,7 +8831,7 @@ function AdminMainContent(props: any) {
                                                 height: 40,
                                                 padding: 12,
                                                 background: "white",
-                                                border: "0.5px solid #E5E6E8",
+                                                border: `1px solid ${theme.color.border}`,
                                                 outlineOffset: -0.25,
                                                 display: "flex",
                                                 alignItems: "center",
@@ -8271,7 +8876,7 @@ function AdminMainContent(props: any) {
                                                     height: 40,
                                                     padding: 12,
                                                     background: "white",
-                                                    border: "0.5px solid #E5E6E8",
+                                                    border: `1px solid ${theme.color.border}`,
                                                     outlineOffset: -0.25,
                                                     display: "flex",
                                                     alignItems: "center",
@@ -8309,7 +8914,7 @@ function AdminMainContent(props: any) {
                                                     height: 40,
                                                     padding: 12,
                                                     background: "white",
-                                                    border: "0.5px solid #E5E6E8",
+                                                    border: `1px solid ${theme.color.border}`,
                                                     outlineOffset: -0.25,
                                                     display: "flex",
                                                     alignItems: "center",
@@ -8354,6 +8959,441 @@ function AdminMainContent(props: any) {
                         </div>
                     </AccordionSection>
 
+                    {/* 배경음악 */}
+                    <AccordionSection
+                        title="배경음악"
+                        sectionKey="bgm"
+                        openMap={openSections}
+                        onToggle={(key) => toggleSection(key as any)}
+                    >
+                        <div
+                            style={{
+                                padding: "16px 16px 32px 16px",
+                                backgroundColor: "white",
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "32px",
+                            }}
+                        >
+                            {/* 무료 음원 섹션 */}
+                            <div
+                                style={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: "8px",
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        color: "black",
+                                        fontSize: 12,
+                                        fontFamily: "Pretendard SemiBold",
+                                    }}
+                                >
+                                    무료 음원
+                                </div>
+                                
+                                {/* 첫 번째 행 (1-5) */}
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        gap: "8px",
+                                    }}
+                                >
+                                    {FREE_BGM_LIST.slice(0, 5).map((bgm) => (
+                                        <button
+                                            key={bgm.id}
+                                            onClick={() => handleFreeBgmSelect(bgm.id)}
+                                            disabled={settingsLoading}
+                                            style={{
+                                                flex: "1 1 0",
+                                                height: 40,
+                                                padding: 12,
+                                                backgroundColor: pageSettings.bgm_type === bgm.id ? "#ECECEC" : "white",
+                                                borderRadius: 1,
+                                                outline: `${theme.border.width}px solid ${pageSettings.bgm_type === bgm.id ? "black" : "#E5E6E8"}`,
+                                                display: "flex",
+                                                justifyContent: "center",
+                                                alignItems: "center",
+                                                gap: 10,
+                                                cursor: settingsLoading ? "not-allowed" : "pointer",
+                                                opacity: settingsLoading ? 0.5 : 1,
+                                            }}
+                                        >
+                                            <span
+                                                style={{
+                                                    color: pageSettings.bgm_type === bgm.id ? "black" : "#AEAEAE",
+                                                    fontSize: 12,
+                                                    fontFamily: "Pretendard Regular",
+                                                }}
+                                            >
+                                                {bgm.id}
+                                            </span>
+                                        </button>
+                                    ))}
+                                </div>
+                                
+                                {/* 두 번째 행 (6-10) */}
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        gap: "8px",
+                                    }}
+                                >
+                                    {FREE_BGM_LIST.slice(5, 10).map((bgm) => (
+                                        <button
+                                            key={bgm.id}
+                                            onClick={() => handleFreeBgmSelect(bgm.id)}
+                                            disabled={settingsLoading}
+                                            style={{
+                                                flex: "1 1 0",
+                                                height: 40,
+                                                padding: 12,
+                                                backgroundColor: pageSettings.bgm_type === bgm.id ? "#ECECEC" : "white",
+                                                borderRadius: 1,
+                                                outline: `${theme.border.width}px solid ${pageSettings.bgm_type === bgm.id ? "black" : "#E5E6E8"}`,
+                                                display: "flex",
+                                                justifyContent: "center",
+                                                alignItems: "center",
+                                                gap: 10,
+                                                cursor: settingsLoading ? "not-allowed" : "pointer",
+                                                opacity: settingsLoading ? 0.5 : 1,
+                                            }}
+                                        >
+                                            <span
+                                                style={{
+                                                    color: pageSettings.bgm_type === bgm.id ? "black" : "#AEAEAE",
+                                                    fontSize: 12,
+                                                    fontFamily: "Pretendard Regular",
+                                                }}
+                                            >
+                                                {bgm.id}
+                                            </span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* 직접 업로드 섹션 */}
+                            <div
+                                style={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: "8px",
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        color: "black",
+                                        fontSize: 12,
+                                        fontFamily: "Pretendard SemiBold",
+                                    }}
+                                >
+                                    직접 업로드 (선택)
+                                </div>
+                                <div
+                                    style={{
+                                        color: "#ADADAD",
+                                        fontSize: 12,
+                                        fontFamily: "Pretendard Regular",
+                                        lineHeight: "16px",
+                                    }}
+                                >
+                                    직접 업로드 시 MP3 파일만 사용 가능하며, 자동으로 압축됩니다.
+                                </div>
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        gap: "12px",
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            display: "flex",
+                                            gap: "12px",
+                                        }}
+                                    >
+                                        <button
+                                            onClick={() => {
+                                                console.log('[BGM] 직접 업로드 버튼 클릭')
+                                                if (typeof document !== "undefined") {
+                                                    const input = document.createElement("input")
+                                                    input.type = "file"
+                                                    input.accept = "audio/*,.mp3,.m4a,.aac,.wav"
+                                                    input.style.display = "none"
+                                                    
+                                                    // 이벤트 리스너 방식으로 변경
+                                                    input.addEventListener('change', (e) => {
+                                                        console.log('[BGM] change 이벤트 발생')
+                                                        const target = e.target as HTMLInputElement
+                                                        console.log('[BGM] target.files:', target?.files)
+                                                        console.log('[BGM] target.files.length:', target?.files?.length)
+                                                        
+                                                        if (target?.files?.[0]) {
+                                                            console.log('[BGM] 파일 선택됨:', target.files[0].name)
+                                                            console.log('[BGM] 선택된 파일 정보:', {
+                                                                name: target.files[0].name,
+                                                                type: target.files[0].type,
+                                                                size: target.files[0].size
+                                                            })
+                                                            
+                                                            // React 이벤트 객체 생성
+                                                            const syntheticEvent = {
+                                                                target: target,
+                                                                currentTarget: target
+                                                            } as React.ChangeEvent<HTMLInputElement>
+                                                            
+                                                            console.log('[BGM] handleAudioUpload 호출 시작')
+                                                            handleAudioUpload(syntheticEvent)
+                                                        } else {
+                                                            console.log('[BGM] 파일 선택이 취소됨 또는 파일이 없음')
+                                                        }
+                                                        
+                                                        // 사용 후 제거
+                                                        try {
+                                                            document.body.removeChild(input)
+                                                            console.log('[BGM] input 요소 제거 완료')
+                                                        } catch (removeError) {
+                                                            console.warn('[BGM] input 요소 제거 실패:', removeError)
+                                                        }
+                                                    })
+                                                    
+                                                    // 취소 시에도 처리
+                                                    input.addEventListener('cancel', () => {
+                                                        console.log('[BGM] 파일 선택 취소됨 (cancel 이벤트)')
+                                                        try {
+                                                            document.body.removeChild(input)
+                                                        } catch (removeError) {
+                                                            console.warn('[BGM] input 요소 제거 실패 (cancel):', removeError)
+                                                        }
+                                                    })
+                                                    
+                                                    // DOM에 추가 후 클릭
+                                                    document.body.appendChild(input)
+                                                    
+                                                    // 다이얼로그 닫힘 감지를 위한 window focus 이벤트
+                                                    const handleWindowFocus = () => {
+                                                        console.log('[BGM] window focus 이벤트 - 다이얼로그가 닫혔을 수 있음')
+                                                        setTimeout(() => {
+                                                            if (input.files?.length === 0) {
+                                                                console.log('[BGM] 파일 선택 없이 다이얼로그 닫힘')
+                                                            }
+                                                        }, 100)
+                                                        window.removeEventListener('focus', handleWindowFocus)
+                                                    }
+                                                    
+                                                    window.addEventListener('focus', handleWindowFocus)
+                                                    input.click()
+                                                    console.log('[BGM] 파일 선택 다이얼로그 열림')
+                                                } else {
+                                                    console.error('[BGM] document가 정의되지 않음 (SSR 환경)')
+                                                }
+                                            }}
+                                            disabled={settingsLoading}
+                                            style={{
+                                                flex: "1 1 0",
+                                                height: 50,
+                                                padding: "8px 12px",
+                                                backgroundColor: "white",
+                                                borderRadius: 1,
+                                                outline: `${theme.border.width}px #AEAEAE solid`,
+                                                display: "flex",
+                                                justifyContent: "center",
+                                                alignItems: "center",
+                                                gap: 8,
+                                                cursor: settingsLoading ? "not-allowed" : "pointer",
+                                                opacity: settingsLoading ? 0.5 : 1,
+                                            }}
+                                        >
+                                            <svg width="13" height="12" viewBox="0 0 13 12" fill="none">
+                                                <path
+                                                    d="M5.75 9V2.8875L3.8 4.8375L2.75 3.75L6.5 0L10.25 3.75L9.2 4.8375L7.25 2.8875V9H5.75ZM0.5 12V8.25H2V10.5H11V8.25H12.5V12H0.5Z"
+                                                    fill="#818181"
+                                                />
+                                            </svg>
+                                            <span
+                                                style={{
+                                                    color: "black",
+                                                    fontSize: 14,
+                                                    fontFamily: "Pretendard",
+                                                    fontWeight: 400,
+                                                }}
+                                        >
+                                            {settingsLoading ? "업로드 중..." : "직접 업로드"}
+                                        </span>
+                                    </button>
+                                    
+                                    {/* 테스트용 버튼 */}
+                                    <button
+                                        onClick={async () => {
+                                            console.log('[BGM] 테스트 음원 설정 시작')
+                                            
+                                            // 기존 커스텀 BGM 파일 삭제 (있다면)
+                                            if (pageSettings.bgm_url && pageSettings.bgm_type === 'custom') {
+                                                console.log(`[BGM] 테스트 음원 설정 시 기존 커스텀 BGM 파일 삭제 시작: ${pageSettings.bgm_url}`)
+                                                await deleteFromR2(pageSettings.bgm_url)
+                                            } else {
+                                                console.log(`[BGM] 기존 커스텀 BGM 파일 없음, 삭제 생략`)
+                                            }
+                                            
+                                            const testUrl = 'https://cdn.roarc.kr/bgm/free/01.m4a'
+                                            const testSettings = {
+                                                ...pageSettings,
+                                                bgm_url: testUrl,
+                                                bgm_type: 'test'
+                                            }
+                                            try {
+                                                await savePageSettings(testSettings)
+                                                setPageSettings(testSettings)
+                                                console.log('[BGM] 테스트 음원 설정 완료')
+                                                setSuccess('테스트 음원이 설정되었습니다!')
+                                                setTimeout(() => setSuccess(null), 3000)
+                                            } catch (error) {
+                                                console.error('[BGM] 테스트 음원 설정 실패:', error)
+                                                setError('테스트 음원 설정에 실패했습니다.')
+                                            }
+                                        }}
+                                        disabled={settingsLoading}
+                                        style={{
+                                            height: 30,
+                                            padding: "4px 8px",
+                                            backgroundColor: "#f0f0f0",
+                                            border: "1px solid #ccc",
+                                            borderRadius: 4,
+                                            cursor: "pointer",
+                                            fontSize: 11,
+                                            marginTop: 8,
+                                        }}
+                                    >
+                                        테스트 음원 설정
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                            {/* 자동 재생 섹션 */}
+                            <div
+                                style={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: "8px",
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        color: "black",
+                                        fontSize: 12,
+                                        fontFamily: "Pretendard SemiBold",
+                                    }}
+                                >
+                                    자동 재생
+                                </div>
+                                <div
+                                    style={{
+                                        color: "#ADADAD",
+                                        fontSize: 12,
+                                        fontFamily: "Pretendard Regular",
+                                        lineHeight: "16px",
+                                    }}
+                                >
+                                    자동 재생 기능은 브라우저 정책에 따라 제한될 수 있습니다.
+                                </div>
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        gap: "8px",
+                                    }}
+                                >
+                                    <button
+                                        onClick={() => handleAutoplayToggle(true)}
+                                        disabled={settingsLoading}
+                                        style={{
+                                            flex: "1 1 0",
+                                            height: 40,
+                                            padding: 12,
+                                            backgroundColor: pageSettings.bgm_autoplay ? "#ECECEC" : "white",
+                                            borderRadius: 1,
+                                            outline: `${theme.border.width}px solid ${pageSettings.bgm_autoplay ? "#757575" : "#E5E6E8"}`,
+                                            display: "flex",
+                                            justifyContent: "center",
+                                            alignItems: "center",
+                                            gap: 10,
+                                            cursor: settingsLoading ? "not-allowed" : "pointer",
+                                            opacity: settingsLoading ? 0.5 : 1,
+                                        }}
+                                    >
+                                        <span
+                                            style={{
+                                                color: pageSettings.bgm_autoplay ? "black" : "#AEAEAE",
+                                                fontSize: 12,
+                                                fontFamily: "Pretendard Regular",
+                                            }}
+                                        >
+                                            자동 재생
+                                        </span>
+                                    </button>
+                                    <button
+                                        onClick={() => handleAutoplayToggle(false)}
+                                        disabled={settingsLoading}
+                                        style={{
+                                            flex: "1 1 0",
+                                            height: 40,
+                                            padding: 12,
+                                            backgroundColor: !pageSettings.bgm_autoplay ? "#ECECEC" : "white",
+                                            borderRadius: 2,
+                                            outline: `${theme.border.width}px solid ${!pageSettings.bgm_autoplay ? "#757575" : "#E5E6E8"}`,
+                                            display: "flex",
+                                            justifyContent: "center",
+                                            alignItems: "center",
+                                            gap: 10,
+                                            cursor: settingsLoading ? "not-allowed" : "pointer",
+                                            opacity: settingsLoading ? 0.5 : 1,
+                                        }}
+                                    >
+                                        <span
+                                            style={{
+                                                color: !pageSettings.bgm_autoplay ? "black" : "#AEAEAE",
+                                                fontSize: 12,
+                                                fontFamily: "Pretendard Regular",
+                                            }}
+                                        >
+                                            자동 재생 끄기
+                                        </span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* 저장 버튼 */}
+                            <button
+                                onClick={() => savePageSettings()}
+                                disabled={settingsLoading}
+                                style={{
+                                    width: "100%",
+                                    height: 50,
+                                    padding: 12,
+                                    backgroundColor: "black",
+                                    display: "flex",
+                                    justifyContent: "center",
+                                    alignItems: "center",
+                                    gap: 10,
+                                    cursor: settingsLoading ? "not-allowed" : "pointer",
+                                    opacity: settingsLoading ? 0.5 : 1,
+                                }}
+                            >
+                                <span
+                                    style={{
+                                        color: "#E6E6E6",
+                                        fontSize: 14,
+                                        fontFamily: "Pretendard SemiBold",
+                                    }}
+                                >
+                                    {settingsLoading ? "저장 중..." : "저장"}
+                                </span>
+                            </button>
+                        </div>
+                    </AccordionSection>
+
                     {/* 추가 기능 */}
                     <AccordionSection
                         title="추가 기능"
@@ -8371,6 +9411,7 @@ function AdminMainContent(props: any) {
                             추가 기능 설정 준비 중입니다.
                         </div>
                     </AccordionSection>
+
 
                     {/* Footer at the end of basic tab */}
                     <AdminFooter />
@@ -8700,7 +9741,10 @@ function AdminMainContent(props: any) {
                                 >
                                     <button
                                         onClick={() => {
-                                            if (currentPageId && typeof document !== 'undefined') {
+                                            if (
+                                                currentPageId &&
+                                                typeof document !== "undefined"
+                                            ) {
                                                 const input =
                                                     document.getElementById(
                                                         "fileInput"
@@ -9083,7 +10127,10 @@ function TransportTab({
                         setLocationName(String(result.locationName))
                     }
                     if (result.venue_address !== undefined) {
-                        console.log("TransportTab 로드 - venue_address:", result.venue_address)
+                        console.log(
+                            "TransportTab 로드 - venue_address:",
+                            result.venue_address
+                        )
                         setVenue_address(String(result.venue_address || ""))
                     }
                 } else if (mounted) {
@@ -9136,7 +10183,7 @@ function TransportTab({
 
     // 텍스트 포맷팅 함수들
     const insertFormat = (index: number, format: "bold" | "small") => {
-        if (typeof document === 'undefined') return
+        if (typeof document === "undefined") return
         const textareaId = `description-${index}`
         const textarea = document.getElementById(
             textareaId
@@ -9175,13 +10222,16 @@ function TransportTab({
 
         // 커서 위치 복원 (다음 렌더링 이후)
         setTimeout(() => {
-            if (typeof document !== 'undefined') {
-                const updatedTextarea = document.getElementById(
-                    textareaId
-                ) as HTMLTextAreaElement
-                if (updatedTextarea) {
-                    updatedTextarea.focus()
-                    updatedTextarea.setSelectionRange(cursorOffset, cursorOffset)
+            if (typeof document !== "undefined") {
+            const updatedTextarea = document.getElementById(
+                textareaId
+            ) as HTMLTextAreaElement
+            if (updatedTextarea) {
+                updatedTextarea.focus()
+                    updatedTextarea.setSelectionRange(
+                        cursorOffset,
+                        cursorOffset
+                    )
                 }
             }
         }, 0)
@@ -9230,10 +10280,13 @@ function TransportTab({
                                 items,
                                 locationName,
                                 venue_address,
-                            })
+                            }),
                         }
                     )
-                    console.log("TransportTab 저장 - venue_address:", venue_address)
+                    console.log(
+                        "TransportTab 저장 - venue_address:",
+                        venue_address
+                    )
                     res = tryRes
                     text = await tryRes.text()
                     if (tryRes.ok) break
@@ -9311,7 +10364,7 @@ function TransportTab({
                         height: 40,
                         padding: 12,
                         background: "white",
-                        border: "0.5px solid #E5E6E8",
+                        border: `1px solid ${theme.color.border}`,
                         outlineOffset: -0.25,
                         fontSize: 14,
                         fontFamily: "Pretendard Regular",
@@ -9351,7 +10404,7 @@ function TransportTab({
                         height: 40,
                         padding: 12,
                         background: "white",
-                        border: "0.5px solid #E5E6E8",
+                        border: `1px solid ${theme.color.border}`,
                         outlineOffset: -0.25,
                         fontSize: 14,
                         fontFamily: "Pretendard Regular",
@@ -9379,7 +10432,7 @@ function TransportTab({
                             style={{
                                 width: "100%",
                                 padding: 12,
-                                border: "0.5px solid #E5E6E8",
+                                border: `1px solid ${theme.color.border}`,
                                 outlineOffset: -0.5,
                                 display: "flex",
                                 flexDirection: "column",
@@ -9418,7 +10471,7 @@ function TransportTab({
                                         disabled={index === 0}
                                         style={{
                                             padding: 6,
-                                            border: "1px solid #E5E6E8",
+                                            border: `1px solid ${theme.color.border}`,
                                             outlineOffset: -1,
                                             background: "white",
                                             cursor:
@@ -9454,7 +10507,7 @@ function TransportTab({
                                         disabled={index === items.length - 1}
                                         style={{
                                             padding: 6,
-                                            border: "1px solid #E5E6E8",
+                                            border: `1px solid ${theme.color.border}`,
                                             outlineOffset: -1,
                                             background: "white",
                                             cursor:
@@ -9497,7 +10550,7 @@ function TransportTab({
                                     height: 40,
                                     padding: 12,
                                     background: "white",
-                                    border: "0.5px solid #E5E6E8",
+                                    border: `1px solid ${theme.color.border}`,
                                     outlineOffset: -0.25,
                                     fontSize: 14,
                                     fontFamily: "Pretendard Regular",
@@ -9517,7 +10570,7 @@ function TransportTab({
                                     height: 120,
                                     padding: 12,
                                     background: "white",
-                                    border: "0.5px solid #E5E6E8",
+                                    border: `1px solid ${theme.color.border}`,
                                     outlineOffset: -0.25,
                                     fontSize: 14,
                                     fontFamily: "Pretendard Regular",
@@ -9547,7 +10600,7 @@ function TransportTab({
                                     onClick={() => insertFormat(index, "bold")}
                                     style={{
                                         padding: "4px 8px",
-                                        border: "0.5px solid #E5E6E8",
+                                        border: `1px solid ${theme.color.border}`,
                                         outlineOffset: -0.5,
                                         background: "white",
                                         cursor: "pointer",
@@ -9565,7 +10618,7 @@ function TransportTab({
                                     onClick={() => insertFormat(index, "small")}
                                     style={{
                                         padding: "4px 8px",
-                                        border: "0.5px solid #E5E6E8",
+                                        border: `1px solid ${theme.color.border}`,
                                         outlineOffset: -0.5,
                                         background: "white",
                                         cursor: "pointer",
@@ -9588,7 +10641,7 @@ function TransportTab({
                             height: 40,
                             padding: 12,
                             background: "#ECECEC",
-                            border: "0.5px solid #E5E6E8",
+                            border: `1px solid ${theme.color.border}`,
                             outlineOffset: -0.25,
                             display: "flex",
                             justifyContent: "center",
@@ -9794,7 +10847,7 @@ function InputField({
                 style={{
                     width: "100%",
                     padding: "11px 12px",
-                    border: "1px solid #e5e7eb",
+                    border: `1px solid ${theme.color.border}`,
                     borderRadius: 8,
                     fontSize: 14,
                     outline: "none",
@@ -9895,16 +10948,16 @@ function CustomOrderDropdown({
         if (!isOpen) {
             setFocusedIndex(0)
             // 스크롤 잠금
-            if (typeof document !== 'undefined') {
-                document.body.style.overflow = "hidden"
+            if (typeof document !== "undefined") {
+            document.body.style.overflow = "hidden"
             }
             // 위치 계산
             requestAnimationFrame(() => updateMenuPosition())
         } else {
             setFocusedIndex(-1)
             // 스크롤 복원
-            if (typeof document !== 'undefined') {
-                document.body.style.overflow = ""
+            if (typeof document !== "undefined") {
+            document.body.style.overflow = ""
             }
             setMenuStyle(null)
         }
@@ -9915,8 +10968,8 @@ function CustomOrderDropdown({
         onChange(selectedValue)
         setIsOpen(false)
         setFocusedIndex(-1)
-        if (typeof document !== 'undefined') {
-            document.body.style.overflow = ""
+        if (typeof document !== "undefined") {
+        document.body.style.overflow = ""
         }
         buttonRef.current?.focus()
     }
@@ -9936,8 +10989,8 @@ function CustomOrderDropdown({
                 e.preventDefault()
                 setIsOpen(false)
                 setFocusedIndex(-1)
-                if (typeof document !== 'undefined') {
-                    document.body.style.overflow = ""
+                if (typeof document !== "undefined") {
+                document.body.style.overflow = ""
                 }
                 buttonRef.current?.focus()
                 break
@@ -9977,22 +11030,29 @@ function CustomOrderDropdown({
             if (clickedInsideButton || clickedInsideMenu) return
             setIsOpen(false)
             setFocusedIndex(-1)
-            if (typeof document !== 'undefined') {
-                document.body.style.overflow = ""
+            if (typeof document !== "undefined") {
+            document.body.style.overflow = ""
             }
         }
 
-        if (isOpen && typeof document !== 'undefined' && typeof window !== 'undefined') {
+        if (
+            isOpen &&
+            typeof document !== "undefined" &&
+            typeof window !== "undefined"
+        ) {
             document.addEventListener("mousedown", handleClickOutside)
             window.addEventListener("scroll", updateMenuPosition, true)
             window.addEventListener("resize", updateMenuPosition)
         }
 
         return () => {
-            if (typeof document !== 'undefined' && typeof window !== 'undefined') {
-                document.removeEventListener("mousedown", handleClickOutside)
-                window.removeEventListener("scroll", updateMenuPosition, true)
-                window.removeEventListener("resize", updateMenuPosition)
+            if (
+                typeof document !== "undefined" &&
+                typeof window !== "undefined"
+            ) {
+            document.removeEventListener("mousedown", handleClickOutside)
+            window.removeEventListener("scroll", updateMenuPosition, true)
+            window.removeEventListener("resize", updateMenuPosition)
             }
         }
     }, [isOpen])
@@ -10015,8 +11075,8 @@ function CustomOrderDropdown({
     // 컴포넌트 언마운트 시 스크롤 복원
     React.useEffect(() => {
         return () => {
-            if (typeof document !== 'undefined') {
-                document.body.style.overflow = ""
+            if (typeof document !== "undefined") {
+            document.body.style.overflow = ""
             }
         }
     }, [])
@@ -10030,7 +11090,10 @@ function CustomOrderDropdown({
         const width = rect.width
         let left = rect.left
         // 우측 경계 보정
-        const maxLeft = (typeof window !== 'undefined' ? window.innerWidth : 800) - width - 8
+        const maxLeft =
+            (typeof window !== "undefined" ? window.innerWidth : 800) -
+            width -
+            8
         if (left > maxLeft) left = Math.max(8, maxLeft)
         // 메뉴 높이 추정 (아이템 1개당 ~40px, 최대 240)
         const itemHeight = 40
@@ -10038,7 +11101,10 @@ function CustomOrderDropdown({
             240,
             Math.max(1, options.length) * itemHeight
         )
-        const spaceBelow = (typeof window !== 'undefined' ? window.innerHeight : 600) - rect.bottom - gap
+        const spaceBelow =
+            (typeof window !== "undefined" ? window.innerHeight : 600) -
+            rect.bottom -
+            gap
         const spaceAbove = rect.top - gap
         let top = rect.bottom + gap
         if (
@@ -10056,7 +11122,7 @@ function CustomOrderDropdown({
             overflowY: "auto",
             zIndex: 10000,
             backgroundColor: "#ffffff",
-            border: "1px solid #E5E6E8",
+            border: `1px solid ${theme.color.border}`,
             boxShadow: "0 6px 20px rgba(0, 0, 0, 0.12)",
             scrollbarWidth: "thin",
             scrollbarColor: "#E5E6E8 transparent",
@@ -10078,7 +11144,7 @@ function CustomOrderDropdown({
                     minHeight: 32, // 모바일 터치 타겟
                     padding: "10px 12px",
                     backgroundColor: "#ffffff",
-                    border: "1px solid #E5E6E8",
+                    border: `1px solid ${theme.color.border}`,
                     fontSize: 12, // 모바일 줌 방지
                     fontFamily: "Pretendard SemiBold",
                     color: "#757575",
@@ -10086,7 +11152,7 @@ function CustomOrderDropdown({
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    outline: "0.5px solid #e5e6e8",
+                    outline: `${theme.border.width}px solid #e5e6e8`,
                     transition:
                         "border-color 0.15s ease, box-shadow 0.15s ease",
                 }}
@@ -10123,7 +11189,7 @@ function CustomOrderDropdown({
 
             {isOpen &&
                 menuStyle &&
-                typeof document !== 'undefined' &&
+                typeof document !== "undefined" &&
                 ReactDOM.createPortal(
                     <div
                         ref={listRef}
