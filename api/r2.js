@@ -1,46 +1,261 @@
 /**
- * Unified Cloudflare R2 API Dispatcher
- *
- * Actions:
- * - GET  action=test     → environment and module test (formerly r2-test)
- * - POST action=presign  → presigned upload with validation (formerly r2-presign)
- * - POST action=simple   → simple presigned upload (formerly r2-simple)
- * - POST action=delete   → delete object by key (formerly r2-delete)
+ * Unified Cloudflare R2 API
+ * Handles all R2 operations: presign, simple, delete, test
+ * 
+ * Endpoints:
+ * - POST /api/r2?action=simple - Simple presigned URL generation
+ * - POST /api/r2?action=presign - Full presigned URL with validation
+ * - POST /api/r2?action=delete - Delete file from R2
+ * - GET /api/r2?action=test - Test environment variables
+ * 
+ * Required Environment Variables:
+ * - R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_ENDPOINT
+ * - Optional: R2_PUBLIC_BASE_URL (for custom domain)
  */
 
+const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3')
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner')
+const { createClient } = require('@supabase/supabase-js')
+const { v4: uuidv4 } = require('uuid')
 
-// Optional auth (used by presign advanced)
-let validateSessionToken = null
-try {
-  ({ validateSessionToken } = require('../lib/auth'))
-} catch (_) {
-  // optional
+// Configure S3 client for Cloudflare R2
+const r2Client = new S3Client({
+  region: 'auto',
+  endpoint: process.env.R2_ENDPOINT,
+  forcePathStyle: true,
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+  },
+})
+
+// Initialize Supabase client for auth validation
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY
+)
+
+// Utility functions
+function getPublicUrl(key) {
+  // Custom Domain 사용: cdn.roarc.kr
+  const base = process.env.R2_PUBLIC_BASE_URL || `${process.env.R2_ENDPOINT}/${process.env.R2_BUCKET}`
+  return `${base}/${key}`
 }
 
-// Note: Supabase client is not required here; auth is handled by validateSessionToken if provided
+function safeFileName(name) {
+  return name.toLowerCase().replace(/[^a-z0-9._-]/g, '-')
+}
 
+function validateSessionToken(token) {
+  try {
+    const decoded = JSON.parse(Buffer.from(token, 'base64').toString('utf-8'))
+    
+    // 토큰 만료 확인
+    if (Date.now() > decoded.expires) {
+      return null
+    }
+    
+    // 추가 검증 로직 (필요시)
+    if (!decoded.userId || !decoded.username) {
+      return null
+    }
+    
+    return decoded
+  } catch (error) {
+    console.error('Token validation error:', error)
+    return null
+  }
+}
+
+// Allowed MIME types
 const ALLOWED_MIMES = [
   'image/jpeg',
-  'image/png',
+  'image/png', 
   'image/webp',
   'image/avif',
   'audio/m4a',
   'audio/mp4',
   'audio/mpeg',
-  'audio/mp3',
+  'audio/mp3'
 ]
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+// Max file size: 10MB
+const MAX_FILE_SIZE = 10 * 1024 * 1024
 
-function setCors(res) {
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-File-Size')
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate')
+// Action handlers
+async function handleSimple(req, res) {
+  try {
+    const { pageId, fileName, contentType, key } = req.body
+
+    if (!pageId || !fileName || !contentType) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: pageId, fileName, contentType'
+      })
+    }
+
+    // Generate object key
+    const finalKey = key || `${pageId}/files/${Date.now()}-${safeFileName(fileName)}`
+
+    // Generate presigned URL for PUT operation
+    const command = new PutObjectCommand({
+      Bucket: process.env.R2_BUCKET,
+      Key: finalKey,
+      ContentType: contentType,
+    })
+
+    const uploadUrl = await getSignedUrl(r2Client, command, { 
+      expiresIn: 300 // 5 minutes
+    })
+
+    // Generate public URL
+    const publicUrl = getPublicUrl(finalKey)
+
+    return res.status(200).json({
+      success: true,
+      uploadUrl,
+      key: finalKey,
+      publicUrl
+    })
+
+  } catch (error) {
+    console.error('R2 simple error:', error)
+    return res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+}
+
+async function handlePresign(req, res) {
+  try {
+    // Validate request body
+    const { pageId, fileName, contentType } = req.body
+    
+    if (!pageId || !fileName || !contentType) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: pageId, fileName, contentType'
+      })
+    }
+
+    // Validate file size if provided
+    const fileSize = req.headers['x-file-size']
+    if (fileSize && parseInt(fileSize) > MAX_FILE_SIZE) {
+      return res.status(400).json({
+        success: false,
+        error: 'File size exceeds 10MB limit'
+      })
+    }
+
+    // Validate MIME type
+    if (!ALLOWED_MIMES.includes(contentType)) {
+      return res.status(400).json({
+        success: false,
+        error: `Unsupported file type. Allowed: ${ALLOWED_MIMES.join(', ')}`
+      })
+    }
+
+    // Validate user session (optional for now)
+    const authHeader = req.headers.authorization
+    if (authHeader) {
+      const token = authHeader.replace('Bearer ', '')
+      const userSession = validateSessionToken(token)
+      
+      if (!userSession) {
+        return res.status(401).json({
+          success: false,
+          error: 'Invalid or expired token'
+        })
+      }
+    }
+
+    // Generate object key based on content type
+    const uuid = uuidv4()
+    const safeName = safeFileName(fileName)
+    let key
+
+    if (contentType.startsWith('image/')) {
+      key = `${pageId}/photos/${uuid}-${safeName}`
+    } else if (contentType.startsWith('audio/')) {
+      key = `${pageId}/audio/${uuid}-${safeName}`
+    } else {
+      key = `${pageId}/files/${uuid}-${safeName}`
+    }
+
+    // Generate presigned URL for PUT operation
+    const command = new PutObjectCommand({
+      Bucket: process.env.R2_BUCKET,
+      Key: key,
+      ContentType: contentType,
+    })
+
+    const uploadUrl = await getSignedUrl(r2Client, command, { 
+      expiresIn: 300 // 5 minutes
+    })
+
+    // Generate public URL
+    const publicUrl = getPublicUrl(key)
+
+    return res.status(200).json({
+      success: true,
+      uploadUrl,
+      key,
+      publicUrl
+    })
+
+  } catch (error) {
+    console.error('R2 presign error:', error)
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    })
+  }
+}
+
+async function handleDelete(req, res) {
+  try {
+    const { key } = req.body
+
+    if (!key) {
+      return res.status(400).json({
+        success: false,
+        error: 'Key is required'
+      })
+    }
+
+    console.log(`[R2-DELETE] 파일 삭제 요청: ${key}`)
+
+    // R2에서 파일 삭제
+    const deleteCommand = new DeleteObjectCommand({
+      Bucket: process.env.R2_BUCKET,
+      Key: key,
+    })
+
+    await r2Client.send(deleteCommand)
+
+    console.log(`[R2-DELETE] 파일 삭제 완료: ${key}`)
+
+    return res.json({
+      success: true,
+      message: 'File deleted successfully',
+      key: key
+    })
+
+  } catch (error) {
+    console.error('[R2-DELETE] 파일 삭제 실패:', error)
+    
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to delete file',
+      message: error.message
+    })
+  }
 }
 
 async function handleTest(req, res) {
   try {
+    // Check environment variables
     const envVars = {
       R2_ACCOUNT_ID: !!process.env.R2_ACCOUNT_ID,
       R2_ACCESS_KEY_ID: !!process.env.R2_ACCESS_KEY_ID,
@@ -49,147 +264,102 @@ async function handleTest(req, res) {
       R2_ENDPOINT: !!process.env.R2_ENDPOINT,
       R2_PUBLIC_BASE_URL: !!process.env.R2_PUBLIC_BASE_URL,
       SUPABASE_URL: !!process.env.SUPABASE_URL,
-      SUPABASE_SERVICE_ROLE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-      SUPABASE_SERVICE_KEY: !!process.env.SUPABASE_SERVICE_KEY,
+      SUPABASE_SERVICE_KEY: !!process.env.SUPABASE_SERVICE_KEY
     }
 
-    const moduleTests = {}
-    try { require('@aws-sdk/client-s3'); moduleTests['@aws-sdk/client-s3'] = true } catch { moduleTests['@aws-sdk/client-s3'] = false }
-    try { require('@aws-sdk/s3-request-presigner'); moduleTests['@aws-sdk/s3-request-presigner'] = true } catch { moduleTests['@aws-sdk/s3-request-presigner'] = false }
-    try { require('uuid'); moduleTests['uuid'] = true } catch { moduleTests['uuid'] = false }
-    try { require('../lib/r2'); moduleTests['../lib/r2'] = true } catch { moduleTests['../lib/r2'] = false }
-    try { require('../lib/auth'); moduleTests['../lib/auth'] = true } catch { moduleTests['../lib/auth'] = false }
+    // Test if we can import required modules
+    let moduleTests = {}
+    try {
+      require('@aws-sdk/client-s3')
+      moduleTests['@aws-sdk/client-s3'] = true
+    } catch (e) {
+      moduleTests['@aws-sdk/client-s3'] = false
+    }
+
+    try {
+      require('@aws-sdk/s3-request-presigner')
+      moduleTests['@aws-sdk/s3-request-presigner'] = true
+    } catch (e) {
+      moduleTests['@aws-sdk/s3-request-presigner'] = false
+    }
+
+    try {
+      require('uuid')
+      moduleTests['uuid'] = true
+    } catch (e) {
+      moduleTests['uuid'] = false
+    }
 
     return res.status(200).json({
       success: true,
       environmentVariables: envVars,
-      moduleTests,
+      moduleTests: moduleTests,
       nodeVersion: process.version,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     })
+
   } catch (error) {
     console.error('R2 Test error:', error)
-    return res.status(500).json({ success: false, error: error.message })
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+      stack: error.stack
+    })
   }
 }
 
-async function handlePresign(req, res) {
-  const { PutObjectCommand } = require('@aws-sdk/client-s3')
-  const { getSignedUrl } = require('@aws-sdk/s3-request-presigner')
-  const { r2Client, getPublicUrl, safeFileName } = require('../lib/r2')
-  const { v4: uuidv4 } = require('uuid')
-  const { pageId, fileName, contentType } = req.body || {}
-  if (!pageId || !fileName || !contentType) {
-    return res.status(400).json({ success: false, error: 'Missing required fields: pageId, fileName, contentType' })
-  }
-
-  // Validate file size if provided
-  const fileSize = req.headers['x-file-size']
-  if (fileSize && parseInt(fileSize, 10) > MAX_FILE_SIZE) {
-    return res.status(400).json({ success: false, error: 'File size exceeds 10MB limit' })
-  }
-
-  // Validate MIME type
-  if (!ALLOWED_MIMES.includes(contentType)) {
-    return res.status(400).json({ success: false, error: `Unsupported file type. Allowed: ${ALLOWED_MIMES.join(', ')}` })
-  }
-
-  // Optional session validation (backwards compatible)
-  const authHeader = req.headers.authorization
-  if (authHeader && typeof validateSessionToken === 'function') {
-    const token = authHeader.replace('Bearer ', '')
-    const userSession = validateSessionToken(token)
-    if (!userSession) {
-      return res.status(401).json({ success: false, error: 'Invalid or expired token' })
-    }
-  }
-
-  const uuid = uuidv4()
-  const safeName = safeFileName(fileName)
-  let key
-  if (contentType.startsWith('image/')) {
-    key = `${pageId}/photos/${uuid}-${safeName}`
-  } else if (contentType.startsWith('audio/')) {
-    key = `${pageId}/audio/${uuid}-${safeName}`
-  } else {
-    key = `${pageId}/files/${uuid}-${safeName}`
-  }
-
-  const command = new PutObjectCommand({
-    Bucket: process.env.R2_BUCKET,
-    Key: key,
-    ContentType: contentType,
-  })
-
-  const uploadUrl = await getSignedUrl(r2Client, command, { expiresIn: 300 })
-  const publicUrl = getPublicUrl(key)
-  return res.status(200).json({ success: true, uploadUrl, key, publicUrl })
-}
-
-async function handleSimple(req, res) {
-  const { PutObjectCommand } = require('@aws-sdk/client-s3')
-  const { getSignedUrl } = require('@aws-sdk/s3-request-presigner')
-  const { r2Client, getPublicUrl, safeFileName } = require('../lib/r2')
-  const { v4: uuidv4 } = require('uuid')
-  const { pageId, fileName, contentType, key: providedKey } = req.body || {}
-  if (!pageId || !fileName || !contentType) {
-    return res.status(400).json({ success: false, error: 'Missing required fields: pageId, fileName, contentType' })
-  }
-
-  const timestamp = Date.now()
-  const safeName = safeFileName(fileName)
-  const key = providedKey || `${pageId}/files/${timestamp}-${safeName}`
-
-  const command = new PutObjectCommand({
-    Bucket: process.env.R2_BUCKET,
-    Key: key,
-    ContentType: contentType,
-  })
-
-  const uploadUrl = await getSignedUrl(r2Client, command, { expiresIn: 300 })
-  const publicUrl = getPublicUrl(key)
-  return res.status(200).json({ success: true, uploadUrl, key, publicUrl })
-}
-
-async function handleDelete(req, res) {
-  const { DeleteObjectCommand } = require('@aws-sdk/client-s3')
-  const { r2Client } = require('../lib/r2')
-  const { key } = req.body || {}
-  if (!key) {
-    return res.status(400).json({ success: false, error: 'Key is required' })
-  }
-  const del = new DeleteObjectCommand({ Bucket: process.env.R2_BUCKET, Key: key })
-  await r2Client.send(del)
-  return res.status(200).json({ success: true, message: 'File deleted successfully', key })
-}
-
+// Main handler
 module.exports = async (req, res) => {
-  setCors(res)
-  if (req.method === 'OPTIONS') return res.status(200).end()
+  // CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-File-Size')
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate')
 
-  const action = String((req.query && req.query.action) || (req.body && req.body.action) || '').toLowerCase()
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end()
+  }
 
-  try {
-    if (req.method === 'GET') {
-      // GET only supports test for now
-      if (action === 'test') return handleTest(req, res)
-      // default to test for GET
-      return handleTest(req, res)
-    }
+  // Get action from query parameter or body
+  const action = req.query.action || req.body?.action
 
-    if (req.method === 'POST') {
-      if (action === 'presign') return handlePresign(req, res)
-      if (action === 'simple') return handleSimple(req, res)
-      if (action === 'delete') return handleDelete(req, res)
-      // default to simple if unspecified
+  if (!action) {
+    return res.status(400).json({
+      success: false,
+      error: 'Action parameter is required. Use: simple, presign, delete, test'
+    })
+  }
+
+  // Route to appropriate handler
+  switch (action) {
+    case 'simple':
+      if (req.method !== 'POST') {
+        return res.status(405).json({ success: false, error: 'Method not allowed' })
+      }
       return handleSimple(req, res)
-    }
 
-    return res.status(405).json({ success: false, error: 'Method not allowed' })
-  } catch (error) {
-    console.error('[R2] Unified handler error:', error)
-    return res.status(500).json({ success: false, error: 'Internal server error' })
+    case 'presign':
+      if (req.method !== 'POST') {
+        return res.status(405).json({ success: false, error: 'Method not allowed' })
+      }
+      return handlePresign(req, res)
+
+    case 'delete':
+      if (req.method !== 'POST') {
+        return res.status(405).json({ success: false, error: 'Method not allowed' })
+      }
+      return handleDelete(req, res)
+
+    case 'test':
+      if (req.method !== 'GET') {
+        return res.status(405).json({ success: false, error: 'Method not allowed' })
+      }
+      return handleTest(req, res)
+
+    default:
+      return res.status(400).json({
+        success: false,
+        error: `Unknown action: ${action}. Use: simple, presign, delete, test`
+      })
   }
 }
-
-
