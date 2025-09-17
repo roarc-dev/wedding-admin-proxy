@@ -70,13 +70,15 @@ function validateSessionToken(token) {
 // Allowed MIME types
 const ALLOWED_MIMES = [
   'image/jpeg',
-  'image/png', 
+  'image/png',
   'image/webp',
   'image/avif',
+  'image/svg+xml',
   'audio/m4a',
   'audio/mp4',
   'audio/mpeg',
-  'audio/mp3'
+  'audio/mp3',
+  'font/woff2',
 ]
 
 // Max file size: 10MB
@@ -102,13 +104,14 @@ async function handleSimple(req, res) {
       Bucket: process.env.R2_BUCKET,
       Key: finalKey,
       ContentType: contentType,
+      CacheControl: 'public, max-age=31536000, immutable',
     })
 
     const uploadUrl = await getSignedUrl(r2Client, command, { 
       expiresIn: 300 // 5 minutes
     })
 
-    // Generate public URL
+    // Generate public URL (no ETag until PUT happens). Client will fetch ETag after PUT.
     const publicUrl = getPublicUrl(finalKey)
 
     return res.status(200).json({
@@ -188,13 +191,14 @@ async function handlePresign(req, res) {
       Bucket: process.env.R2_BUCKET,
       Key: key,
       ContentType: contentType,
+      CacheControl: 'public, max-age=31536000, immutable',
     })
 
     const uploadUrl = await getSignedUrl(r2Client, command, { 
       expiresIn: 300 // 5 minutes
     })
 
-    // Generate public URL
+    // Generate public URL (no ETag yet). Client will append ?v=etag after upload.
     const publicUrl = getPublicUrl(key)
 
     return res.status(200).json({
@@ -363,3 +367,7 @@ module.exports = async (req, res) => {
       })
   }
 }
+
+
+
+

@@ -12,18 +12,26 @@ import { addPropertyControls, ControlType } from "framer"
 // ======= Gallery Minis (single-file, inline styles) =======
 // Key generation utilities for R2
 function slugifyName(name: string): string {
-    const idx = name.lastIndexOf('.')
+    const idx = name.lastIndexOf(".")
     const base = idx >= 0 ? name.slice(0, idx) : name
-    const ext = idx >= 0 ? name.slice(idx) : ''
-    return base
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '')
-        + ext.toLowerCase()
+    const ext = idx >= 0 ? name.slice(idx) : ""
+    return (
+        base
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "") + ext.toLowerCase()
+    )
 }
 
 function makeGalleryKey(pageId: string, file: File): string {
-    return `gallery/${pageId}/${Date.now()}-${slugifyName(file.name)}` // no leading slash
+    const name = slugifyName(file.name)
+    const extMatch = name.match(/\.([a-z0-9]+)$/i)
+    const ext = (extMatch ? extMatch[1].toLowerCase() : '').replace('jpeg', 'jpg')
+    let baseFolder = 'files'
+    if (['png', 'jpg', 'webp', 'svg'].includes(ext)) baseFolder = 'images'
+    if (['mp3', 'm4a'].includes(ext)) baseFolder = 'audio'
+    if (['woff2'].includes(ext)) baseFolder = 'fonts'
+    return `${baseFolder}/${pageId}/${Date.now()}-${name}`
 }
 
 // Legacy Supabase transform function (for fallback display only)
@@ -212,7 +220,7 @@ function UiPhotoTile({
     // Admin 썸네일은 작은 변환 이미지를 우선 사용 (가능한 경우)
     const thumbSrc = React.useMemo(() => {
         if (!src) return src
-        
+
         try {
             const u = new URL(src)
             // Supabase URL인 경우 썸네일 변환 시도
@@ -321,7 +329,6 @@ function UiPhotoTile({
         Number.isFinite(totalCount) ? totalCount : 1
     )
     const orderOptions = Array.from({ length: effectiveCount }, (_, i) => i + 1)
-
     return (
         <div
             style={{
@@ -693,12 +700,12 @@ const theme: any = {
     },
     // UI Primitives 테마 확장
     border: {
-        width: 1,           // 모든 컴포넌트가 참조할 전역 테두리 굵기
-        radius: 0           // 기존 디자인 유지
+        width: 1, // 모든 컴포넌트가 참조할 전역 테두리 굵기
+        radius: 0, // 기존 디자인 유지
     },
     formSpace: {
-        fieldGroupGap: 16,  // FormField 묶음 간 간격
-        fieldLabelGap: 8    // 라벨과 입력 사이 간격
+        fieldGroupGap: 24, // FormField 묶음 간 간격
+        fieldLabelGap: 8, // 라벨과 입력 사이 간격
     },
 } as const
 
@@ -730,7 +737,7 @@ function FormField({
     labelGap,
     style,
     labelStyle,
-    children
+    children,
 }: FormFieldProps) {
     return (
         <div
@@ -739,7 +746,7 @@ function FormField({
                 flexDirection: "column",
                 gap: labelGap ?? theme.formSpace.fieldLabelGap,
                 marginBottom: gap ?? theme.formSpace.fieldGroupGap,
-                ...style
+                ...style,
             }}
         >
             <label
@@ -748,14 +755,30 @@ function FormField({
                     color: theme.color.text,
                     fontSize: 14,
                     fontFamily: "Pretendard SemiBold",
-                    ...labelStyle
+                    ...labelStyle,
                 }}
             >
-                {label} {required ? <span aria-hidden="true" style={{ color: theme.color.danger }}>*</span> : null}
+                {label}{" "}
+                {required ? (
+                    <span
+                        aria-hidden="true"
+                        style={{ color: theme.color.danger }}
+                    >
+                        *
+                    </span>
+                ) : null}
             </label>
             {children}
             {helpText ? (
-                <div style={{ color: theme.color.muted, fontSize: 12, marginTop: 4 }}>{helpText}</div>
+                <div
+                    style={{
+                        color: theme.color.muted,
+                        fontSize: 12,
+                        marginTop: 4,
+                    }}
+                >
+                    {helpText}
+                </div>
             ) : null}
         </div>
     )
@@ -765,37 +788,37 @@ type InputBaseProps = React.InputHTMLAttributes<HTMLInputElement> & {
     invalid?: boolean
 }
 
-const InputBase = React.forwardRef<HTMLInputElement, InputBaseProps>(function InputBase(
-    { style, invalid, ...props },
-    ref
-) {
-    return (
-        <input
-            ref={ref}
-            {...props}
-            style={{
-                width: "100%",
-                height: 40,
-                padding: "10px 12px",
-                borderStyle: "solid",
-                borderWidth: theme.border.width,               // ✅ 1로 통일 (토큰)
-                borderColor: invalid ? theme.color.danger : theme.color.border,
-                borderRadius: theme.border.radius,
-                outline: "none",
-                background: theme.color.surface,
-                color: theme.color.text,
-                fontFamily: "Pretendard Regular",
-                fontSize: 14,
-                ...style
-            }}
-        />
-    )
-})
+const InputBase = React.forwardRef<HTMLInputElement, InputBaseProps>(
+    function InputBase({ style, invalid, ...props }, ref) {
+        return (
+            <input
+                ref={ref}
+                {...props}
+                style={{
+                    width: "100%",
+                    height: 40,
+                    padding: "10px 12px",
+                    borderStyle: "solid",
+                    borderWidth: theme.border.width, // ✅ 1로 통일 (토큰)
+                    borderColor: invalid
+                        ? theme.color.danger
+                        : theme.color.border,
+                    borderRadius: theme.border.radius,
+                    outline: "none",
+                    background: theme.color.surface,
+                    color: theme.color.text,
+                    fontFamily: "Pretendard Regular",
+                    fontSize: 14,
+                    ...style,
+                }}
+            />
+        )
+    }
+)
 
 type ButtonBaseProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
     variant?: "primary" | "default"
 }
-
 const ButtonBase: React.FC<ButtonBaseProps> = ({
     variant = "default",
     style,
@@ -812,15 +835,17 @@ const ButtonBase: React.FC<ButtonBaseProps> = ({
                 height: 40,
                 padding: "0 14px",
                 borderStyle: "solid",
-                borderWidth: theme.border.width,               // ✅ 1로 통일 (토큰)
-                borderColor: isPrimary ? theme.color.primary : theme.color.border,
+                borderWidth: theme.border.width, // ✅ 1로 통일 (토큰)
+                borderColor: isPrimary
+                    ? theme.color.primary
+                    : theme.color.border,
                 borderRadius: theme.border.radius,
                 background: isPrimary ? theme.color.primary : theme.color.bg,
                 color: isPrimary ? theme.color.primaryText : theme.color.text,
                 cursor: "pointer",
                 fontFamily: "Pretendard Regular",
                 fontSize: 14,
-                ...style
+                ...style,
             }}
         />
     )
@@ -1231,8 +1256,16 @@ function SaveBar({
     label?: string
 }) {
     return (
-        <Row gap={2} style={{ marginTop: theme.space(2), width: "100%" }}>
-            <Button onClick={onSave} disabled={!!loading} fullWidth>
+        <Row
+            gap={2}
+            style={{ marginTop: theme.space(2), width: "100%", height: 44 }}
+        >
+            <Button
+                onClick={onSave}
+                disabled={!!loading}
+                fullWidth
+                style={{ fontFamily: "Pretendard SemiBold", fontSize: 14 }}
+            >
                 {loading ? "저장 중..." : (label ?? "저장")}
             </Button>
         </Row>
@@ -1662,7 +1695,6 @@ function InlineNameSection({
         </div>
     )
 }
-
 function InlinePhotoSection({
     imageUrl,
     displayDateTime,
@@ -2115,7 +2147,6 @@ function removeAuthToken() {
         // localStorage 사용 불가 시 무시
     }
 }
-
 // 인증 관련 함수들
 async function authenticateAdmin(
     username: string,
@@ -2501,8 +2532,10 @@ async function saveImageMeta(
 ): Promise<any> {
     try {
         const token = getAuthToken()
-        console.log(`saveImageMeta 시작: pageId=${pageId}, fileName=${fileName}, order=${order}, storagePath=${storagePath}, hasToken=${!!token}`)
-        
+        console.log(
+            `saveImageMeta 시작: pageId=${pageId}, fileName=${fileName}, order=${order}, storagePath=${storagePath}, hasToken=${!!token}`
+        )
+
         const requestBody = {
                 action: "saveMeta",
                 pageId,
@@ -2511,8 +2544,8 @@ async function saveImageMeta(
                 storagePath,
                 fileSize,
         }
-        console.log('saveImageMeta 요청 body:', requestBody)
-        
+        console.log("saveImageMeta 요청 body:", requestBody)
+
         const response = await fetch(`${PROXY_BASE_URL}/api/images`, {
             method: "POST",
             headers: {
@@ -2523,16 +2556,16 @@ async function saveImageMeta(
         })
 
         console.log(`saveImageMeta 응답 status: ${response.status}`)
-        
+
         if (!response.ok) {
             const errorText = await response.text()
-            console.error('saveImageMeta HTTP 오류:', errorText)
+            console.error("saveImageMeta HTTP 오류:", errorText)
             throw new Error(`HTTP ${response.status}: ${errorText}`)
         }
 
         const result = await response.json()
-        console.log('saveImageMeta 응답 result:', result)
-        
+        console.log("saveImageMeta 응답 result:", result)
+
         if (!result.success) throw new Error(result.error)
         return result.data
     } catch (error: unknown) {
@@ -2559,7 +2592,6 @@ function validateImageFileSize(file: File): void {
         )
     }
 }
-
 // 기본 이미지 압축 함수
 async function compressImage(
     file: File,
@@ -2772,9 +2804,11 @@ async function compressAudio(
             // 실제 음원 압축은 복잡하므로, 여기서는 파일 크기 체크만 수행
             // 실제 환경에서는 FFmpeg 등을 사용해야 함
             console.log(`음원 파일 크기: ${originalSize.toFixed(2)}KB`)
-            
+
             if (originalSize > maxSizeKB) {
-                console.warn(`음원 파일이 ${maxSizeKB}KB를 초과합니다. 실제 압축이 필요합니다.`)
+                console.warn(
+                    `음원 파일이 ${maxSizeKB}KB를 초과합니다. 실제 압축이 필요합니다.`
+                )
             }
 
             onProgress?.(100)
@@ -2787,16 +2821,16 @@ async function compressAudio(
 
 // 무료 음원 데이터
 const FREE_BGM_LIST = [
-    { id: '1', name: '01', url: 'https://cdn.roarc.kr/bgm/free/01.m4a' },
-    { id: '2', name: '02', url: 'https://cdn.roarc.kr/bgm/free/02.m4a' },
-    { id: '3', name: '03', url: 'https://cdn.roarc.kr/bgm/free/03.m4a' },
-    { id: '4', name: '04', url: 'https://cdn.roarc.kr/bgm/free/04.m4a' },
-    { id: '5', name: '05', url: 'https://cdn.roarc.kr/bgm/free/05.m4a' },
-    { id: '6', name: '06', url: 'https://cdn.roarc.kr/bgm/free/06.m4a' },
-    { id: '7', name: '07', url: 'https://cdn.roarc.kr/bgm/free/07.m4a' },
-    { id: '8', name: '08', url: 'https://cdn.roarc.kr/bgm/free/08.m4a' },
-    { id: '9', name: '09', url: 'https://cdn.roarc.kr/bgm/free/09.m4a' },
-    { id: '10', name: '10', url: 'https://cdn.roarc.kr/bgm/free/10.m4a' },
+    { id: "1", name: "01", url: "https://cdn.roarc.kr/bgm/free/01.m4a" },
+    { id: "2", name: "02", url: "https://cdn.roarc.kr/bgm/free/02.m4a" },
+    { id: "3", name: "03", url: "https://cdn.roarc.kr/bgm/free/03.m4a" },
+    { id: "4", name: "04", url: "https://cdn.roarc.kr/bgm/free/04.m4a" },
+    { id: "5", name: "05", url: "https://cdn.roarc.kr/bgm/free/05.m4a" },
+    { id: "6", name: "06", url: "https://cdn.roarc.kr/bgm/free/06.m4a" },
+    { id: "7", name: "07", url: "https://cdn.roarc.kr/bgm/free/07.m4a" },
+    { id: "8", name: "08", url: "https://cdn.roarc.kr/bgm/free/08.m4a" },
+    { id: "9", name: "09", url: "https://cdn.roarc.kr/bgm/free/09.m4a" },
+    { id: "10", name: "10", url: "https://cdn.roarc.kr/bgm/free/10.m4a" },
 ]
 
 // 메인 Admin 컴포넌트 (내부 로직)
@@ -3028,7 +3062,24 @@ function AdminMainContent(props: any) {
     const [compressProgress, setCompressProgress] = useState<number | null>(
         null
     )
+    const audioRef = React.useRef<HTMLAudioElement | null>(null)
+    const [selectedBgmId, setSelectedBgmId] = useState<string | null>(null)
+    const [playingBgmId, setPlayingBgmId] = useState<string | null>(null)
 
+    React.useEffect(() => {
+        const match = FREE_BGM_LIST.find((b) => b.url === pageSettings.bgm_url)
+        setSelectedBgmId(match ? match.id : null)
+    }, [pageSettings.bgm_url])
+
+    React.useEffect(() => {
+        const el = audioRef.current
+        if (!el) return
+        const onEnded = () => setPlayingBgmId(null)
+        el.addEventListener("ended", onEnded)
+        return () => {
+            el.removeEventListener("ended", onEnded)
+        }
+    }, [])
     // 미리보기용 포맷터 및 프롭 빌더
     const formatPhotoDisplayDateTime = (): string => {
         const locale =
@@ -3428,7 +3479,6 @@ function AdminMainContent(props: any) {
     }
 
     // moveImageToPosition 함수는 이제 필요 없음 - 직접 로직 사용
-
     // 특정 위치의 이미지 교체 함수
     const handleReplaceImage = async (index: number, newFile: File) => {
         console.log(`이미지 교체 시작: index=${index}, file=${newFile.name}`)
@@ -3494,13 +3544,24 @@ function AdminMainContent(props: any) {
             console.log("이미지 업로드 시작... (R2)")
             try {
                 // R2 업로드 시도
-                console.log('[R2] REPLACE_START', { name: processedFile.name, type: processedFile.type, size: processedFile.size })
+                console.log("[R2] REPLACE_START", {
+                    name: processedFile.name,
+                    type: processedFile.type,
+                    size: processedFile.size,
+                })
                 const key = makeGalleryKey(currentPageId, processedFile)
-                console.log('[R2] PRESIGN_REQ', { key })
-                
-                const uploadRes = await uploadToR2(processedFile, currentPageId, key)
-                console.log('[R2] PUBLIC_URL', uploadRes.publicUrl)
-                console.log("R2 업로드 완료:", { key: uploadRes.key, publicUrl: uploadRes.publicUrl })
+                console.log("[R2] PRESIGN_REQ", { key })
+
+                const uploadRes = await uploadToR2(
+                    processedFile,
+                    currentPageId,
+                    key
+                )
+                console.log("[R2] PUBLIC_URL", uploadRes.publicUrl)
+                console.log("R2 업로드 완료:", {
+                    key: uploadRes.key,
+                    publicUrl: uploadRes.publicUrl,
+                })
 
                 // 메타데이터 저장 (R2 public URL을 path로 저장)
                 saved = await saveImageMeta(
@@ -3861,7 +3922,6 @@ function AdminMainContent(props: any) {
             console.warn("localStorage 접근 실패:", error)
         }
     }, [])
-
     // 로그인/로그아웃
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -4195,7 +4255,10 @@ function AdminMainContent(props: any) {
             let imageUrl: string = ""
             let imagePath: string = ""
             try {
-                const { publicUrl, key } = await uploadToR2(finalFile, currentPageId)
+                const { publicUrl, key } = await uploadToR2(
+                    finalFile,
+                    currentPageId
+                )
                 imageUrl = publicUrl
                 imagePath = key
             } catch (e) {
@@ -4232,7 +4295,6 @@ function AdminMainContent(props: any) {
     useEffect(() => {
         if (currentPageId) loadExistingImages()
     }, [currentPageId])
-
     // 이미지 업로드 (presigned URL 방식 + 압축)
     const handleFileSelect = async (
         event: React.ChangeEvent<HTMLInputElement>
@@ -4285,20 +4347,37 @@ function AdminMainContent(props: any) {
                     let saved: any = null
                     let publicUrl: string = ""
                     let key: string = ""
-                    
+
                     try {
                         // R2에 업로드
-                console.log('[R2] GALLERY_UPLOAD_START', { name: processedFile.name, type: processedFile.type, size: processedFile.size })
-                const galleryKey = makeGalleryKey(currentPageId, processedFile)
-                console.log('[R2] GALLERY_PRESIGN_REQ', { key: galleryKey })
-                        const uploadResult = await uploadToR2(processedFile, currentPageId, galleryKey)
+                        console.log("[R2] GALLERY_UPLOAD_START", {
+                            name: processedFile.name,
+                            type: processedFile.type,
+                            size: processedFile.size,
+                        })
+                        const galleryKey = makeGalleryKey(
+                            currentPageId,
+                            processedFile
+                        )
+                        console.log("[R2] GALLERY_PRESIGN_REQ", {
+                            key: galleryKey,
+                        })
+                        const uploadResult = await uploadToR2(
+                            processedFile,
+                            currentPageId,
+                            galleryKey
+                        )
                         publicUrl = uploadResult.publicUrl
                         key = uploadResult.key
-                        console.log('[R2] PUBLIC_URL', publicUrl)
-                        console.log(`R2 업로드 성공: ${processedFile.name}, publicUrl: ${publicUrl}`)
-                        
+                        console.log("[R2] PUBLIC_URL", publicUrl)
+                        console.log(
+                            `R2 업로드 성공: ${processedFile.name}, publicUrl: ${publicUrl}`
+                        )
+
                         // 메타데이터 저장 (publicUrl을 path 대신 사용)
-                        console.log(`메타데이터 저장 시작: ${processedFile.name}`)
+                        console.log(
+                            `메타데이터 저장 시작: ${processedFile.name}`
+                        )
                         saved = await saveImageMeta(
                             currentPageId,
                             processedFile.name,
@@ -4306,7 +4385,10 @@ function AdminMainContent(props: any) {
                             publicUrl, // R2 public URL을 path로 사용
                             processedFile.size
                         )
-                        console.log(`메타데이터 저장 성공: ${processedFile.name}, saved:`, saved)
+                        console.log(
+                            `메타데이터 저장 성공: ${processedFile.name}, saved:`,
+                            saved
+                        )
                     } catch (e) {
                         console.error(
                             "업로드 또는 메타데이터 저장 실패:",
@@ -4327,11 +4409,14 @@ function AdminMainContent(props: any) {
                         original_name: saved.original_name || file.name,
                         display_order: existingImages.length + i + 1,
                     }
-                    console.log('[GALLERY] 새 이미지 추가:', newImg)
+                    console.log("[GALLERY] 새 이미지 추가:", newImg)
                     setExistingImages((prev) => {
-                        console.log('[GALLERY] 이전 이미지 수:', prev.length)
+                        console.log("[GALLERY] 이전 이미지 수:", prev.length)
                         const updated = [...prev, newImg]
-                        console.log('[GALLERY] 업데이트 후 이미지 수:', updated.length)
+                        console.log(
+                            "[GALLERY] 업데이트 후 이미지 수:",
+                            updated.length
+                        )
                         return updated
                     })
                     setImagesVersion((v) => v + 1)
@@ -4370,19 +4455,22 @@ function AdminMainContent(props: any) {
             // 예: https://cdn.roarc.kr/bgm/kim4bun/1234567890-song.mp3 -> bgm/kim4bun/1234567890-song.mp3
             const url = new URL(publicUrl)
             const key = url.pathname.substring(1) // 첫 번째 '/' 제거
-            
+
             console.log(`[BGM] R2 파일 삭제 시작: ${key}`)
-            
-            const response = await fetch(`${PROXY_BASE_URL}/api/r2?action=delete`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ key }),
-            })
-            
+
+            const response = await fetch(
+                `${PROXY_BASE_URL}/api/r2?action=delete`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ key }),
+                }
+            )
+
             console.log(`[BGM] R2 삭제 응답: ${response.status}`)
-            
+
             if (!response.ok) {
                 const errorText = await response.text()
                 console.warn(`[BGM] R2 파일 삭제 실패: ${errorText}`)
@@ -4396,63 +4484,89 @@ function AdminMainContent(props: any) {
         }
     }
 
-    const uploadToR2 = async (file: File, pageId: string, customKey?: string): Promise<{ publicUrl: string; key: string }> => {
+    const uploadToR2 = async (
+        file: File,
+        pageId: string,
+        customKey?: string
+    ): Promise<{ publicUrl: string; key: string; etag?: string }> => {
         try {
-            console.log(`uploadToR2 시작: ${file.name}, pageId: ${pageId}, size: ${file.size}, type: ${file.type}`)
-            
+            console.log(
+                `uploadToR2 시작: ${file.name}, pageId: ${pageId}, size: ${file.size}, type: ${file.type}`
+            )
+
             // Use custom key if provided, otherwise generate one
             const key = customKey || makeGalleryKey(pageId, file)
-            console.log('[R2] PRESIGN_REQ', { key })
-            
+            console.log("[R2] PRESIGN_REQ", { key })
+
             // 1. Get presigned URL (using unified r2 endpoint)
-            const presignResponse = await fetch(`${PROXY_BASE_URL}/api/r2?action=simple`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    pageId,
-                    fileName: file.name,
-                    contentType: file.type,
-                    key, // Pass the custom key to API
-                }),
-            })
+            const presignResponse = await fetch(
+                `${PROXY_BASE_URL}/api/r2?action=simple`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        pageId,
+                        fileName: file.name,
+                        contentType: file.type,
+                        key, // Pass the custom key to API
+                    }),
+                }
+            )
 
             console.log(`[R2] PRESIGN_RES ${presignResponse.status}`)
-            
+
             if (!presignResponse.ok) {
                 const errorText = await presignResponse.text()
-                console.error('Presigned URL 요청 실패:', errorText)
+                console.error("Presigned URL 요청 실패:", errorText)
                 throw new Error(`Failed to get presigned URL: ${errorText}`)
             }
 
             const presignData = await presignResponse.json()
             const { uploadUrl, key: serverKey, publicUrl } = presignData
-            console.log('[R2] PRESIGN_RES', presignData?.uploadUrl?.slice?.(0, 120))
+            console.log(
+                "[R2] PRESIGN_RES",
+                presignData?.uploadUrl?.slice?.(0, 120)
+            )
 
             // 2. Upload file to R2
             console.log(`R2 직접 업로드 시작: ${uploadUrl?.slice?.(0, 120)}...`)
             const uploadResponse = await fetch(uploadUrl, {
-                method: 'PUT',
+                method: "PUT",
                 headers: {
-                    'Content-Type': file.type,
+                    "Content-Type": file.type,
                 },
                 body: file,
             })
 
-            const putText = await uploadResponse.text().catch(() => '')
-            console.log('[R2] PUT_RES', uploadResponse.status, putText.slice(0, 200))
-            
+            const putText = await uploadResponse.text().catch(() => "")
+            console.log(
+                "[R2] PUT_RES",
+                uploadResponse.status,
+                putText.slice(0, 200)
+            )
+
             if (!uploadResponse.ok) {
-                console.error('R2 업로드 실패:', putText)
+                console.error("R2 업로드 실패:", putText)
                 throw new Error(`Failed to upload file to R2: ${putText}`)
             }
 
-            console.log('[R2] PUBLIC_URL', publicUrl)
-            console.log(`uploadToR2 완료: publicUrl=${publicUrl}, key=${serverKey}`)
-            return { publicUrl, key: serverKey }
+            // ETag 추출 → 버전 파라미터로 사용
+            // Note: ETag 헤더는 따옴표가 포함될 수 있어 제거 처리
+            let etag = uploadResponse.headers.get("ETag") || uploadResponse.headers.get("etag") || undefined
+            if (etag) {
+                etag = etag.replace(/\"/g, "").trim()
+            }
+
+            console.log("[R2] PUBLIC_URL", publicUrl)
+            console.log(
+                `uploadToR2 완료: publicUrl=${publicUrl}, key=${serverKey}`
+            )
+            const versionedUrl = etag ? `${publicUrl}?v=${encodeURIComponent(etag)}` : publicUrl
+            return { publicUrl: versionedUrl, key: serverKey, etag }
         } catch (error) {
-            console.error('R2 upload failed:', error)
+            console.error("R2 upload failed:", error)
             throw error
         }
     }
@@ -4461,50 +4575,67 @@ function AdminMainContent(props: any) {
     const handleAudioUpload = async (
         event: React.ChangeEvent<HTMLInputElement>
     ) => {
-        console.log('[BGM] handleAudioUpload 함수 호출됨')
-        console.log('[BGM] event:', event)
-        console.log('[BGM] event.target:', event.target)
-        console.log('[BGM] event.target.files:', event.target.files)
-        
+        console.log("[BGM] handleAudioUpload 함수 호출됨")
+        console.log("[BGM] event:", event)
+        console.log("[BGM] event.target:", event.target)
+        console.log("[BGM] event.target.files:", event.target.files)
+
         const file = event.target.files?.[0]
-        console.log('[BGM] 추출된 파일:', file)
-        console.log('[BGM] currentPageId:', currentPageId)
-        
+        console.log("[BGM] 추출된 파일:", file)
+        console.log("[BGM] currentPageId:", currentPageId)
+
         if (!file) {
-            console.log('[BGM] 파일이 없어서 함수 종료')
+            console.log("[BGM] 파일이 없어서 함수 종료")
             return
         }
         if (!currentPageId) {
-            console.log('[BGM] currentPageId가 없어서 함수 종료')
+            console.log("[BGM] currentPageId가 없어서 함수 종료")
             return
         }
 
         // 오디오 파일 타입 검증
-        const allowedAudioTypes = ['audio/mpeg', 'audio/mp3', 'audio/m4a', 'audio/mp4']
-        if (!allowedAudioTypes.includes(file.type) && !file.name.toLowerCase().match(/\.(mp3|m4a|mp4)$/)) {
-            alert('MP3, M4A 파일만 업로드 가능합니다.')
+        const allowedAudioTypes = [
+            "audio/mpeg",
+            "audio/mp3",
+            "audio/m4a",
+            "audio/mp4",
+        ]
+        if (
+            !allowedAudioTypes.includes(file.type) &&
+            !file.name.toLowerCase().match(/\.(mp3|m4a|mp4)$/)
+        ) {
+            alert("MP3, M4A 파일만 업로드 가능합니다.")
             return
         }
 
         setSettingsLoading(true)
 
         try {
-            console.log(`[BGM] 음원 업로드 시작: ${file.name}, 크기: ${(file.size / 1024).toFixed(2)}KB, 타입: ${file.type}`)
+            console.log(
+                `[BGM] 음원 업로드 시작: ${file.name}, 크기: ${(file.size / 1024).toFixed(2)}KB, 타입: ${file.type}`
+            )
             console.log(`[BGM] currentPageId: ${currentPageId}`)
 
             // 1. 음원 압축 (5MB 이상인 경우)
             let processedFile = file
-            if (file.size / 1024 > 5120) { // 5MB
-                console.log(`[BGM] 음원 압축 시작: ${(file.size / 1024).toFixed(2)}KB`)
+            if (file.size / 1024 > 5120) {
+                // 5MB
+                console.log(
+                    `[BGM] 음원 압축 시작: ${(file.size / 1024).toFixed(2)}KB`
+                )
                 processedFile = await compressAudio(file, 5120)
-                console.log(`[BGM] 음원 압축 완료: ${(processedFile.size / 1024).toFixed(2)}KB`)
+                console.log(
+                    `[BGM] 음원 압축 완료: ${(processedFile.size / 1024).toFixed(2)}KB`
+                )
             } else {
                 console.log(`[BGM] 음원 크기가 5MB 미만이므로 압축 생략`)
             }
 
             // 2. 기존 BGM 파일 삭제 (있다면)
-            if (pageSettings.bgm_url && pageSettings.bgm_type === 'custom') {
-                console.log(`[BGM] 기존 커스텀 BGM 파일 삭제 시작: ${pageSettings.bgm_url}`)
+            if (pageSettings.bgm_url && pageSettings.bgm_type === "custom") {
+                console.log(
+                    `[BGM] 기존 커스텀 BGM 파일 삭제 시작: ${pageSettings.bgm_url}`
+                )
                 await deleteFromR2(pageSettings.bgm_url)
             } else {
                 console.log(`[BGM] 기존 커스텀 BGM 파일 없음, 삭제 생략`)
@@ -4517,51 +4648,60 @@ function AdminMainContent(props: any) {
                 name: processedFile.name,
                 type: processedFile.type,
                 size: processedFile.size,
-                lastModified: processedFile.lastModified
+                lastModified: processedFile.lastModified,
             })
-            
-            const uploadResult = await uploadToR2(processedFile, currentPageId, audioKey)
+
+            const uploadResult = await uploadToR2(
+                processedFile,
+                currentPageId,
+                audioKey
+            )
             console.log(`[BGM] R2 업로드 결과:`, uploadResult)
             const { publicUrl } = uploadResult
             console.log(`[BGM] R2 업로드 완료, 공개 URL: ${publicUrl}`)
-            
+
             // R2 업로드 검증: HEAD 요청으로 파일 존재 확인
             try {
                 console.log(`[BGM] R2 파일 존재 확인 시작: ${publicUrl}`)
-                const headResponse = await fetch(publicUrl, { method: 'HEAD' })
+                const headResponse = await fetch(publicUrl, { method: "HEAD" })
                 console.log(`[BGM] R2 파일 확인 응답: ${headResponse.status}`)
                 if (headResponse.ok) {
                     console.log(`[BGM] R2 파일 존재 확인됨`)
                 } else {
-                    console.warn(`[BGM] R2 파일 접근 불가: ${headResponse.status}`)
+                    console.warn(
+                        `[BGM] R2 파일 접근 불가: ${headResponse.status}`
+                    )
                 }
             } catch (headError) {
                 console.warn(`[BGM] R2 파일 확인 중 오류:`, headError)
             }
-            
+
             // 4. 페이지 설정에 저장
             const updatedSettings = {
                 ...pageSettings,
                 bgm_url: publicUrl,
-                bgm_type: 'custom'
+                bgm_type: "custom",
             }
 
             console.log(`[BGM] 저장할 설정:`, updatedSettings)
-            console.log(`[BGM] sanitized 설정:`, sanitizeSettingsForSave(updatedSettings))
+            console.log(
+                `[BGM] sanitized 설정:`,
+                sanitizeSettingsForSave(updatedSettings)
+            )
             console.log(`[BGM] 페이지 설정 저장 시작`)
-            
+
             const saveResult = await savePageSettings(updatedSettings)
             console.log(`[BGM] 페이지 설정 저장 결과:`, saveResult)
-            
+
             setPageSettings(updatedSettings)
             console.log(`[BGM] 로컬 상태 업데이트 완료`)
 
-            setSuccess('음원이 성공적으로 업로드되었습니다!')
+            setSuccess("음원이 성공적으로 업로드되었습니다!")
             setTimeout(() => setSuccess(null), 3000)
-
         } catch (error: unknown) {
-            console.error('음원 업로드 실패:', error)
-            const message = error instanceof Error ? error.message : String(error)
+            console.error("음원 업로드 실패:", error)
+            const message =
+                error instanceof Error ? error.message : String(error)
             setError(`음원 업로드에 실패했습니다: ${message}`)
         } finally {
             setSettingsLoading(false)
@@ -4570,45 +4710,24 @@ function AdminMainContent(props: any) {
 
     // 무료 음원 선택 핸들러
     const handleFreeBgmSelect = async (bgmId: string) => {
-        const selectedBgm = FREE_BGM_LIST.find(bgm => bgm.id === bgmId)
+        const selectedBgm = FREE_BGM_LIST.find((bgm) => bgm.id === bgmId)
         if (!selectedBgm) {
             console.error(`[BGM] 무료 음원을 찾을 수 없음: ${bgmId}`)
             return
         }
 
-        console.log(`[BGM] 무료 음원 선택: ${selectedBgm.name} (${selectedBgm.url})`)
-        setSettingsLoading(true)
+        // 즉시 재생 + 로컬 상태만 반영 (서버 저장은 최종 저장 버튼에서 수행)
+        setSelectedBgmId(bgmId)
+        setPlayingBgmId(bgmId)
+        setPageSettings((prev) => ({ ...prev, bgm_url: selectedBgm.url, bgm_type: "free" }))
 
         try {
-            // 기존 커스텀 BGM 파일 삭제 (있다면)
-            if (pageSettings.bgm_url && pageSettings.bgm_type === 'custom') {
-                console.log(`[BGM] 무료 음원 선택 시 기존 커스텀 BGM 파일 삭제 시작: ${pageSettings.bgm_url}`)
-                await deleteFromR2(pageSettings.bgm_url)
-            } else {
-                console.log(`[BGM] 기존 커스텀 BGM 파일 없음, 삭제 생략`)
+            if (audioRef.current) {
+                audioRef.current.src = selectedBgm.url
+                audioRef.current.currentTime = 0
+                await audioRef.current.play()
             }
-
-            const updatedSettings = {
-                ...pageSettings,
-                bgm_url: selectedBgm.url,
-                bgm_type: 'free'
-            }
-
-            console.log(`[BGM] 무료 음원 페이지 설정 저장 시작`)
-            await savePageSettings(updatedSettings)
-            setPageSettings(updatedSettings)
-            console.log(`[BGM] 무료 음원 페이지 설정 저장 완료`)
-
-            setSuccess(`무료 음원 "${selectedBgm.name}"이 선택되었습니다!`)
-            setTimeout(() => setSuccess(null), 3000)
-
-        } catch (error: unknown) {
-            console.error('[BGM] 무료 음원 선택 실패:', error)
-            const message = error instanceof Error ? error.message : String(error)
-            setError(`무료 음원 선택에 실패했습니다: ${message}`)
-        } finally {
-            setSettingsLoading(false)
-        }
+        } catch {}
     }
 
     // 자동재생 설정 변경
@@ -4618,15 +4737,15 @@ function AdminMainContent(props: any) {
         try {
             const updatedSettings = {
                 ...pageSettings,
-                bgm_autoplay: autoplay
+                bgm_autoplay: autoplay,
             }
 
             await savePageSettings(updatedSettings)
             setPageSettings(updatedSettings)
-
         } catch (error: unknown) {
-            console.error('자동재생 설정 실패:', error)
-            const message = error instanceof Error ? error.message : String(error)
+            console.error("자동재생 설정 실패:", error)
+            const message =
+                error instanceof Error ? error.message : String(error)
             setError(`자동재생 설정에 실패했습니다: ${message}`)
         } finally {
             setSettingsLoading(false)
@@ -4677,7 +4796,6 @@ function AdminMainContent(props: any) {
             setLoading(false)
         }
     }
-
     const handleSaveContact = async () => {
         if (!selectedContact) return
 
@@ -5029,7 +5147,6 @@ function AdminMainContent(props: any) {
             </div>
         )
     }
-
     // 관리자 화면
     return (
         <div
@@ -5306,6 +5423,8 @@ function AdminMainContent(props: any) {
                                         loading={settingsLoading}
                                     />
                                 </div>
+                                {/* 오디오 프리뷰 요소 */}
+                                <audio ref={audioRef} style={{ display: "none" }} />
                             </div>
                         </div>
                     </AccordionSection>
@@ -5373,7 +5492,7 @@ function AdminMainContent(props: any) {
                                     style={{
                                         display: "flex",
                                         flexDirection: "column",
-                                        gap: theme.gap.sm,
+                                        gap: theme.gap.md,
                                     }}
                                 >
                                     <span style={theme.typography.label}>
@@ -5382,7 +5501,7 @@ function AdminMainContent(props: any) {
                                     <div
                                         style={{
                                             display: "flex",
-                                            gap: theme.gap.sm,
+                                            gap: theme.gap.md,
                                             width: "100%",
                                         }}
                                     >
@@ -5460,6 +5579,7 @@ function AdminMainContent(props: any) {
                                         display: "flex",
                                         flexDirection: "column",
                                         gap: theme.gap.sm,
+                                        marginTop: 14,
                                     }}
                                 >
                                     <Field label="예식 일시">
@@ -5495,25 +5615,6 @@ function AdminMainContent(props: any) {
                                             }}
                                         />
                                     </Field>
-
-                                    {/* 식장 이름 */}
-                                    <FormField label="식장 이름">
-                                        <InputBase
-                                            type="text"
-                                            value={
-                                                pageSettings.photo_section_location ||
-                                                ""
-                                            }
-                                            onChange={(e) =>
-                                                setPageSettings({
-                                                    ...pageSettings,
-                                                    photo_section_location:
-                                                        e.target.value,
-                                                })
-                                            }
-                                            placeholder="식장 이름을 입력하세요"
-                                        />
-                                    </FormField>
 
                                     {/* 언어 토글 (영문/국문) */}
                                     <div
@@ -5878,12 +5979,34 @@ function AdminMainContent(props: any) {
                                     </div>
                                 </div>
 
+                                {/* 식장 이름 */}
+                                <FormField
+                                    label="식장 이름"
+                                    style={{ marginTop: 12 }}
+                                >
+                                    <InputBase
+                                        type="text"
+                                        value={
+                                            pageSettings.photo_section_location ||
+                                            ""
+                                        }
+                                        onChange={(e) =>
+                                            setPageSettings({
+                                                ...pageSettings,
+                                                photo_section_location:
+                                                    e.target.value,
+                                            })
+                                        }
+                                        placeholder="식장 이름을 입력하세요"
+                                    />
+                                </FormField>
+
                                 {/* 일시 표시 위치 / 텍스트 색상 */}
                                 <div
                                     style={{
                                         display: "flex",
                                         flexDirection: "column",
-                                        gap: theme.gap.sm,
+                                        gap: theme.gap.md,
                                     }}
                                 >
                                     <span style={theme.typography.label}>
@@ -6863,6 +6986,7 @@ function AdminMainContent(props: any) {
                                 <div
                                     style={{
                                         display: "flex",
+                                        marginTop: 16,
                                         flexDirection: "column",
                                         gap: theme.gap.sm,
                                     }}
@@ -6963,6 +7087,7 @@ function AdminMainContent(props: any) {
                                 <div
                                     style={{
                                         display: "flex",
+                                        marginTop: 16,
                                         flexDirection: "column",
                                         gap: theme.gap.sm,
                                     }}
@@ -7064,6 +7189,7 @@ function AdminMainContent(props: any) {
                                     style={{
                                         display: "flex",
                                         flexDirection: "column",
+                                        marginTop: 16,
                                         gap: theme.gap.sm,
                                     }}
                                 >
@@ -7162,7 +7288,7 @@ function AdminMainContent(props: any) {
                                 {/* 신부 */}
                                 <div
                                     style={{
-                                        padding: "24px 0px 0px 0px",
+                                        marginTop: 48,
                                         display: "flex",
                                         flexDirection: "column",
                                         gap: theme.gap.sm,
@@ -7259,11 +7385,11 @@ function AdminMainContent(props: any) {
                                         </div>
                                     </div>
                                 </div>
-
                                 {/* 신부 아버지 */}
                                 <div
                                     style={{
                                         display: "flex",
+                                        marginTop: 16,
                                         flexDirection: "column",
                                         gap: theme.gap.sm,
                                     }}
@@ -7366,6 +7492,8 @@ function AdminMainContent(props: any) {
                                         display: "flex",
                                         flexDirection: "column",
                                         gap: theme.gap.sm,
+                                        marginTop: 16,
+                                        marginBottom: 16,
                                     }}
                                 >
                                     <div style={theme.typography.label}>
@@ -8008,13 +8136,6 @@ function AdminMainContent(props: any) {
                                     pageId={currentPageId}
                                     tokenGetter={getAuthToken}
                                 />
-
-                                {/* 저장 버튼 */}
-                                <SaveBar
-                                    onSave={savePageSettings}
-                                    loading={settingsLoading}
-                                    label="저장"
-                                />
                             </div>
                         </div>
                     </AccordionSection>
@@ -8121,7 +8242,7 @@ function AdminMainContent(props: any) {
                                     style={{
                                         display: "flex",
                                         flexDirection: "column",
-                                                gap: theme.gap.sm,
+                                        gap: theme.gap.sm,
                                     }}
                                 >
                                     {/* 신랑 */}
@@ -8264,6 +8385,7 @@ function AdminMainContent(props: any) {
                                     <div
                                         style={{
                                             display: "flex",
+                                            marginTop: 16,
                                             flexDirection: "column",
                                             gap: theme.gap.sm,
                                         }}
@@ -8400,6 +8522,7 @@ function AdminMainContent(props: any) {
                                     <div
                                         style={{
                                             display: "flex",
+                                            marginTop: 16,
                                             flexDirection: "column",
                                             gap: theme.gap.sm,
                                         }}
@@ -8537,8 +8660,9 @@ function AdminMainContent(props: any) {
                                 <div
                                     style={{
                                         display: "flex",
+                                        marginTop: 16,
                                         flexDirection: "column",
-                                                gap: theme.gap.sm,
+                                        gap: theme.gap.sm,
                                     }}
                                 >
                                     {/* 신부 */}
@@ -8681,6 +8805,7 @@ function AdminMainContent(props: any) {
                                     <div
                                         style={{
                                             display: "flex",
+                                            marginTop: 16,
                                             flexDirection: "column",
                                             gap: theme.gap.sm,
                                         }}
@@ -8817,6 +8942,7 @@ function AdminMainContent(props: any) {
                                     <div
                                         style={{
                                             display: "flex",
+                                            marginTop: 16,
                                             flexDirection: "column",
                                             gap: theme.gap.sm,
                                         }}
@@ -8969,7 +9095,6 @@ function AdminMainContent(props: any) {
                         <div
                             style={{
                                 padding: "16px 16px 32px 16px",
-                                backgroundColor: "white",
                                 display: "flex",
                                 flexDirection: "column",
                                 gap: "32px",
@@ -8986,45 +9111,70 @@ function AdminMainContent(props: any) {
                                 <div
                                     style={{
                                         color: "black",
-                                        fontSize: 12,
+                                        fontSize: 14,
                                         fontFamily: "Pretendard SemiBold",
                                     }}
                                 >
                                     무료 음원
                                 </div>
-                                
+                                <div
+                                    style={{
+                                        color: "#ADADAD",
+                                        fontSize: 14,
+                                        fontFamily: "Pretendard Regular",
+                                        lineHeight: "16px",
+                                    }}
+                                >
+                                    선택하여 미리 들어보세요.
+                                </div>
+
                                 {/* 첫 번째 행 (1-5) */}
                                 <div
                                     style={{
                                         display: "flex",
                                         gap: "8px",
+                                        marginTop: 8,
                                     }}
                                 >
                                     {FREE_BGM_LIST.slice(0, 5).map((bgm) => (
                                         <button
                                             key={bgm.id}
-                                            onClick={() => handleFreeBgmSelect(bgm.id)}
+                                            onClick={() =>
+                                                handleFreeBgmSelect(bgm.id)
+                                            }
                                             disabled={settingsLoading}
                                             style={{
                                                 flex: "1 1 0",
                                                 height: 40,
                                                 padding: 12,
-                                                backgroundColor: pageSettings.bgm_type === bgm.id ? "#ECECEC" : "white",
-                                                borderRadius: 1,
-                                                outline: `${theme.border.width}px solid ${pageSettings.bgm_type === bgm.id ? "black" : "#E5E6E8"}`,
+                                                backgroundColor:
+                                                    selectedBgmId === bgm.id || playingBgmId === bgm.id
+                                                        ? "#ECECEC"
+                                                        : "white",
+                                                borderRadius: 2,
+                                                border: "none",
+                                                outline: `${theme.border.width}px solid ${selectedBgmId === bgm.id || playingBgmId === bgm.id ? "black" : "#E5E6E8"}`,
                                                 display: "flex",
                                                 justifyContent: "center",
                                                 alignItems: "center",
                                                 gap: 10,
-                                                cursor: settingsLoading ? "not-allowed" : "pointer",
-                                                opacity: settingsLoading ? 0.5 : 1,
+                                                cursor: settingsLoading
+                                                    ? "not-allowed"
+                                                    : "pointer",
+                                                opacity: settingsLoading
+                                                    ? 0.5
+                                                    : 1,
                                             }}
                                         >
                                             <span
                                                 style={{
-                                                    color: pageSettings.bgm_type === bgm.id ? "black" : "#AEAEAE",
+                                                    color:
+                                                        selectedBgmId === bgm.id || playingBgmId === bgm.id
+                                                            ? "black"
+                                                            : "#AEAEAE",
                                                     fontSize: 12,
-                                                    fontFamily: "Pretendard Regular",
+                                                    fontFamily:
+                                                        "Pretendard Regular",
                                                 }}
                                             >
                                                 {bgm.id}
@@ -9032,7 +9182,7 @@ function AdminMainContent(props: any) {
                                         </button>
                                     ))}
                                 </div>
-                                
+
                                 {/* 두 번째 행 (6-10) */}
                                 <div
                                     style={{
@@ -9043,28 +9193,42 @@ function AdminMainContent(props: any) {
                                     {FREE_BGM_LIST.slice(5, 10).map((bgm) => (
                                         <button
                                             key={bgm.id}
-                                            onClick={() => handleFreeBgmSelect(bgm.id)}
+                                            onClick={() =>
+                                                handleFreeBgmSelect(bgm.id)
+                                            }
                                             disabled={settingsLoading}
                                             style={{
                                                 flex: "1 1 0",
                                                 height: 40,
                                                 padding: 12,
-                                                backgroundColor: pageSettings.bgm_type === bgm.id ? "#ECECEC" : "white",
-                                                borderRadius: 1,
-                                                outline: `${theme.border.width}px solid ${pageSettings.bgm_type === bgm.id ? "black" : "#E5E6E8"}`,
+                                                backgroundColor:
+                                                    selectedBgmId === bgm.id || playingBgmId === bgm.id
+                                                        ? "#ECECEC"
+                                                        : "white",
+                                                borderRadius: 2,
+                                                border: "none",
+                                                outline: `${theme.border.width}px solid ${selectedBgmId === bgm.id || playingBgmId === bgm.id ? "black" : "#E5E6E8"}`,
                                                 display: "flex",
                                                 justifyContent: "center",
                                                 alignItems: "center",
                                                 gap: 10,
-                                                cursor: settingsLoading ? "not-allowed" : "pointer",
-                                                opacity: settingsLoading ? 0.5 : 1,
+                                                cursor: settingsLoading
+                                                    ? "not-allowed"
+                                                    : "pointer",
+                                                opacity: settingsLoading
+                                                    ? 0.5
+                                                    : 1,
                                             }}
                                         >
                                             <span
                                                 style={{
-                                                    color: pageSettings.bgm_type === bgm.id ? "black" : "#AEAEAE",
+                                                    color:
+                                                        selectedBgmId === bgm.id || playingBgmId === bgm.id
+                                                            ? "black"
+                                                            : "#AEAEAE",
                                                     fontSize: 12,
-                                                    fontFamily: "Pretendard Regular",
+                                                    fontFamily:
+                                                        "Pretendard Regular",
                                                 }}
                                             >
                                                 {bgm.id}
@@ -9085,7 +9249,7 @@ function AdminMainContent(props: any) {
                                 <div
                                     style={{
                                         color: "black",
-                                        fontSize: 12,
+                                        fontSize: 14,
                                         fontFamily: "Pretendard SemiBold",
                                     }}
                                 >
@@ -9094,12 +9258,13 @@ function AdminMainContent(props: any) {
                                 <div
                                     style={{
                                         color: "#ADADAD",
-                                        fontSize: 12,
+                                        fontSize: 14,
                                         fontFamily: "Pretendard Regular",
                                         lineHeight: "16px",
                                     }}
                                 >
-                                    직접 업로드 시 MP3 파일만 사용 가능하며, 자동으로 압축됩니다.
+                                    직접 업로드 시 MP3 파일만 사용 가능하며,
+                                    자동으로 압축됩니다.
                                 </div>
                                 <div
                                     style={{
@@ -9116,78 +9281,97 @@ function AdminMainContent(props: any) {
                                     >
                                         <button
                                             onClick={() => {
-                                                console.log('[BGM] 직접 업로드 버튼 클릭')
-                                                if (typeof document !== "undefined") {
-                                                    const input = document.createElement("input")
+                                                if (
+                                                    typeof document !==
+                                                    "undefined"
+                                                ) {
+                                                    const input =
+                                                        document.createElement(
+                                                            "input"
+                                                        )
                                                     input.type = "file"
-                                                    input.accept = "audio/*,.mp3,.m4a,.aac,.wav"
+                                                    input.accept =
+                                                        "audio/*,.mp3,.m4a,.aac,.wav"
                                                     input.style.display = "none"
-                                                    
+
                                                     // 이벤트 리스너 방식으로 변경
-                                                    input.addEventListener('change', (e) => {
-                                                        console.log('[BGM] change 이벤트 발생')
-                                                        const target = e.target as HTMLInputElement
-                                                        console.log('[BGM] target.files:', target?.files)
-                                                        console.log('[BGM] target.files.length:', target?.files?.length)
-                                                        
-                                                        if (target?.files?.[0]) {
-                                                            console.log('[BGM] 파일 선택됨:', target.files[0].name)
-                                                            console.log('[BGM] 선택된 파일 정보:', {
-                                                                name: target.files[0].name,
-                                                                type: target.files[0].type,
-                                                                size: target.files[0].size
-                                                            })
-                                                            
-                                                            // React 이벤트 객체 생성
-                                                            const syntheticEvent = {
-                                                                target: target,
-                                                                currentTarget: target
-                                                            } as React.ChangeEvent<HTMLInputElement>
-                                                            
-                                                            console.log('[BGM] handleAudioUpload 호출 시작')
-                                                            handleAudioUpload(syntheticEvent)
-                                                        } else {
-                                                            console.log('[BGM] 파일 선택이 취소됨 또는 파일이 없음')
-                                                        }
-                                                        
-                                                        // 사용 후 제거
-                                                        try {
-                                                            document.body.removeChild(input)
-                                                            console.log('[BGM] input 요소 제거 완료')
-                                                        } catch (removeError) {
-                                                            console.warn('[BGM] input 요소 제거 실패:', removeError)
-                                                        }
-                                                    })
-                                                    
-                                                    // 취소 시에도 처리
-                                                    input.addEventListener('cancel', () => {
-                                                        console.log('[BGM] 파일 선택 취소됨 (cancel 이벤트)')
-                                                        try {
-                                                            document.body.removeChild(input)
-                                                        } catch (removeError) {
-                                                            console.warn('[BGM] input 요소 제거 실패 (cancel):', removeError)
-                                                        }
-                                                    })
-                                                    
-                                                    // DOM에 추가 후 클릭
-                                                    document.body.appendChild(input)
-                                                    
-                                                    // 다이얼로그 닫힘 감지를 위한 window focus 이벤트
-                                                    const handleWindowFocus = () => {
-                                                        console.log('[BGM] window focus 이벤트 - 다이얼로그가 닫혔을 수 있음')
-                                                        setTimeout(() => {
-                                                            if (input.files?.length === 0) {
-                                                                console.log('[BGM] 파일 선택 없이 다이얼로그 닫힘')
+                                                    input.addEventListener(
+                                                        "change",
+                                                        (e) => {
+                                                            const target =
+                                                                e.target as HTMLInputElement
+
+                                                            if (
+                                                                target
+                                                                    ?.files?.[0]
+                                                            ) {
+                                                                // React 이벤트 객체 생성
+                                                                const syntheticEvent =
+                                                                    {
+                                                                        target: target,
+                                                                        currentTarget:
+                                                                            target,
+                                                                    } as React.ChangeEvent<HTMLInputElement>
+                                                                handleAudioUpload(
+                                                                    syntheticEvent
+                                                                )
                                                             }
-                                                        }, 100)
-                                                        window.removeEventListener('focus', handleWindowFocus)
-                                                    }
-                                                    
-                                                    window.addEventListener('focus', handleWindowFocus)
+
+                                                            // 사용 후 제거
+                                                            try {
+                                                                document.body.removeChild(
+                                                                    input
+                                                                )
+                                                            } catch (removeError) {
+                                                                // noop
+                                                            }
+                                                        }
+                                                    )
+
+                                                    // 취소 시에도 처리
+                                                    input.addEventListener(
+                                                        "cancel",
+                                                        () => {
+                                                            try {
+                                                                document.body.removeChild(
+                                                                    input
+                                                                )
+                                                            } catch (removeError) {
+                                                                // noop
+                                                            }
+                                                        }
+                                                    )
+
+                                                    // DOM에 추가 후 클릭
+                                                    document.body.appendChild(
+                                                        input
+                                                    )
+
+                                                    // 다이얼로그 닫힘 감지를 위한 window focus 이벤트
+                                                    const handleWindowFocus =
+                                                        () => {
+                                                            setTimeout(() => {
+                                                                if (
+                                                                    input.files
+                                                                        ?.length ===
+                                                                    0
+                                                                ) {
+                                                                    // noop
+                                                                }
+                                                            }, 100)
+                                                            window.removeEventListener(
+                                                                "focus",
+                                                                handleWindowFocus
+                                                            )
+                                                        }
+
+                                                    window.addEventListener(
+                                                        "focus",
+                                                        handleWindowFocus
+                                                    )
                                                     input.click()
-                                                    console.log('[BGM] 파일 선택 다이얼로그 열림')
                                                 } else {
-                                                    console.error('[BGM] document가 정의되지 않음 (SSR 환경)')
+                                                    // noop
                                                 }
                                             }}
                                             disabled={settingsLoading}
@@ -9195,18 +9379,29 @@ function AdminMainContent(props: any) {
                                                 flex: "1 1 0",
                                                 height: 50,
                                                 padding: "8px 12px",
+                                                marginTop: 8,
                                                 backgroundColor: "white",
-                                                borderRadius: 1,
-                                                outline: `${theme.border.width}px #AEAEAE solid`,
+                                                borderRadius: 2,
+                                                outline: `0.5px #AEAEAE solid`,
                                                 display: "flex",
                                                 justifyContent: "center",
                                                 alignItems: "center",
+                                                border: "none",
                                                 gap: 8,
-                                                cursor: settingsLoading ? "not-allowed" : "pointer",
-                                                opacity: settingsLoading ? 0.5 : 1,
+                                                cursor: settingsLoading
+                                                    ? "not-allowed"
+                                                    : "pointer",
+                                                opacity: settingsLoading
+                                                    ? 0.5
+                                                    : 1,
                                             }}
                                         >
-                                            <svg width="13" height="12" viewBox="0 0 13 12" fill="none">
+                                            <svg
+                                                width="13"
+                                                height="12"
+                                                viewBox="0 0 13 12"
+                                                fill="none"
+                                            >
                                                 <path
                                                     d="M5.75 9V2.8875L3.8 4.8375L2.75 3.75L6.5 0L10.25 3.75L9.2 4.8375L7.25 2.8875V9H5.75ZM0.5 12V8.25H2V10.5H11V8.25H12.5V12H0.5Z"
                                                     fill="#818181"
@@ -9216,61 +9411,20 @@ function AdminMainContent(props: any) {
                                                 style={{
                                                     color: "black",
                                                     fontSize: 14,
-                                                    fontFamily: "Pretendard",
-                                                    fontWeight: 400,
+                                                    fontFamily:
+                                                        "Pretendard Regular",
                                                 }}
-                                        >
-                                            {settingsLoading ? "업로드 중..." : "직접 업로드"}
-                                        </span>
-                                    </button>
-                                    
-                                    {/* 테스트용 버튼 */}
-                                    <button
-                                        onClick={async () => {
-                                            console.log('[BGM] 테스트 음원 설정 시작')
-                                            
-                                            // 기존 커스텀 BGM 파일 삭제 (있다면)
-                                            if (pageSettings.bgm_url && pageSettings.bgm_type === 'custom') {
-                                                console.log(`[BGM] 테스트 음원 설정 시 기존 커스텀 BGM 파일 삭제 시작: ${pageSettings.bgm_url}`)
-                                                await deleteFromR2(pageSettings.bgm_url)
-                                            } else {
-                                                console.log(`[BGM] 기존 커스텀 BGM 파일 없음, 삭제 생략`)
-                                            }
-                                            
-                                            const testUrl = 'https://cdn.roarc.kr/bgm/free/01.m4a'
-                                            const testSettings = {
-                                                ...pageSettings,
-                                                bgm_url: testUrl,
-                                                bgm_type: 'test'
-                                            }
-                                            try {
-                                                await savePageSettings(testSettings)
-                                                setPageSettings(testSettings)
-                                                console.log('[BGM] 테스트 음원 설정 완료')
-                                                setSuccess('테스트 음원이 설정되었습니다!')
-                                                setTimeout(() => setSuccess(null), 3000)
-                                            } catch (error) {
-                                                console.error('[BGM] 테스트 음원 설정 실패:', error)
-                                                setError('테스트 음원 설정에 실패했습니다.')
-                                            }
-                                        }}
-                                        disabled={settingsLoading}
-                                        style={{
-                                            height: 30,
-                                            padding: "4px 8px",
-                                            backgroundColor: "#f0f0f0",
-                                            border: "1px solid #ccc",
-                                            borderRadius: 4,
-                                            cursor: "pointer",
-                                            fontSize: 11,
-                                            marginTop: 8,
-                                        }}
-                                    >
-                                        테스트 음원 설정
-                                    </button>
+                                            >
+                                                {settingsLoading
+                                                    ? "업로드 중..."
+                                                    : "직접 업로드"}
+                                            </span>
+                                        </button>
+
+                                        {/* 테스트용 버튼 제거됨 */}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
                             {/* 자동 재생 섹션 */}
                             <div
@@ -9283,7 +9437,7 @@ function AdminMainContent(props: any) {
                                 <div
                                     style={{
                                         color: "black",
-                                        fontSize: 12,
+                                        fontSize: 14,
                                         fontFamily: "Pretendard SemiBold",
                                     }}
                                 >
@@ -9292,12 +9446,13 @@ function AdminMainContent(props: any) {
                                 <div
                                     style={{
                                         color: "#ADADAD",
-                                        fontSize: 12,
+                                        fontSize: 14,
                                         fontFamily: "Pretendard Regular",
                                         lineHeight: "16px",
                                     }}
                                 >
-                                    자동 재생 기능은 브라우저 정책에 따라 제한될 수 있습니다.
+                                    자동 재생 기능은 브라우저 정책에 따라 제한될
+                                    수 있습니다.
                                 </div>
                                 <div
                                     style={{
@@ -9306,56 +9461,80 @@ function AdminMainContent(props: any) {
                                     }}
                                 >
                                     <button
-                                        onClick={() => handleAutoplayToggle(true)}
+                                        onClick={() =>
+                                            handleAutoplayToggle(true)
+                                        }
                                         disabled={settingsLoading}
                                         style={{
                                             flex: "1 1 0",
                                             height: 40,
                                             padding: 12,
-                                            backgroundColor: pageSettings.bgm_autoplay ? "#ECECEC" : "white",
+                                            marginTop: 8,
+                                            border: "none",
+                                            backgroundColor:
+                                                pageSettings.bgm_autoplay
+                                                    ? "#ECECEC"
+                                                    : "white",
                                             borderRadius: 1,
                                             outline: `${theme.border.width}px solid ${pageSettings.bgm_autoplay ? "#757575" : "#E5E6E8"}`,
                                             display: "flex",
                                             justifyContent: "center",
                                             alignItems: "center",
                                             gap: 10,
-                                            cursor: settingsLoading ? "not-allowed" : "pointer",
+                                            cursor: settingsLoading
+                                                ? "not-allowed"
+                                                : "pointer",
                                             opacity: settingsLoading ? 0.5 : 1,
                                         }}
                                     >
                                         <span
                                             style={{
-                                                color: pageSettings.bgm_autoplay ? "black" : "#AEAEAE",
+                                                color: pageSettings.bgm_autoplay
+                                                    ? "black"
+                                                    : "#AEAEAE",
                                                 fontSize: 12,
-                                                fontFamily: "Pretendard Regular",
+                                                fontFamily:
+                                                    "Pretendard Regular",
                                             }}
                                         >
                                             자동 재생
                                         </span>
                                     </button>
                                     <button
-                                        onClick={() => handleAutoplayToggle(false)}
+                                        onClick={() =>
+                                            handleAutoplayToggle(false)
+                                        }
                                         disabled={settingsLoading}
                                         style={{
                                             flex: "1 1 0",
                                             height: 40,
                                             padding: 12,
-                                            backgroundColor: !pageSettings.bgm_autoplay ? "#ECECEC" : "white",
+                                            marginTop: 8,
+                                            backgroundColor:
+                                                !pageSettings.bgm_autoplay
+                                                    ? "#ECECEC"
+                                                    : "white",
                                             borderRadius: 2,
                                             outline: `${theme.border.width}px solid ${!pageSettings.bgm_autoplay ? "#757575" : "#E5E6E8"}`,
                                             display: "flex",
                                             justifyContent: "center",
                                             alignItems: "center",
                                             gap: 10,
-                                            cursor: settingsLoading ? "not-allowed" : "pointer",
+                                            border: "none",
+                                            cursor: settingsLoading
+                                                ? "not-allowed"
+                                                : "pointer",
                                             opacity: settingsLoading ? 0.5 : 1,
                                         }}
                                     >
                                         <span
                                             style={{
-                                                color: !pageSettings.bgm_autoplay ? "black" : "#AEAEAE",
+                                                color: !pageSettings.bgm_autoplay
+                                                    ? "black"
+                                                    : "#AEAEAE",
                                                 fontSize: 12,
-                                                fontFamily: "Pretendard Regular",
+                                                fontFamily:
+                                                    "Pretendard Regular",
                                             }}
                                         >
                                             자동 재생 끄기
@@ -9370,14 +9549,17 @@ function AdminMainContent(props: any) {
                                 disabled={settingsLoading}
                                 style={{
                                     width: "100%",
-                                    height: 50,
+                                    height: 44,
                                     padding: 12,
+                                    border: "none",
                                     backgroundColor: "black",
                                     display: "flex",
                                     justifyContent: "center",
                                     alignItems: "center",
                                     gap: 10,
-                                    cursor: settingsLoading ? "not-allowed" : "pointer",
+                                    cursor: settingsLoading
+                                        ? "not-allowed"
+                                        : "pointer",
                                     opacity: settingsLoading ? 0.5 : 1,
                                 }}
                             >
@@ -9411,7 +9593,6 @@ function AdminMainContent(props: any) {
                             추가 기능 설정 준비 중입니다.
                         </div>
                     </AccordionSection>
-
 
                     {/* Footer at the end of basic tab */}
                     <AdminFooter />
@@ -9709,7 +9890,6 @@ function AdminMainContent(props: any) {
                             </div>
                         </div>
                     </div>
-
                     {/* 갤러리 관리 */}
                     <div>
                         <div
@@ -10032,7 +10212,6 @@ function AdminMainContent(props: any) {
         </div>
     )
 }
-
 // 교통안내 입력 탭 컴포넌트
 function TransportTab({
     pageId,
@@ -10383,7 +10562,7 @@ function TransportTab({
                         color: "black",
                         fontSize: 14,
                         fontFamily: "Pretendard SemiBold",
-                        marginTop: 8,
+                        marginTop: 16,
                     }}
                 >
                     식장 주소
@@ -10431,13 +10610,13 @@ function TransportTab({
                             key={index}
                             style={{
                                 width: "100%",
-                                padding: 12,
+                                padding: 16,
                                 border: `1px solid ${theme.color.border}`,
                                 outlineOffset: -0.5,
                                 display: "flex",
                                 flexDirection: "column",
                                 gap: theme.gap.sm,
-                                marginBottom: 12,
+                                marginBottom: 16,
                                 alignItems: "flex-start",
                             }}
                         >
@@ -10605,7 +10784,7 @@ function TransportTab({
                                         background: "white",
                                         cursor: "pointer",
                                         fontSize: 10,
-                                        fontFamily: "Pretendard Regular",
+                                        fontFamily: "Pretendard SemiBold",
                                         color: "#7F7F7F",
                                         lineHeight: "20px",
                                     }}
@@ -10677,7 +10856,7 @@ function TransportTab({
                     alignItems: "center",
                 }}
             >
-                {saving ? "저장 중..." : "교통안내 저장"}
+                {saving ? "저장 중..." : "저장"}
             </button>
 
             {errorMsg && (
@@ -10832,7 +11011,7 @@ function InputField({
                 style={{
                     display: "block",
                     fontSize: 14,
-                    color: "#6b7280",
+                    color: "#000",
                     marginBottom: 6,
                     letterSpacing: "0.02em",
                     textTransform: "uppercase",
@@ -10853,7 +11032,7 @@ function InputField({
                     outline: "none",
                     boxSizing: "border-box",
                     backgroundColor: "#ffffff",
-                    color: "#111827",
+                    color: "#000",
                     transition: "border-color .15s ease",
                 }}
                 onFocus={(e) => {
@@ -10923,7 +11102,6 @@ interface CustomOrderDropdownProps {
     options: Array<{ value: string | number; label: string }>
     placeholder?: string
 }
-
 function CustomOrderDropdown({
     value,
     onChange,
