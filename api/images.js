@@ -201,17 +201,9 @@ async function handleImageOperation(req, res) {
       if (storagePath.startsWith('https://')) {
         // R2 방식: storagePath가 이미 완전한 public URL
         publicUrl = storagePath
-        // robust: 전체 경로(pathname)에서 선행 '/' 제거하여 버킷 내 key를 그대로 사용
-        // 예: https://cdn.roarc.kr/gallery/kim4bun/123.jpg -> gallery/kim4bun/123.jpg
-        //     https://cdn.roarc.kr/kim4bun/files/123.jpg    -> kim4bun/files/123.jpg
-        try {
-          const u = new URL(storagePath)
-          filename = u.pathname.replace(/^\/+/, '')
-        } catch {
-          // URL 파싱 실패 시 기존 fallback (마지막 3세그먼트)
-          const urlParts = storagePath.split('/')
-          filename = urlParts.slice(-3).join('/')
-        }
+        // URL에서 key 부분만 추출 (예: "page-id/files/timestamp-image.jpg")
+        const urlParts = storagePath.split('/')
+        filename = urlParts.slice(-3).join('/')  // "page-id/files/filename.jpg"
       } else {
         // 기존 Supabase 방식
         const { data: { publicUrl: supabaseUrl } } = supabase.storage
@@ -444,7 +436,7 @@ async function handleDeleteImage(req, res) {
 
   try {
     // 스토리지에서 파일 삭제 (R2 키 패턴 우선 확인)
-    const isR2Key = /\/(files|photos|audio)\//.test(fileName)
+    const isR2Key = /\/(files|photos|audio|images)\//.test(fileName)
 
     if (isR2Key) {
       try {
