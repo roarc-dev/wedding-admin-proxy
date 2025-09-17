@@ -458,7 +458,8 @@ async function handleDeleteImage(req, res) {
     // 쿼리스트링 제거 및 선행 슬래시 제거
     keyToDelete = keyToDelete.split('?')[0].replace(/^\/+/, '')
 
-    const isR2Key = /\/(files|photos|audio|images)\//.test(keyToDelete)
+    // R2 키 판별: 최상위 폴더가 아래 중 하나인지 확인
+    const isR2Key = /^(files|photos|audio|images|gallery)\//.test(keyToDelete)
 
     if (isR2Key) {
       try {
