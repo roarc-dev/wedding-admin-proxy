@@ -197,13 +197,20 @@ async function handleImageOperation(req, res) {
       // R2 호환성: storagePath가 이미 완전한 URL인지 확인
       let publicUrl
       let filename
-      
-      if (storagePath.startsWith('https://')) {
+
+      if (storagePath.startsWith('https://') || storagePath.startsWith('http://')) {
         // R2 방식: storagePath가 이미 완전한 public URL
         publicUrl = storagePath
-        // URL에서 key 부분만 추출 (예: "page-id/files/timestamp-image.jpg")
-        const urlParts = storagePath.split('/')
-        filename = urlParts.slice(-3).join('/')  // "page-id/files/filename.jpg"
+        try {
+          const u = new URL(storagePath)
+          // 쿼리스트링을 제거하고 선행 슬래시 제거하여 순수 키만 저장
+          filename = u.pathname.replace(/^\/+/, '')
+        } catch (e) {
+          // URL 파싱 실패 시 도메인 제거 및 쿼리 제거 시도
+          const noProto = storagePath.replace(/^https?:\/\//, '')
+          const pathOnly = noProto.split('/').slice(1).join('/')
+          filename = pathOnly.split('?')[0]
+        }
       } else {
         // 기존 Supabase 방식
         const { data: { publicUrl: supabaseUrl } } = supabase.storage
@@ -436,7 +443,22 @@ async function handleDeleteImage(req, res) {
 
   try {
     // 스토리지에서 파일 삭제 (R2 키 패턴 우선 확인)
-    const isR2Key = /\/(files|photos|audio|images)\//.test(fileName)
+    // fileName이 URL이거나 쿼리를 포함하는 경우를 안전하게 처리
+    let keyToDelete = fileName || ''
+    if (/^https?:\/\//.test(keyToDelete)) {
+      try {
+        const u = new URL(keyToDelete)
+        keyToDelete = u.pathname.replace(/^\/+/, '')
+      } catch {
+        // URL 파싱 실패 시 도메인 제거 후 사용
+        const noProto = keyToDelete.replace(/^https?:\/\//, '')
+        keyToDelete = noProto.split('/').slice(1).join('/')
+      }
+    }
+    // 쿼리스트링 제거 및 선행 슬래시 제거
+    keyToDelete = keyToDelete.split('?')[0].replace(/^\/+/, '')
+
+    const isR2Key = /\/(files|photos|audio|images)\//.test(keyToDelete)
 
     if (isR2Key) {
       try {
@@ -451,7 +473,7 @@ async function handleDeleteImage(req, res) {
         })
         await r2.send(new DeleteObjectCommand({
           Bucket: process.env.R2_BUCKET,
-          Key: fileName,
+          Key: keyToDelete,
         }))
       } catch (r2Err) {
         console.warn('R2 delete warning:', r2Err)
