@@ -26,11 +26,14 @@ function slugifyName(name: string): string {
 function makeGalleryKey(pageId: string, file: File): string {
     const name = slugifyName(file.name)
     const extMatch = name.match(/\.([a-z0-9]+)$/i)
-    const ext = (extMatch ? extMatch[1].toLowerCase() : '').replace('jpeg', 'jpg')
-    let baseFolder = 'files'
-    if (['png', 'jpg', 'webp', 'svg'].includes(ext)) baseFolder = 'images'
-    if (['mp3', 'm4a'].includes(ext)) baseFolder = 'audio'
-    if (['woff2'].includes(ext)) baseFolder = 'fonts'
+    const ext = (extMatch ? extMatch[1].toLowerCase() : "").replace(
+        "jpeg",
+        "jpg"
+    )
+    let baseFolder = "files"
+    if (["png", "jpg", "webp", "svg"].includes(ext)) baseFolder = "images"
+    if (["mp3", "m4a"].includes(ext)) baseFolder = "audio"
+    if (["woff2"].includes(ext)) baseFolder = "fonts"
     return `${baseFolder}/${pageId}/${Date.now()}-${name}`
 }
 
@@ -2145,7 +2148,7 @@ function removeAuthToken() {
     localStorage.removeItem("admin_session")
     } catch {
         // localStorage 사용 불가 시 무시
-    }
+}
 }
 // 인증 관련 함수들
 async function authenticateAdmin(
@@ -2592,11 +2595,11 @@ function validateImageFileSize(file: File): void {
         )
     }
 }
-// 기본 이미지 압축 함수
+// 기본 이미지 압축 함수 (품질 우선 + 이진 탐색)
 async function compressImage(
     file: File,
     maxSizeKB = 1024,
-    quality = 0.8
+    quality = 0.9
 ): Promise<File> {
     return new Promise((resolve, reject) => {
         if (typeof document === "undefined") {
@@ -2606,97 +2609,96 @@ async function compressImage(
         const canvas = document.createElement("canvas")
         const ctx = canvas.getContext("2d")
         const img = new Image()
+        const objectUrl = URL.createObjectURL(file)
 
-        img.onload = () => {
-            let { width, height } = img
+        img.onload = async () => {
+            try {
+                let { width, height } = img
 
-            // 적절한 크기 계산 (품질 저하 최소화)
-            const MAX_WIDTH = 1920
-            const MAX_HEIGHT = 1080
+                // 긴 변 기준 리사이징 (과도한 축소 방지)
+                const MAX_LONG_EDGE = 2560
+                const longEdge = Math.max(width, height)
+                const scale = longEdge > MAX_LONG_EDGE ? MAX_LONG_EDGE / longEdge : 1
+                width = Math.round(width * scale)
+                height = Math.round(height * scale)
 
-            if (width > MAX_WIDTH) {
-                height = (height * MAX_WIDTH) / width
-                width = MAX_WIDTH
-            }
+                canvas.width = width
+                canvas.height = height
 
-            if (height > MAX_HEIGHT) {
-                width = (width * MAX_HEIGHT) / height
-                height = MAX_HEIGHT
-            }
+                if (ctx) {
+                    ctx.imageSmoothingEnabled = true
+                    ctx.imageSmoothingQuality = "high"
+                    ctx.clearRect(0, 0, width, height)
+                    ctx.drawImage(img, 0, 0, width, height)
+                }
 
-            canvas.width = width
-            canvas.height = height
+                // 포맷 선택: PNG/WebP -> WebP(알파 유지), 그 외 JPEG
+                const targetFormat =
+                    file.type === "image/png" || file.type === "image/webp"
+                        ? "image/webp"
+                        : "image/jpeg"
 
-            // 렌더링 품질 설정 (고품질)
-            if (ctx) {
-                ctx.imageSmoothingEnabled = true
-                ctx.imageSmoothingQuality = "high"
+                // JPEG의 경우 배경을 흰색으로 채워 투명 픽셀 방지
+                if (ctx && targetFormat === "image/jpeg") {
+                    // 다시 그려 배경 처리
+                    ctx.globalCompositeOperation = "destination-over"
+                    ctx.fillStyle = "white"
+                    ctx.fillRect(0, 0, width, height)
+                    ctx.globalCompositeOperation = "source-over"
+                }
 
-                // 배경 설정 (투명도 제거)
-                ctx.fillStyle = "white"
-                ctx.fillRect(0, 0, width, height)
-                ctx.drawImage(img, 0, 0, width, height)
-            }
+                const toBlobPromise = (q: number): Promise<Blob> =>
+                    new Promise((res, rej) => {
+                        canvas.toBlob(
+                            (blob) => {
+                                if (!blob) return rej(new Error("toBlob 실패"))
+                                res(blob)
+                            },
+                            targetFormat,
+                            q
+                        )
+                    })
 
-            // 반복적 압축 (품질 유지하면서 크기 조정)
-            const compressRecursive = (
-                currentQuality: number,
-                attempt = 0
-            ): void => {
-                if (attempt > 8) {
-                    // 최대 8번 시도 (품질 저하 최소화)
-                    canvas.toBlob(
-                        (blob) => {
-                            if (!blob) {
-                                reject(new Error("압축 실패"))
-                                return
-                            }
-                            const finalFile = new File([blob], file.name, {
-                                type: "image/jpeg",
-                                lastModified: Date.now(),
-                            })
-                            resolve(finalFile)
-                        },
-                        "image/jpeg",
-                        Math.max(0.3, currentQuality) // 최소 품질 0.3 유지
-                    )
+                const startQ = Math.min(0.92, quality || 0.9)
+                const minQ = targetFormat === "image/jpeg" ? 0.7 : 0.75
+
+                // 1차 시도 (높은 품질)
+                let blob = await toBlobPromise(startQ)
+                if (blob.size / 1024 <= maxSizeKB) {
+                    resolve(new File([blob], file.name, { type: targetFormat, lastModified: Date.now() }))
                     return
                 }
 
-                canvas.toBlob(
-                    (blob) => {
-                        if (!blob) {
-                            reject(new Error("압축 실패"))
-                            return
-                        }
-
-                        const fileSizeKB = blob.size / 1024
-
-                        if (fileSizeKB <= maxSizeKB || currentQuality <= 0.3) {
-                            const compressedFile = new File([blob], file.name, {
-                                type: "image/jpeg",
-                                lastModified: Date.now(),
-                            })
-                            resolve(compressedFile)
-                        } else {
-                            // 품질을 점진적으로 낮춤 (작은 단위로)
-                            const newQuality = Math.max(
-                                0.3,
-                                currentQuality - 0.05
-                            )
-                            compressRecursive(newQuality, attempt + 1)
-                        }
-                    },
-                    "image/jpeg",
-                    currentQuality
-                )
+                // 2차: 이진 탐색으로 목표 용량에 맞추되 가능한 높은 품질 유지
+                let low = minQ
+                let high = startQ
+                let best: Blob | null = null
+                for (let i = 0; i < 8; i++) {
+                    const mid = Math.max(minQ, Math.min(high, (low + high) / 2))
+                    const testBlob = await toBlobPromise(mid)
+                    const kb = testBlob.size / 1024
+                    if (kb <= maxSizeKB) {
+                        best = testBlob
+                        low = mid + 0.02 // 더 높은 품질을 시도
+                    } else {
+                        high = mid - 0.02 // 더 낮은 품질로
+                    }
+                    if (high - low < 0.01) break
+                }
+                const finalBlob = best || blob
+                resolve(new File([finalBlob], file.name, { type: targetFormat, lastModified: Date.now() }))
+            } catch (e) {
+                reject(e)
+            } finally {
+                URL.revokeObjectURL(objectUrl)
             }
-
-            compressRecursive(quality)
         }
 
-        img.onerror = () => reject(new Error("이미지 로드 실패"))
-        img.src = URL.createObjectURL(file)
+        img.onerror = () => {
+            URL.revokeObjectURL(objectUrl)
+            reject(new Error("이미지 로드 실패"))
+        }
+        img.src = objectUrl
     })
 }
 
@@ -2722,44 +2724,32 @@ async function progressiveCompress(
 
         onProgress?.(10)
 
-        // 1단계: 큰 파일의 경우 사전 리사이징
+        // 1단계: 큰 파일의 경우 사전 리사이징 (고품질 유지)
         let processedFile = file
         if (originalSize > 10 * 1024 * 1024) {
-            // 10MB 이상 - 더 작은 크기로
-            processedFile = await compressImage(file, targetSizeKB, 0.9)
+            // 10MB 이상 - 높은 품질에서 1차 축소
+            processedFile = await compressImage(file, targetSizeKB, 0.92)
             onProgress?.(40)
         } else if (originalSize > 5 * 1024 * 1024) {
-            // 5MB 이상 - 적당한 크기로
-            processedFile = await compressImage(file, targetSizeKB, 0.85)
+            // 5MB 이상 - 가벼운 축소
+            processedFile = await compressImage(file, targetSizeKB, 0.9)
             onProgress?.(35)
         }
 
         // 2단계: 기본 압축
         onProgress?.(50)
-        let compressedFile = await compressImage(
-            processedFile,
-            targetSizeKB,
-            0.8
-        )
+        let compressedFile = await compressImage(processedFile, targetSizeKB, 0.9)
 
         // 3단계: 여전히 크면 추가 압축
         if (compressedFile.size / 1024 > targetSizeKB) {
             onProgress?.(70)
-            compressedFile = await compressImage(
-                processedFile,
-                targetSizeKB,
-                0.6
-            )
+            compressedFile = await compressImage(processedFile, targetSizeKB, 0.82)
         }
 
         // 4단계: 최종 압축 (최소 품질 유지)
         if (compressedFile.size / 1024 > targetSizeKB) {
             onProgress?.(90)
-            compressedFile = await compressImage(
-                processedFile,
-                targetSizeKB,
-                0.4
-            )
+            compressedFile = await compressImage(processedFile, targetSizeKB, 0.78)
         }
 
         onProgress?.(100)
@@ -4554,7 +4544,10 @@ function AdminMainContent(props: any) {
 
             // ETag 추출 → 버전 파라미터로 사용
             // Note: ETag 헤더는 따옴표가 포함될 수 있어 제거 처리
-            let etag = uploadResponse.headers.get("ETag") || uploadResponse.headers.get("etag") || undefined
+            let etag =
+                uploadResponse.headers.get("ETag") ||
+                uploadResponse.headers.get("etag") ||
+                undefined
             if (etag) {
                 etag = etag.replace(/\"/g, "").trim()
             }
@@ -4563,7 +4556,9 @@ function AdminMainContent(props: any) {
             console.log(
                 `uploadToR2 완료: publicUrl=${publicUrl}, key=${serverKey}`
             )
-            const versionedUrl = etag ? `${publicUrl}?v=${encodeURIComponent(etag)}` : publicUrl
+            const versionedUrl = etag
+                ? `${publicUrl}?v=${encodeURIComponent(etag)}`
+                : publicUrl
             return { publicUrl: versionedUrl, key: serverKey, etag }
         } catch (error) {
             console.error("R2 upload failed:", error)
@@ -4719,7 +4714,11 @@ function AdminMainContent(props: any) {
         // 즉시 재생 + 로컬 상태만 반영 (서버 저장은 최종 저장 버튼에서 수행)
         setSelectedBgmId(bgmId)
         setPlayingBgmId(bgmId)
-        setPageSettings((prev) => ({ ...prev, bgm_url: selectedBgm.url, bgm_type: "free" }))
+        setPageSettings((prev) => ({
+            ...prev,
+            bgm_url: selectedBgm.url,
+            bgm_type: "free",
+        }))
 
         try {
             if (audioRef.current) {
@@ -5424,7 +5423,10 @@ function AdminMainContent(props: any) {
                                     />
                                 </div>
                                 {/* 오디오 프리뷰 요소 */}
-                                <audio ref={audioRef} style={{ display: "none" }} />
+                                <audio
+                                    ref={audioRef}
+                                    style={{ display: "none" }}
+                                />
                             </div>
                         </div>
                     </AccordionSection>
@@ -9148,7 +9150,8 @@ function AdminMainContent(props: any) {
                                                 height: 40,
                                                 padding: 12,
                                                 backgroundColor:
-                                                    selectedBgmId === bgm.id || playingBgmId === bgm.id
+                                                    selectedBgmId === bgm.id ||
+                                                    playingBgmId === bgm.id
                                                         ? "#ECECEC"
                                                         : "white",
                                                 borderRadius: 2,
@@ -9169,7 +9172,9 @@ function AdminMainContent(props: any) {
                                             <span
                                                 style={{
                                                     color:
-                                                        selectedBgmId === bgm.id || playingBgmId === bgm.id
+                                                        selectedBgmId ===
+                                                            bgm.id ||
+                                                        playingBgmId === bgm.id
                                                             ? "black"
                                                             : "#AEAEAE",
                                                     fontSize: 12,
@@ -9202,7 +9207,8 @@ function AdminMainContent(props: any) {
                                                 height: 40,
                                                 padding: 12,
                                                 backgroundColor:
-                                                    selectedBgmId === bgm.id || playingBgmId === bgm.id
+                                                    selectedBgmId === bgm.id ||
+                                                    playingBgmId === bgm.id
                                                         ? "#ECECEC"
                                                         : "white",
                                                 borderRadius: 2,
@@ -9223,7 +9229,9 @@ function AdminMainContent(props: any) {
                                             <span
                                                 style={{
                                                     color:
-                                                        selectedBgmId === bgm.id || playingBgmId === bgm.id
+                                                        selectedBgmId ===
+                                                            bgm.id ||
+                                                        playingBgmId === bgm.id
                                                             ? "black"
                                                             : "#AEAEAE",
                                                     fontSize: 12,
