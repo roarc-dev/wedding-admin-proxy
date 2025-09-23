@@ -107,6 +107,7 @@ async function handleGetSettings(req, res) {
     if (!data) {
       const defaultSettings = {
         page_id: pageId,
+        type: 'papillon',
         groom_name_kr: '',
         groom_name_en: '',
         bride_name_kr: '',
@@ -202,6 +203,7 @@ async function handleUpdateSettings(req, res, validatedUser) {
 
     // 허용된 컬럼만 저장 (알 수 없는 키로 인한 에러 방지)
     const allowedKeys = [
+      'type',
       'groom_name_kr',
       'groom_name_en',
       'bride_name_kr',
@@ -211,6 +213,8 @@ async function handleUpdateSettings(req, res, validatedUser) {
       'wedding_minute',
       'venue_name',
       'venue_address',
+      'venue_lat',
+      'venue_lng',
       'photo_section_image_url',
       'photo_section_image_path',
       'photo_section_location',
