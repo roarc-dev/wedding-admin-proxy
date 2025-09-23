@@ -240,7 +240,7 @@ function UiPhotoTile({
             return src
         } catch {
             // URL 파싱 실패 시 원본 사용
-        return src
+            return src
         }
     }, [src])
 
@@ -259,7 +259,7 @@ function UiPhotoTile({
 
         // DOM에 추가
         if (typeof document !== "undefined") {
-        document.body.appendChild(input)
+            document.body.appendChild(input)
         }
 
         const handleFileSelect = async (e: Event) => {
@@ -268,7 +268,7 @@ function UiPhotoTile({
 
             // 정리 작업
             if (typeof document !== "undefined") {
-            document.body.removeChild(input)
+                document.body.removeChild(input)
             }
 
             if (!file) return
@@ -310,7 +310,7 @@ function UiPhotoTile({
 
         input.addEventListener("cancel", handleCancel, { once: true })
         if (typeof window !== "undefined") {
-        window.addEventListener("focus", handleCancel, { once: true })
+            window.addEventListener("focus", handleCancel, { once: true })
         }
 
         // 파일 대화상자 열기
@@ -319,10 +319,10 @@ function UiPhotoTile({
         } catch (err) {
             console.error("파일 대화상자 열기 실패:", err)
             if (typeof document !== "undefined") {
-            document.body.removeChild(input)
+                document.body.removeChild(input)
             }
             if (typeof window !== "undefined") {
-            alert("파일 선택 대화상자를 열 수 없습니다.")
+                alert("파일 선택 대화상자를 열 수 없습니다.")
             }
         }
     }
@@ -530,12 +530,12 @@ function UiPhotoTile({
                             onChange={(newPosition) => {
                                 // AdminOld.tsx 방식으로 직접 함수 호출
                                 try {
-                                const moveImageToPosition = (window as any)
-                                    .moveImageToPosition
-                                if (moveImageToPosition) {
-                                    moveImageToPosition(
-                                        index - 1,
-                                        newPosition as number
+                                    const moveImageToPosition = (window as any)
+                                        .moveImageToPosition
+                                    if (moveImageToPosition) {
+                                        moveImageToPosition(
+                                            index - 1,
+                                            newPosition as number
                                         )
                                     }
                                 } catch (error) {
@@ -2127,7 +2127,7 @@ function reorderImages(
 function getAuthToken() {
     if (typeof window === "undefined") return null
     try {
-    return localStorage.getItem("admin_session")
+        return localStorage.getItem("admin_session")
     } catch {
         return null
     }
@@ -2136,7 +2136,7 @@ function getAuthToken() {
 function setAuthToken(token: string): void {
     if (typeof window === "undefined") return
     try {
-    localStorage.setItem("admin_session", token)
+        localStorage.setItem("admin_session", token)
     } catch {
         // localStorage 사용 불가 시 무시
     }
@@ -2145,10 +2145,10 @@ function setAuthToken(token: string): void {
 function removeAuthToken() {
     if (typeof window === "undefined") return
     try {
-    localStorage.removeItem("admin_session")
+        localStorage.removeItem("admin_session")
     } catch {
         // localStorage 사용 불가 시 무시
-}
+    }
 }
 // 인증 관련 함수들
 async function authenticateAdmin(
@@ -2540,12 +2540,12 @@ async function saveImageMeta(
         )
 
         const requestBody = {
-                action: "saveMeta",
-                pageId,
-                fileName,
-                displayOrder: order,
-                storagePath,
-                fileSize,
+            action: "saveMeta",
+            pageId,
+            fileName,
+            displayOrder: order,
+            storagePath,
+            fileSize,
         }
         console.log("saveImageMeta 요청 body:", requestBody)
 
@@ -2618,7 +2618,8 @@ async function compressImage(
                 // 긴 변 기준 리사이징 (과도한 축소 방지)
                 const MAX_LONG_EDGE = 2560
                 const longEdge = Math.max(width, height)
-                const scale = longEdge > MAX_LONG_EDGE ? MAX_LONG_EDGE / longEdge : 1
+                const scale =
+                    longEdge > MAX_LONG_EDGE ? MAX_LONG_EDGE / longEdge : 1
                 width = Math.round(width * scale)
                 height = Math.round(height * scale)
 
@@ -2665,7 +2666,12 @@ async function compressImage(
                 // 1차 시도 (높은 품질)
                 let blob = await toBlobPromise(startQ)
                 if (blob.size / 1024 <= maxSizeKB) {
-                    resolve(new File([blob], file.name, { type: targetFormat, lastModified: Date.now() }))
+                    resolve(
+                        new File([blob], file.name, {
+                            type: targetFormat,
+                            lastModified: Date.now(),
+                        })
+                    )
                     return
                 }
 
@@ -2686,7 +2692,12 @@ async function compressImage(
                     if (high - low < 0.01) break
                 }
                 const finalBlob = best || blob
-                resolve(new File([finalBlob], file.name, { type: targetFormat, lastModified: Date.now() }))
+                resolve(
+                    new File([finalBlob], file.name, {
+                        type: targetFormat,
+                        lastModified: Date.now(),
+                    })
+                )
             } catch (e) {
                 reject(e)
             } finally {
@@ -2738,18 +2749,30 @@ async function progressiveCompress(
 
         // 2단계: 기본 압축
         onProgress?.(50)
-        let compressedFile = await compressImage(processedFile, targetSizeKB, 0.9)
+        let compressedFile = await compressImage(
+            processedFile,
+            targetSizeKB,
+            0.9
+        )
 
         // 3단계: 여전히 크면 추가 압축
         if (compressedFile.size / 1024 > targetSizeKB) {
             onProgress?.(70)
-            compressedFile = await compressImage(processedFile, targetSizeKB, 0.82)
+            compressedFile = await compressImage(
+                processedFile,
+                targetSizeKB,
+                0.82
+            )
         }
 
         // 4단계: 최종 압축 (최소 품질 유지)
         if (compressedFile.size / 1024 > targetSizeKB) {
             onProgress?.(90)
-            compressedFile = await compressImage(processedFile, targetSizeKB, 0.78)
+            compressedFile = await compressImage(
+                processedFile,
+                targetSizeKB,
+                0.78
+            )
         }
 
         onProgress?.(100)
@@ -3564,9 +3587,9 @@ function AdminMainContent(props: any) {
                 console.log("이미지 메타데이터 저장 완료:", saved)
             } catch (e) {
                 console.error("R2 업로드 실패:", e)
-                    throw new Error(
+                throw new Error(
                     `이미지 업로드 실패: ${e instanceof Error ? e.message : String(e)}`
-                    )
+                )
             }
 
             // 4. 기존 이미지 삭제 (스토리지 + DB)
@@ -3889,24 +3912,24 @@ function AdminMainContent(props: any) {
         if (typeof window === "undefined") return
 
         try {
-        const token = localStorage.getItem("admin_session")
-        if (token) {
-            const tokenData = validateSessionToken(token)
-            if (tokenData) {
-                setIsAuthenticated(true)
-                setCurrentUser({ username: tokenData.username })
-                // 저장된 사전 할당 페이지 ID 적용 (관리자가 미리 설정한 경우)
+            const token = localStorage.getItem("admin_session")
+            if (token) {
+                const tokenData = validateSessionToken(token)
+                if (tokenData) {
+                    setIsAuthenticated(true)
+                    setCurrentUser({ username: tokenData.username })
+                    // 저장된 사전 할당 페이지 ID 적용 (관리자가 미리 설정한 경우)
                     const storedAssigned =
                         localStorage.getItem("assigned_page_id")
-                if (storedAssigned && storedAssigned.trim().length > 0) {
-                    setAssignedPageId(storedAssigned)
-                    setCurrentPageId(storedAssigned)
+                    if (storedAssigned && storedAssigned.trim().length > 0) {
+                        setAssignedPageId(storedAssigned)
+                        setCurrentPageId(storedAssigned)
+                    }
+                    loadAllPages()
+                    loadContactList()
+                } else {
+                    localStorage.removeItem("admin_session")
                 }
-                loadAllPages()
-                loadContactList()
-            } else {
-                localStorage.removeItem("admin_session")
-            }
             }
         } catch (error) {
             console.warn("localStorage 접근 실패:", error)
@@ -3925,10 +3948,10 @@ function AdminMainContent(props: any) {
         if (result.success) {
             if (typeof window !== "undefined") {
                 try {
-            localStorage.setItem(
-                "admin_session",
-                generateSessionToken(result.user)
-            )
+                    localStorage.setItem(
+                        "admin_session",
+                        generateSessionToken(result.user)
+                    )
                 } catch (error) {
                     console.warn("localStorage 저장 실패:", error)
                 }
@@ -3947,7 +3970,7 @@ function AdminMainContent(props: any) {
                 setCurrentPageId(assigned)
                 if (typeof window !== "undefined") {
                     try {
-                localStorage.setItem("assigned_page_id", assigned)
+                        localStorage.setItem("assigned_page_id", assigned)
                     } catch (error) {
                         console.warn("localStorage 저장 실패:", error)
                     }
@@ -3956,7 +3979,7 @@ function AdminMainContent(props: any) {
                 setAssignedPageId(null)
                 if (typeof window !== "undefined") {
                     try {
-                localStorage.removeItem("assigned_page_id")
+                        localStorage.removeItem("assigned_page_id")
                     } catch (error) {
                         console.warn("localStorage 삭제 실패:", error)
                     }
@@ -3983,7 +4006,7 @@ function AdminMainContent(props: any) {
         setContactList([])
         if (typeof window !== "undefined") {
             try {
-        localStorage.removeItem("assigned_page_id")
+                localStorage.removeItem("assigned_page_id")
             } catch (error) {
                 console.warn("localStorage 삭제 실패:", error)
             }
@@ -4265,10 +4288,10 @@ function AdminMainContent(props: any) {
             // CDN 캐시 무효화를 위한 버전 업데이트
             setPhotoSectionImageVersion((v) => v + 1)
 
-            // 즉시 서버 저장 (override)
+            // 즉시 서버 저장: R2 public URL을 컬럼에 기록
             await savePageSettings({
                 photo_section_image_path: imagePath,
-                photo_section_image_url: "",
+                photo_section_image_url: imageUrl,
             })
 
             setSuccess("메인 사진이 업로드되었습니다.")
@@ -5554,12 +5577,12 @@ function AdminMainContent(props: any) {
                                             <div
                                                 style={{
                                                     color: "var(--Black, black)",
-                                                fontSize: 14,
-                                                fontFamily:
-                                                    "Pretendard Regular",
+                                                    fontSize: 14,
+                                                    fontFamily:
+                                                        "Pretendard Regular",
                                                     wordWrap: "break-word",
-                                            }}
-                                        >
+                                                }}
+                                            >
                                                 사진 업로드
                                             </div>
                                         </button>
@@ -8288,8 +8311,8 @@ function AdminMainContent(props: any) {
                                                     width: "100%",
                                                     border: "none",
                                                     outline: "none",
-                                                fontSize: 14,
-                                                fontFamily:
+                                                    fontSize: 14,
+                                                    fontFamily:
                                                         "Pretendard Regular",
                                                     color: selectedContact?.groom_name
                                                         ? "black"
@@ -8425,8 +8448,8 @@ function AdminMainContent(props: any) {
                                                     width: "100%",
                                                     border: "none",
                                                     outline: "none",
-                                                fontSize: 14,
-                                                fontFamily:
+                                                    fontSize: 14,
+                                                    fontFamily:
                                                         "Pretendard Regular",
                                                     color: selectedContact?.groom_father_name
                                                         ? "black"
@@ -8562,13 +8585,13 @@ function AdminMainContent(props: any) {
                                                     width: "100%",
                                                     border: "none",
                                                     outline: "none",
-                                                fontSize: 14,
-                                                fontFamily:
+                                                    fontSize: 14,
+                                                    fontFamily:
                                                         "Pretendard Regular",
                                                     color: selectedContact?.groom_mother_name
                                                         ? "black"
                                                         : "#ADADAD",
-                                            }}
+                                                }}
                                             />
                                         </div>
                                         <div
@@ -8708,8 +8731,8 @@ function AdminMainContent(props: any) {
                                                     width: "100%",
                                                     border: "none",
                                                     outline: "none",
-                                                fontSize: 14,
-                                                fontFamily:
+                                                    fontSize: 14,
+                                                    fontFamily:
                                                         "Pretendard Regular",
                                                     color: selectedContact?.bride_name
                                                         ? "black"
@@ -8845,13 +8868,13 @@ function AdminMainContent(props: any) {
                                                     width: "100%",
                                                     border: "none",
                                                     outline: "none",
-                                                fontSize: 14,
-                                                fontFamily:
-                                                    "Pretendard Regular",
+                                                    fontSize: 14,
+                                                    fontFamily:
+                                                        "Pretendard Regular",
                                                     color: selectedContact?.bride_father_name
-                                                    ? "black"
-                                                    : "#ADADAD",
-                                            }}
+                                                        ? "black"
+                                                        : "#ADADAD",
+                                                }}
                                             />
                                         </div>
                                         <div
@@ -8982,13 +9005,13 @@ function AdminMainContent(props: any) {
                                                     width: "100%",
                                                     border: "none",
                                                     outline: "none",
-                                                fontSize: 14,
-                                                fontFamily:
-                                                    "Pretendard Regular",
+                                                    fontSize: 14,
+                                                    fontFamily:
+                                                        "Pretendard Regular",
                                                     color: selectedContact?.bride_mother_name
-                                                    ? "black"
-                                                    : "#ADADAD",
-                                            }}
+                                                        ? "black"
+                                                        : "#ADADAD",
+                                                }}
                                             />
                                         </div>
                                         <div
@@ -10256,6 +10279,231 @@ function TransportTab({
     const [errorMsg, setErrorMsg] = React.useState<string>("")
     const [successMsg, setSuccessMsg] = React.useState<string>("")
 
+    // 다음 Postcode API와 Google Maps API 타입 정의
+    interface DaumPostcodeData {
+        address: string
+        roadAddress: string
+        jibunAddress: string
+        zonecode: string
+        addressType: string
+        bname: string
+        buildingName: string
+    }
+
+    interface GoogleGeocodeResult {
+        geometry: {
+            location: {
+                lat: () => number
+                lng: () => number
+            }
+        }
+    }
+
+    // 다음 Postcode API 스크립트 로드
+    const loadDaumPostcodeScript = (): Promise<void> => {
+        return new Promise((resolve, reject) => {
+            if ((window as any).daum && (window as any).daum.Postcode) {
+                resolve()
+                return
+            }
+
+            const script = document.createElement('script')
+            script.src = '//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js'
+            script.onload = () => resolve()
+            script.onerror = () => reject(new Error('다음 Postcode API 로드 실패'))
+            document.head.appendChild(script)
+        })
+    }
+
+    // Google Maps API가 완전히 로드될 때까지 대기
+    const waitForGoogleMapsAPI = (): Promise<void> => {
+        return new Promise((resolve, reject) => {
+            const maxAttempts = 50
+            let attempts = 0
+
+            const checkGoogleMaps = () => {
+                attempts++
+
+                if ((window as any).google && (window as any).google.maps && (window as any).google.maps.Geocoder) {
+                    resolve()
+                    return
+                }
+
+                if (attempts >= maxAttempts) {
+                    reject(new Error('Google Maps API 로드 타임아웃'))
+                    return
+                }
+
+                setTimeout(checkGoogleMaps, 200)
+            }
+
+            checkGoogleMaps()
+        })
+    }
+
+    // Google Maps API 스크립트 로드
+    const loadGoogleMapsScript = (): Promise<void> => {
+        return new Promise((resolve, reject) => {
+            if ((window as any).google && (window as any).google.maps && (window as any).google.maps.Geocoder) {
+                resolve()
+                return
+            }
+
+            // Google Maps API 키 가져오기 (map-config.js에서)
+            fetch('https://wedding-admin-proxy.vercel.app/api/map-config')
+                .then(response => response.json())
+                .then((config: any) => {
+                    if (config.success && config.data.googleMapsApiKey) {
+                        const apiKey = config.data.googleMapsApiKey
+
+                        // 기존 스크립트가 있는지 확인
+                        const existingScript = document.querySelector('script[src*="maps.googleapis.com"]')
+                        if (existingScript) {
+                            return waitForGoogleMapsAPI().then(resolve).catch(reject)
+                        }
+
+                        const script = document.createElement('script')
+                        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=geometry`
+                        script.onload = () => {
+                            waitForGoogleMapsAPI().then(resolve).catch(reject)
+                        }
+                        script.onerror = () => reject(new Error('Google Maps API 로드 실패'))
+
+                        document.head.appendChild(script)
+                    } else {
+                        reject(new Error('Google Maps API 키를 찾을 수 없습니다'))
+                    }
+                })
+                .catch(() => reject(new Error('Map config 로드 실패')))
+        })
+    }
+
+    // 주소를 좌표로 변환
+    const geocodeAddress = (address: string): Promise<{ lat: number; lng: number }> => {
+        return new Promise((resolve, reject) => {
+            if (!(window as any).google || !(window as any).google.maps) {
+                reject(new Error('Google Maps API가 로드되지 않았습니다'))
+                return
+            }
+
+            if (!(window as any).google.maps.Geocoder) {
+                reject(new Error('Google Maps Geocoder가 초기화되지 않았습니다'))
+                return
+            }
+
+            const geocoder = new (window as any).google.maps.Geocoder()
+
+            geocoder.geocode(
+                { address: address, region: 'KR' },
+                (results: GoogleGeocodeResult[] | null, status: string) => {
+                    if (status === 'OK' && results && results.length > 0) {
+                        const location = results[0].geometry.location
+                        resolve({
+                            lat: location.lat(),
+                            lng: location.lng()
+                        })
+                    } else {
+                        reject(new Error(`주소 변환 실패: ${status}`))
+                    }
+                }
+            )
+        })
+    }
+
+    // 다음 Postcode API 팝업 열기
+    const openDaumPostcode = async () => {
+        try {
+            await loadDaumPostcodeScript()
+            await loadGoogleMapsScript()
+
+            // API 로드 완료 후 잠시 대기 (안정성 확보)
+            await new Promise(resolve => setTimeout(resolve, 500))
+
+            new (window as any).daum.Postcode({
+                oncomplete: async (data: DaumPostcodeData) => {
+                    const fullAddress = data.roadAddress || data.jibunAddress
+                    setVenue_address(fullAddress)
+
+                    try {
+                        // 주소를 좌표로 변환
+                        const coordinates = await geocodeAddress(fullAddress)
+
+                        // 페이지 설정에 좌표 저장
+                        await saveCoordinatesToServer(coordinates.lat, coordinates.lng, fullAddress)
+
+                        setSuccessMsg(`주소와 좌표가 모두 설정되었습니다: ${fullAddress}`)
+                        setTimeout(() => setSuccessMsg(""), 3000)
+                    } catch (error) {
+                        // 좌표 변환 실패해도 주소는 저장
+                        try {
+                            await saveCoordinatesToServer(0, 0, fullAddress)
+                            setSuccessMsg(`주소가 설정되었습니다: ${fullAddress} (좌표 변환 실패)`)
+                            setTimeout(() => setSuccessMsg(""), 3000)
+                        } catch (saveError) {
+                            setErrorMsg('주소 설정에 실패했습니다. 다시 시도해주세요.')
+                            setTimeout(() => setErrorMsg(""), 3000)
+                        }
+                    }
+                }
+            }).open()
+        } catch (error) {
+            // Google Maps API 실패 시 주소만 저장하는 폴백
+            try {
+                const fallbackAddress = prompt('지도 API 로드에 실패했습니다. 주소를 직접 입력해주세요:')
+                if (fallbackAddress && fallbackAddress.trim()) {
+                    setVenue_address(fallbackAddress.trim())
+                    await saveCoordinatesToServer(0, 0, fallbackAddress.trim())
+                    setSuccessMsg(`주소가 설정되었습니다: ${fallbackAddress} (수동 입력)`)
+                    setTimeout(() => setSuccessMsg(""), 3000)
+                } else {
+                    setErrorMsg('주소가 입력되지 않았습니다.')
+                    setTimeout(() => setErrorMsg(""), 3000)
+                }
+            } catch (fallbackError) {
+                setErrorMsg('주소 검색 및 입력에 실패했습니다.')
+                setTimeout(() => setErrorMsg(""), 3000)
+            }
+        }
+    }
+
+    // 서버에 좌표 저장
+    const saveCoordinatesToServer = async (lat: number, lng: number, address: string) => {
+        const token = tokenGetter()
+        if (!token) {
+            throw new Error("로그인이 필요합니다")
+        }
+
+        const requestBody = {
+            settings: {
+                venue_address: address,
+                venue_lat: lat,
+                venue_lng: lng,
+            }
+        }
+
+        const response = await fetch(
+            `https://wedding-admin-proxy.vercel.app/api/page-settings`,
+            {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify(requestBody),
+            }
+        )
+
+        if (!response.ok) {
+            const errorText = await response.text()
+            throw new Error(`서버 오류: ${response.status} - ${errorText}`)
+        }
+
+        const result = await response.json()
+        if (!result.success) {
+            throw new Error(result.error || "저장 실패")
+        }
+    }
+
     React.useEffect(() => {
         let mounted = true
         const getApiBases = () => {
@@ -10310,14 +10558,14 @@ function TransportTab({
                         )
                         setItems(loaded.length > 0 ? loaded : DEFAULT_ITEMS)
                     }
-                    if (result.locationName) {
-                        setLocationName(String(result.locationName))
+                    if (result.locationName !== undefined) {
+                        setLocationName(String(result.locationName || ""))
+                    }
+                    // venue_name도 동일하게 처리 (locationName과 venue_name이 같은 값)
+                    if (result.venue_name !== undefined) {
+                        setLocationName(String(result.venue_name || ""))
                     }
                     if (result.venue_address !== undefined) {
-                        console.log(
-                            "TransportTab 로드 - venue_address:",
-                            result.venue_address
-                        )
                         setVenue_address(String(result.venue_address || ""))
                     }
                 } else if (mounted) {
@@ -10410,11 +10658,11 @@ function TransportTab({
         // 커서 위치 복원 (다음 렌더링 이후)
         setTimeout(() => {
             if (typeof document !== "undefined") {
-            const updatedTextarea = document.getElementById(
-                textareaId
-            ) as HTMLTextAreaElement
-            if (updatedTextarea) {
-                updatedTextarea.focus()
+                const updatedTextarea = document.getElementById(
+                    textareaId
+                ) as HTMLTextAreaElement
+                if (updatedTextarea) {
+                    updatedTextarea.focus()
                     updatedTextarea.setSelectionRange(
                         cursorOffset,
                         cursorOffset
@@ -10605,6 +10853,66 @@ function TransportTab({
                         setVenue_address(e.target.value)
                     }
                 />
+                
+                {/* 도로명 주소 입력 버튼 */}
+                <button
+                    type="button"
+                    onClick={openDaumPostcode}
+                    style={{
+                        marginTop: 8,
+                        padding: "8px 16px",
+                        backgroundColor: "#4285f4",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "4px",
+                        fontSize: "14px",
+                        fontFamily: "Pretendard Regular",
+                        cursor: "pointer",
+                        transition: "background-color 0.2s",
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = "#3367d6"
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = "#4285f4"
+                    }}
+                >
+                    도로명 주소 입력
+                </button>
+
+                {/* 성공/에러 메시지 */}
+                {successMsg && (
+                    <div
+                        style={{
+                            marginTop: 8,
+                            padding: "8px 12px",
+                            backgroundColor: "#d4edda",
+                            color: "#155724",
+                            border: "1px solid #c3e6cb",
+                            borderRadius: "4px",
+                            fontSize: "14px",
+                            fontFamily: "Pretendard Regular",
+                        }}
+                    >
+                        {successMsg}
+                    </div>
+                )}
+                {errorMsg && (
+                    <div
+                        style={{
+                            marginTop: 8,
+                            padding: "8px 12px",
+                            backgroundColor: "#f8d7da",
+                            color: "#721c24",
+                            border: "1px solid #f5c6cb",
+                            borderRadius: "4px",
+                            fontSize: "14px",
+                            fontFamily: "Pretendard Regular",
+                        }}
+                    >
+                        {errorMsg}
+                    </div>
+                )}
             </div>
 
             {loading ? (
@@ -11135,7 +11443,7 @@ function CustomOrderDropdown({
             setFocusedIndex(0)
             // 스크롤 잠금
             if (typeof document !== "undefined") {
-            document.body.style.overflow = "hidden"
+                document.body.style.overflow = "hidden"
             }
             // 위치 계산
             requestAnimationFrame(() => updateMenuPosition())
@@ -11143,7 +11451,7 @@ function CustomOrderDropdown({
             setFocusedIndex(-1)
             // 스크롤 복원
             if (typeof document !== "undefined") {
-            document.body.style.overflow = ""
+                document.body.style.overflow = ""
             }
             setMenuStyle(null)
         }
@@ -11155,7 +11463,7 @@ function CustomOrderDropdown({
         setIsOpen(false)
         setFocusedIndex(-1)
         if (typeof document !== "undefined") {
-        document.body.style.overflow = ""
+            document.body.style.overflow = ""
         }
         buttonRef.current?.focus()
     }
@@ -11176,7 +11484,7 @@ function CustomOrderDropdown({
                 setIsOpen(false)
                 setFocusedIndex(-1)
                 if (typeof document !== "undefined") {
-                document.body.style.overflow = ""
+                    document.body.style.overflow = ""
                 }
                 buttonRef.current?.focus()
                 break
@@ -11217,7 +11525,7 @@ function CustomOrderDropdown({
             setIsOpen(false)
             setFocusedIndex(-1)
             if (typeof document !== "undefined") {
-            document.body.style.overflow = ""
+                document.body.style.overflow = ""
             }
         }
 
@@ -11236,9 +11544,9 @@ function CustomOrderDropdown({
                 typeof document !== "undefined" &&
                 typeof window !== "undefined"
             ) {
-            document.removeEventListener("mousedown", handleClickOutside)
-            window.removeEventListener("scroll", updateMenuPosition, true)
-            window.removeEventListener("resize", updateMenuPosition)
+                document.removeEventListener("mousedown", handleClickOutside)
+                window.removeEventListener("scroll", updateMenuPosition, true)
+                window.removeEventListener("resize", updateMenuPosition)
             }
         }
     }, [isOpen])
@@ -11262,7 +11570,7 @@ function CustomOrderDropdown({
     React.useEffect(() => {
         return () => {
             if (typeof document !== "undefined") {
-            document.body.style.overflow = ""
+                document.body.style.overflow = ""
             }
         }
     }, [])
