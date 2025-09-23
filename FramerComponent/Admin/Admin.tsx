@@ -10410,7 +10410,44 @@ function TransportTab({
         })
     }
 
-    // 다음 Postcode API 팝업 열기
+    // 다음 주소 검색 레이어 닫기
+    const closeDaumPostcode = () => {
+        const element_layer = document.getElementById('addressLayer')
+        if (element_layer) {
+            element_layer.style.display = 'none'
+        }
+    }
+
+    // 레이어 위치 초기화
+    const initLayerPosition = () => {
+        const width = 300
+        const height = 400
+        const borderWidth = 5
+
+        const element_layer = document.getElementById('addressLayer')
+        if (element_layer) {
+            element_layer.style.width = width + 'px'
+            element_layer.style.height = height + 'px'
+            element_layer.style.border = borderWidth + 'px solid'
+
+            // 모바일 환경에서 화면 크기 제한
+            const maxWidth = Math.min(width, window.innerWidth * 0.9)
+            const maxHeight = Math.min(height, window.innerHeight * 0.7)
+
+            element_layer.style.width = Math.max(maxWidth, 280) + 'px'
+            element_layer.style.height = Math.max(maxHeight, 350) + 'px'
+
+            // 화면 중앙에 위치
+            const left = Math.max(10, (window.innerWidth - maxWidth) / 2)
+            const top = Math.max(10, (window.innerHeight - maxHeight) / 2)
+
+            element_layer.style.left = left + 'px'
+            element_layer.style.top = top + 'px'
+            element_layer.style.transform = 'none'
+        }
+    }
+
+    // 다음 Postcode API 레이어 열기
     const openDaumPostcode = async () => {
         try {
             await loadDaumPostcodeScript()
@@ -10418,6 +10455,13 @@ function TransportTab({
 
             // API 로드 완료 후 잠시 대기 (안정성 확보)
             await new Promise(resolve => setTimeout(resolve, 500))
+
+            const element_layer = document.getElementById('addressLayer')
+            if (!element_layer) {
+                setErrorMsg('주소 검색 레이어를 찾을 수 없습니다.')
+                setTimeout(() => setErrorMsg(""), 3000)
+                return
+            }
 
             new (window as any).daum.Postcode({
                 oncomplete: async (data: DaumPostcodeData) => {
@@ -10444,8 +10488,28 @@ function TransportTab({
                             setTimeout(() => setErrorMsg(""), 3000)
                         }
                     }
-                }
-            }).open()
+
+                    // 레이어 닫기
+                    closeDaumPostcode()
+                },
+                width: '100%',
+                height: '100%',
+                maxSuggestItems: 5
+            }).embed(element_layer)
+
+            // 레이어 보이기
+            element_layer.style.display = 'block'
+
+            // 레이어 위치 초기화
+            initLayerPosition()
+
+            // 브라우저 크기 변경 시 레이어 위치 재조정
+            const handleResize = () => {
+                initLayerPosition()
+            }
+
+            window.addEventListener('resize', handleResize)
+            window.addEventListener('orientationchange', handleResize)
         } catch (error) {
             // Google Maps API 실패 시 주소만 저장하는 폴백
             try {
@@ -10853,6 +10917,43 @@ function TransportTab({
                         setVenue_address(e.target.value)
                     }
                 />
+
+                {/* 다음 주소 검색 레이어 */}
+                <div
+                    id="addressLayer"
+                    style={{
+                        display: "none",
+                        position: "fixed",
+                        overflow: "hidden",
+                        zIndex: 1000,
+                        WebkitOverflowScrolling: "touch",
+                        left: "50%",
+                        top: "50%",
+                        transform: "translate(-50%, -50%)",
+                        width: "300px",
+                        height: "400px",
+                        border: "5px solid #000",
+                        backgroundColor: "white",
+                        boxShadow: "0 10px 30px rgba(0, 0, 0, 0.3)",
+                        borderRadius: "8px",
+                        maxWidth: "90vw",
+                        maxHeight: "70vh",
+                    }}
+                >
+                    <img
+                        src="//t1.daumcdn.net/postcode/resource/images/close.png"
+                        id="btnCloseLayer"
+                        style={{
+                            cursor: "pointer",
+                            position: "absolute",
+                            right: "-3px",
+                            top: "-3px",
+                            zIndex: 1,
+                        }}
+                        onClick={closeDaumPostcode}
+                        alt="닫기 버튼"
+                    />
+                </div>
                 
                 {/* 도로명 주소 입력 버튼 */}
                 <button
