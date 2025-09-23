@@ -10859,22 +10859,26 @@ function TransportTab({
                     type="button"
                     onClick={openDaumPostcode}
                     style={{
-                        marginTop: 8,
-                        padding: "8px 16px",
+                        flex: "1 1 0",
+                        height: 50,
+                        paddingLeft: 12,
+                        paddingRight: 12,
+                        paddingTop: 8,
+                        paddingBottom: 8,
                         backgroundColor: "#4285f4",
                         color: "white",
+                        outline: "0.50px var(--roarc-grey-500, #AEAEAE) solid",
+                        outlineOffset: "-0.50px",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        gap: 8,
+                        display: "flex",
                         border: "none",
-                        borderRadius: "4px",
+                        borderRadius: "2px",
+                        cursor: "pointer",
+                        opacity: 1,
                         fontSize: "14px",
                         fontFamily: "Pretendard Regular",
-                        cursor: "pointer",
-                        transition: "background-color 0.2s",
-                    }}
-                    onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = "#3367d6"
-                    }}
-                    onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = "#4285f4"
                     }}
                 >
                     도로명 주소 입력
