@@ -25,39 +25,6 @@ interface GalleryImage {
     created_at: string
 }
 
-// Supabase public URL을 변환(render) URL로 변경해 크기/품질 최적화
-const toTransformedUrl = (
-    publicUrl: string,
-    opts: { width?: number; height?: number; quality?: number; format?: "webp" | "jpg" | "png"; resize?: "cover" | "contain" | "fill" }
-) => {
-    if (!publicUrl) return publicUrl
-    try {
-        const url = new URL(publicUrl)
-        const split = url.pathname.split("/storage/v1/object/")
-        if (split.length !== 2) return publicUrl
-        url.pathname = `/storage/v1/render/image/${split[1]}`
-        const params = url.searchParams
-        if (opts.width) params.set("width", String(opts.width))
-        if (opts.height) params.set("height", String(opts.height))
-        if (opts.quality) params.set("quality", String(opts.quality))
-        if (opts.format) params.set("format", opts.format)
-        if (opts.resize) params.set("resize", opts.resize)
-        return url.toString()
-    } catch {
-        return publicUrl
-    }
-}
-
-// 변환 실패 시 원본 URL로 폴백하는 핸들러
-const makeOnErrorFallback = (originalUrl?: string) => (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-    const img = e.currentTarget as HTMLImageElement & { dataset: any }
-    if (!originalUrl) return
-    if (!img.dataset || img.dataset.fallbackDone === "1") return
-    img.dataset.fallbackDone = "1"
-    ;(img as any).srcset = ""
-    img.src = originalUrl
-}
-
 // 프록시를 통한 안전한 이미지 목록 가져오기
 async function getImagesByPageId(pageId: string) {
     try {
@@ -205,15 +172,15 @@ export default function UnifiedGallery(props: UnifiedGalleryProps) {
             try {
                 setLoading(true)
                 setError("")
-                
+
                 // 갤러리 타입과 이미지 데이터를 병렬로 로드
                 const [type, imageData] = await Promise.all([
                     getPageGalleryType(pageId),
-                    getImagesByPageId(pageId)
+                    getImagesByPageId(pageId),
                 ])
-                
+
                 setGalleryType(type)
-                
+
                 // 이미지 데이터를 갤러리 형식으로 변환
                 const galleryImages: GalleryImage[] = imageData.map(
                     (img: any, index: number) => ({
@@ -851,13 +818,7 @@ export default function UnifiedGallery(props: UnifiedGalleryProps) {
                                 }}
                             >
                                 <img
-                                    src={toTransformedUrl(image.src, { width: 640, quality: isSlowNetwork ? 60 : 75, format: "jpg", resize: "contain" })}
-                                    srcSet={[
-                                        `${toTransformedUrl(image.src, { width: 320, quality: isSlowNetwork ? 60 : 75, format: 'jpg', resize: 'contain' })} 320w`,
-                                        `${toTransformedUrl(image.src, { width: 480, quality: isSlowNetwork ? 60 : 75, format: 'jpg', resize: 'contain' })} 480w`,
-                                        `${toTransformedUrl(image.src, { width: 640, quality: isSlowNetwork ? 60 : 75, format: 'jpg', resize: 'contain' })} 640w`,
-                                    ].join(', ')}
-                                    sizes="(max-width: 430px) 100vw, 430px"
+                                    src={image.src}
                                     alt={image.alt}
                                     style={{
                                         width: "100%",
@@ -866,10 +827,8 @@ export default function UnifiedGallery(props: UnifiedGalleryProps) {
                                         pointerEvents: "none",
                                         display: "block",
                                     }}
-                                    loading="lazy"
-                                    decoding="async"
                                     onLoad={handleImageLoad}
-                                    onError={makeOnErrorFallback(image.src)}
+                                    onError={handleImageError}
                                 />
                             </div>
                         ))}
@@ -1097,13 +1056,7 @@ export default function UnifiedGallery(props: UnifiedGalleryProps) {
                             onClick={() => handleThumbnailClick(index)}
                         >
                             <img
-                                src={toTransformedUrl(image.src, { width: 120, quality: isSlowNetwork ? 50 : 65, format: "webp", resize: "cover" })}
-                                srcSet={[
-                                    `${toTransformedUrl(image.src, { width: 80, quality: 60, format: 'webp', resize: 'cover' })} 80w`,
-                                    `${toTransformedUrl(image.src, { width: 120, quality: 60, format: 'webp', resize: 'cover' })} 120w`,
-                                    `${toTransformedUrl(image.src, { width: 160, quality: 60, format: 'webp', resize: 'cover' })} 160w`,
-                                ].join(', ')}
-                                sizes="60px"
+                                src={image.src}
                                 alt={image.alt}
                                 style={{
                                     width: "100%",
@@ -1112,9 +1065,19 @@ export default function UnifiedGallery(props: UnifiedGalleryProps) {
                                     opacity: selectedIndex === index ? 1 : 0.5,
                                     transition: "opacity 0.2s ease",
                                 }}
-                                loading="lazy"
-                                decoding="async"
-                                onError={makeOnErrorFallback(image.src)}
+                                onError={(e) => {
+                                    const target = e.target as HTMLImageElement
+                                    target.style.display = "none"
+                                    if (target.parentNode) {
+                                        const parent =
+                                            target.parentNode as HTMLElement
+                                        parent.innerHTML = `
+                                            <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #999; font-size: 10px;">
+                                                Error
+                                            </div>
+                                        `
+                                    }
+                                }}
                             />
                         </motion.div>
                     ))}

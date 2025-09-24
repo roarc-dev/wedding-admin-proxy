@@ -1,54 +1,21 @@
-// CalendarComplete.js — Calendar.tsx 기능을 React.createElement 기반 JS로 변환
+// CalendarComplete.js — Calendar.tsx 기능을 jsx runtime 기반 JS로 변환
 // - 브라우저 ESM
-// - JSX/TS 미사용 (createElement)
-// - Framer/React 전역 런타임에서 동작
+// - JSX Runtime 사용 (reference.js 패턴 적용)
+// - React 훅 직접 import
 // - typography.js로 폰트 로딩 보장
 
+import { jsx } from "react/jsx-runtime";
+import { useState, useEffect } from "react";
 import typography from "https://cdn.roarc.kr/fonts/typography.js";
 
-// React 전역은 Framer/Canvas 최적화 단계에서 아직 준비 전일 수 있으므로
-// 즉시 검사/throw하지 않고, 접근 시점에 동적으로 해소하는 Proxy + 폴백을 사용한다.
-const React = (() => {
-  const resolve = () =>
-    (globalThis && (globalThis.React || (globalThis.Framer && globalThis.Framer.React))) || null;
-  const fallback = {
-    createElement: () => null,
-    Fragment: "div",
-  };
-  return new Proxy(
-    {},
-    {
-      get(_t, key) {
-        const r = resolve();
-        if (!r) {
-          return (fallback && fallback[key]) || (() => null);
-        }
-        return r[key];
-      },
-    }
-  );
-})();
-
-// framer-motion 환경 감지 (없으면 폴백 제공)
-const framerNS = (globalThis && globalThis.Framer) || {};
-let motion = null;
-try {
-  const motionEnv = framerNS.motion || globalThis.motion || null;
-  motion = motionEnv && motionEnv.div ? motionEnv : null;
-} catch (_) {
-  motion = null;
-}
-if (!motion) {
-  const factory = (tag) => (props) => React.createElement(tag, props, props && props.children);
-  motion = { div: factory("div") };
-}
+// === reference.js 패턴: React 훅 직접 import로 Proxy 패턴 불필요 ===
 
 // 프록시 서버 URL (고정된 Production URL)
 const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app";
 
 // 하트 모양 SVG (색상/크기 적용)
 function HeartShape({ color, size = 16 }) {
-  return React.createElement(
+  return jsx(
     "svg",
     {
       xmlns: "http://www.w3.org/2000/svg",
@@ -63,28 +30,37 @@ function HeartShape({ color, size = 16 }) {
         transform: "translate(-50%, -45%)",
         zIndex: 0,
       },
-    },
-    React.createElement(
-      "g",
-      { clipPath: "url(#clip0_31_239)" },
-      React.createElement(
-        "g",
-        { style: { mixBlendMode: "multiply" } },
-        React.createElement("path", {
-          d: "M8.21957 1.47997C8.08957 1.59997 7.99957 1.73997 7.87957 1.85997C7.75957 1.73997 7.66957 1.59997 7.53957 1.47997C3.08957 -2.76003 -2.51043 2.94997 1.21957 7.84997C2.91957 10.08 5.58957 11.84 7.86957 13.43C10.1596 11.83 12.8196 10.08 14.5196 7.84997C18.2596 2.94997 12.6596 -2.76003 8.19957 1.47997H8.21957Z",
-          fill: color,
-        })
-      )
-    ),
-    React.createElement(
-      "defs",
-      null,
-      React.createElement(
-        "clipPath",
-        { id: "clip0_31_239" },
-        React.createElement("rect", { width: 15.76, height: 13.44, fill: "white" })
-      )
-    )
+      children: [
+        jsx(
+          "g",
+          {
+            clipPath: "url(#clip0_31_239)",
+            children: jsx(
+              "g",
+              {
+                style: { mixBlendMode: "multiply" },
+                children: jsx("path", {
+                  d: "M8.21957 1.47997C8.08957 1.59997 7.99957 1.73997 7.87957 1.85997C7.75957 1.73997 7.66957 1.59997 7.53957 1.47997C3.08957 -2.76003 -2.51043 2.94997 1.21957 7.84997C2.91957 10.08 5.58957 11.84 7.86957 13.43C10.1596 11.83 12.8196 10.08 14.5196 7.84997C18.2596 2.94997 12.6596 -2.76003 8.19957 1.47997H8.21957Z",
+                  fill: color,
+                })
+              }
+            )
+          }
+        ),
+        jsx(
+          "defs",
+          {
+            children: jsx(
+              "clipPath",
+              {
+                id: "clip0_31_239",
+                children: jsx("rect", { width: 15.76, height: 13.44, fill: "white" })
+              }
+            )
+          }
+        )
+      ]
+    }
   );
 }
 
@@ -191,11 +167,9 @@ function CalendarComplete(props) {
     overrideHighlightShape,
     overrideHighlightTextColor,
   } = props || {};
-  const resolveReactNow = () =>
-    (globalThis && (globalThis.React || (globalThis.Framer && globalThis.Framer.React))) || null;
-  const R = resolveReactNow();
-  if (!R) return null;
-  const { useState, useEffect, useMemo } = R;
+  
+  // reference.js 패턴: React 훅을 직접 import했으므로 바로 사용 가능
+  // 더 이상 런타임 확인이나 Proxy 패턴 불필요
 
   const [calendarData, setCalendarData] = useState([]);
   const [pageSettings, setPageSettings] = useState(null);

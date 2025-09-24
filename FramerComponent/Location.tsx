@@ -106,19 +106,32 @@ export default function Location(props: LocationProps) {
                         lineHeight: "32px",
                     }}
                 >
-                    {loading ? "" : displayLocationName.includes("|") ? (
-                        displayLocationName.split("|").map((part, index, array) => (
-                            <React.Fragment key={index}>
-                                <span style={{ fontFamily: "Pretendard SemiBold" }}>
-                                    {part.trim()}
-                                </span>
-                                {index < array.length - 1 && (
-                                    <span style={{ fontFamily: "Pretendard Regular" }}>
-                                        {" | "}
+                    {loading ? (
+                        ""
+                    ) : displayLocationName.includes("|") ? (
+                        displayLocationName
+                            .split("|")
+                            .map((part, index, array) => (
+                                <React.Fragment key={index}>
+                                    <span
+                                        style={{
+                                            fontFamily: "Pretendard SemiBold",
+                                        }}
+                                    >
+                                        {part.trim()}
                                     </span>
-                                )}
-                            </React.Fragment>
-                        ))
+                                    {index < array.length - 1 && (
+                                        <span
+                                            style={{
+                                                fontFamily:
+                                                    "Pretendard Regular",
+                                            }}
+                                        >
+                                            {" | "}
+                                        </span>
+                                    )}
+                                </React.Fragment>
+                            ))
                     ) : (
                         <span style={{ fontFamily: "Pretendard SemiBold" }}>
                             {displayLocationName}

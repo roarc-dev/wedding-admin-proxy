@@ -1,48 +1,13 @@
 // LocationUnified.js — Location, NaverMap, LocationDetail, MapBtn을 통합한 완전한 컴포넌트
 // - 브라우저 ESM
-// - JSX/TS 미사용 (createElement)
-// - Framer/React 전역 런타임에서 동작
+// - JSX Runtime 사용 (reference.js 패턴 적용)
+// - React 훅 직접 import
 // - typography.js를 직접 import하여 폰트 CSS를 주입
+import { jsx } from "react/jsx-runtime";
+import { useState, useRef, useEffect } from "react";
 import typography from "https://cdn.roarc.kr/fonts/typography.js";
 
-// === 런타임 전역에서 React 확보 (지연 해소: 최적화 단계 대비) ===
-const React = (() => {
-  const resolve = () =>
-    (globalThis && (globalThis.React || (globalThis.Framer && globalThis.Framer.React))) || null;
-  const fallback = {
-    createElement: () => null,
-    Fragment: "div",
-    useState: (initial) => [initial, () => {}],
-    useEffect: (callback, deps) => { callback(); },
-    useRef: (initial) => ({ current: initial }),
-  };
-  return new Proxy(
-    {},
-    {
-      get(_t, key) {
-        const r = resolve();
-        if (!r) {
-          return (fallback && fallback[key]) || (() => null);
-        }
-        return r[key];
-      },
-    }
-  );
-})();
-
-// (옵션) framer-motion이 전역에 있으면 쓰고, 없으면 안전 폴백
-const framerNS = (globalThis && globalThis.Framer) || {};
-let motion = null;
-try {
-  const motionEnv = framerNS.motion || globalThis.motion || null;
-  motion = motionEnv && (motionEnv.div || motionEnv.span || motionEnv.button) ? motionEnv : null;
-} catch (_) {
-  motion = null;
-}
-if (!motion) {
-  const factory = (tag) => (props) => React.createElement(tag, props, props && props.children);
-  motion = { div: factory("div"), span: factory("span"), button: factory("button") };
-}
+// === reference.js 패턴: React 훅 직접 import로 Proxy 패턴 불필요 ===
 
 // 프록시 서버 URL (고정된 Production URL)
 const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app";
@@ -242,13 +207,9 @@ function processBoldAndLineBreak(text, keyPrefix) {
 // === 메인 컴포넌트 ===
 function LocationUnified(props) {
   const { pageId = "", style } = props;
-  const resolveReactNow = () =>
-    (globalThis && (globalThis.React || (globalThis.Framer && globalThis.Framer.React))) || null;
-  const R = resolveReactNow();
-  if (!R) {
-    return null;
-  }
-  const { useEffect, useRef, useState } = R;
+  
+  // reference.js 패턴: React 훅을 직접 import했으므로 바로 사용 가능
+  // 더 이상 런타임 확인이나 Proxy 패턴 불필요
 
   // 통합 상태 관리
   const [locationSettings, setLocationSettings] = useState({

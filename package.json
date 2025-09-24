@@ -9,11 +9,10 @@
     "deploy:qa": "VERCEL_CLI_SKIP_DEV_SCRIPT=true npx vercel --prod --local-config=vercel.qa.json",
     "dev:qa": "VERCEL_CLI_SKIP_DEV_SCRIPT=true npx vercel dev --local-config=vercel.qa.json",
     "build": "echo 'No build step required for API proxy'",
-    "preview": "vercel dev --listen 3001"
+    "preview": "vercel dev --listen 3001",
+    "lint": "tsc --noEmit -p tsconfig.admin.json"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.645.0",
-    "@aws-sdk/s3-request-presigner": "^3.645.0",
     "@supabase/supabase-js": "^2.39.0",
     "@tanstack/react-query": "^5.83.0",
     "bcryptjs": "^2.4.3",
@@ -23,8 +22,7 @@
     "framer-motion": "^10.16.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "styled-components": "^6.1.19",
-    "zod": "^3.23.8"
+    "styled-components": "^6.1.19"
   },
   "devDependencies": {
     "@types/react": "^18.2.15",
@@ -34,5 +32,3 @@
     "vercel": "^47.0.1"
   }
 }
-
-

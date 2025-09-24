@@ -199,3 +199,8 @@ CREATE INDEX IF NOT EXISTS idx_wedding_contacts_page_id ON wedding_contacts(page
 -- FROM invite_cards ic
 -- LEFT JOIN page_settings ps ON ic.page_id = ps.page_id
 -- LIMIT 10;
+
+-- Add BGM related columns if they don't exist
+ALTER TABLE page_settings ADD COLUMN IF NOT EXISTS bgm_url TEXT DEFAULT '';
+ALTER TABLE page_settings ADD COLUMN IF NOT EXISTS bgm_type TEXT DEFAULT '';
+ALTER TABLE page_settings ADD COLUMN IF NOT EXISTS bgm_autoplay BOOLEAN DEFAULT FALSE;

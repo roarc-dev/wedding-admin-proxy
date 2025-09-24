@@ -1,22 +1,29 @@
 /**
  * Unified Cloudflare R2 API
- * Handles all R2 operations: presign, simple, delete, test
+ * Handles all R2 operations: presign, simple, delete, test, finalize
  * 
  * Endpoints:
- * - POST /api/r2?action=simple - Simple presigned URL generation
- * - POST /api/r2?action=presign - Full presigned URL with validation
- * - POST /api/r2?action=delete - Delete file from R2
- * - GET /api/r2?action=test - Test environment variables
+ * - POST /api/r2?action=simple   - Simple presigned URL generation
+ * - POST /api/r2?action=presign  - Full presigned URL with validation
+ * - POST /api/r2?action=delete   - Delete file from R2
+ * - GET  /api/r2?action=test     - Test environment variables
+ * - GET|POST /api/r2?action=finalize  - Return ETag and versioned public URL for a key
  * 
  * Required Environment Variables:
  * - R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_ENDPOINT
  * - Optional: R2_PUBLIC_BASE_URL (for custom domain)
  */
 
-const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3')
+const { S3Client, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3')
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner')
 const { createClient } = require('@supabase/supabase-js')
-const { v4: uuidv4 } = require('uuid')
+// UUID 생성 함수 (ESM 호환성 문제 해결)
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
 
 // Configure S3 client for Cloudflare R2
 const r2Client = new S3Client({
@@ -38,8 +45,14 @@ const supabase = createClient(
 // Utility functions
 function getPublicUrl(key) {
   // Custom Domain 사용: cdn.roarc.kr
-  const base = process.env.R2_PUBLIC_BASE_URL || `${process.env.R2_ENDPOINT}/${process.env.R2_BUCKET}`
+  const baseRaw = process.env.R2_PUBLIC_BASE_URL || `${process.env.R2_ENDPOINT}/${process.env.R2_BUCKET}`
+  const base = String(baseRaw).replace(/\/$/, '')
   return `${base}/${key}`
+}
+
+function buildVersionedUrl(key, etag) {
+  const v = (etag || '').replace(/"/g, '') || String(Date.now())
+  return `${getPublicUrl(key)}?v=${encodeURIComponent(v)}`
 }
 
 function safeFileName(name) {
@@ -74,6 +87,7 @@ const ALLOWED_MIMES = [
   'image/webp',
   'image/avif',
   'image/svg+xml',
+  'image/gif',
   'audio/m4a',
   'audio/mp4',
   'audio/mpeg',
@@ -100,11 +114,17 @@ async function handleSimple(req, res) {
     const finalKey = key || `${pageId}/files/${Date.now()}-${safeFileName(fileName)}`
 
     // Generate presigned URL for PUT operation
+    // Framer 컴포넌트 파일들은 더 짧은 캐시로 설정하여 변경사항을 빠르게 반영
+    const isFramerComponent = finalKey.includes('framer/components/') && (contentType === 'application/javascript' || contentType === 'text/javascript')
+    const cacheControl = isFramerComponent 
+      ? 'public, max-age=300, must-revalidate' // 5분 캐시, 재검증 필수
+      : 'public, max-age=31536000, immutable'  // 1년 캐시, 불변 파일
+    
     const command = new PutObjectCommand({
       Bucket: process.env.R2_BUCKET,
       Key: finalKey,
       ContentType: contentType,
-      CacheControl: 'public, max-age=31536000, immutable',
+      CacheControl: cacheControl,
     })
 
     const uploadUrl = await getSignedUrl(r2Client, command, { 
@@ -174,7 +194,7 @@ async function handlePresign(req, res) {
     }
 
     // Generate object key based on content type
-    const uuid = uuidv4()
+    const uuid = generateUUID()
     const safeName = safeFileName(fileName)
     let key
 
@@ -187,11 +207,17 @@ async function handlePresign(req, res) {
     }
 
     // Generate presigned URL for PUT operation
+    // Framer 컴포넌트 파일들은 더 짧은 캐시로 설정하여 변경사항을 빠르게 반영
+    const isFramerComponent = key.includes('framer/components/') && (contentType === 'application/javascript' || contentType === 'text/javascript')
+    const cacheControl = isFramerComponent 
+      ? 'public, max-age=300, must-revalidate' // 5분 캐시, 재검증 필수
+      : 'public, max-age=31536000, immutable'  // 1년 캐시, 불변 파일
+    
     const command = new PutObjectCommand({
       Bucket: process.env.R2_BUCKET,
       Key: key,
       ContentType: contentType,
-      CacheControl: 'public, max-age=31536000, immutable',
+      CacheControl: cacheControl,
     })
 
     const uploadUrl = await getSignedUrl(r2Client, command, { 
@@ -287,12 +313,8 @@ async function handleTest(req, res) {
       moduleTests['@aws-sdk/s3-request-presigner'] = false
     }
 
-    try {
-      require('uuid')
-      moduleTests['uuid'] = true
-    } catch (e) {
-      moduleTests['uuid'] = false
-    }
+    // UUID는 내장 함수로 대체했으므로 테스트에서 제외
+    moduleTests['uuid'] = 'replaced with built-in function'
 
     return res.status(200).json({
       success: true,
@@ -312,12 +334,47 @@ async function handleTest(req, res) {
   }
 }
 
+async function handleFinalize(req, res) {
+  try {
+    const key = req.method === 'GET' ? req.query.key : req.body?.key
+    if (!key) {
+      return res.status(400).json({ success: false, error: 'Key is required' })
+    }
+
+    const head = await r2Client.send(new HeadObjectCommand({
+      Bucket: process.env.R2_BUCKET,
+      Key: key,
+    }))
+
+    const etag = (head.ETag || '').replace(/"/g, '') || null
+    const contentType = head.ContentType || null
+    const publicUrl = getPublicUrl(key)
+    const versionedUrl = buildVersionedUrl(key, etag)
+
+    return res.status(200).json({
+      success: true,
+      key,
+      etag,
+      contentType,
+      publicUrl,
+      versionedUrl,
+    })
+  } catch (error) {
+    console.error('R2 finalize error:', error)
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to finalize (HEAD object)',
+      message: error.message,
+    })
+  }
+}
+
 // Main handler
 module.exports = async (req, res) => {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-File-Size')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-File-Size, If-None-Match, ETag')
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate')
 
   if (req.method === 'OPTIONS') {
@@ -360,6 +417,12 @@ module.exports = async (req, res) => {
       }
       return handleTest(req, res)
 
+    case 'finalize':
+      if (req.method !== 'GET' && req.method !== 'POST') {
+        return res.status(405).json({ success: false, error: 'Method not allowed' })
+      }
+      return handleFinalize(req, res)
+
     default:
       return res.status(400).json({
         success: false,
@@ -367,7 +430,3 @@ module.exports = async (req, res) => {
       })
   }
 }
-
-
-
-

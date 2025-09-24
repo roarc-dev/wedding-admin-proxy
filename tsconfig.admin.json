@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["FramerComponent/Admin/Admin.tsx"],
+  "exclude": []
+}

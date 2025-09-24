@@ -53,7 +53,9 @@ export default function MapLinkButtonGroup({
     useEffect(() => {
         const fetchConfig = async () => {
             try {
-                const res = await fetch("https://wedding-admin-proxy.vercel.app/api/map-config")
+                const res = await fetch(
+                    "https://wedding-admin-proxy.vercel.app/api/map-config"
+                )
                 const json = await res.json()
                 if (json.success) {
                     setNaverClientId(json.data.naverClientId || "3cxftuac0e")
@@ -267,7 +269,8 @@ export default function MapLinkButtonGroup({
             geocoderInstance.current = new window.google.maps.Geocoder()
             const tempDiv = document.createElement("div")
             document.body.appendChild(tempDiv)
-            placesServiceInstance.current = new window.google.maps.places.PlacesService(tempDiv)
+            placesServiceInstance.current =
+                new window.google.maps.places.PlacesService(tempDiv)
             if (placeName && placeName.trim()) {
                 setTimeout(() => searchPlace(placeName), 500)
             }

@@ -23,23 +23,26 @@ function renderStyledText(text: string): JSX.Element[] {
     let index = 0
     const regex = /(\{([^}]*)\})|(\n\n)|(\n)/g
     let match: RegExpExecArray | null
-    
+
     while ((match = regex.exec(text)) !== null) {
         const start = match.index
         const end = start + match[0].length
-        
+
         // 매칭 전 일반 텍스트 추가
         if (start > index) {
             const beforeText = text.slice(index, start)
             segments.push(...processBoldAndLineBreak(beforeText, `t-${index}`))
         }
-        
+
         if (match[1]) {
             // { } 처리 - 내부 텍스트에서 * * 처리와 줄바꿈 처리도 수행
             const inner = match[2] || ""
             const innerSegments = processBoldAndLineBreak(inner, `q-${start}`)
             segments.push(
-                <span key={`q-${start}`} style={{ fontSize: 13, lineHeight: "20px" }}>
+                <span
+                    key={`q-${start}`}
+                    style={{ fontSize: 13, lineHeight: "20px" }}
+                >
                     {innerSegments}
                 </span>
             )
@@ -52,44 +55,47 @@ function renderStyledText(text: string): JSX.Element[] {
             // 한 번 줄바꿈 처리 (\n) - 일반 줄바꿈
             segments.push(<br key={`br-${start}`} />)
         }
-        
+
         index = end
     }
-    
+
     // 남은 텍스트 처리
     if (index < text.length) {
         const remainingText = text.slice(index)
         segments.push(...processBoldAndLineBreak(remainingText, `t-${index}`))
     }
-    
+
     return segments
 }
 
 // * * 처리와 줄바꿈 처리를 모두 수행하는 함수
-function processBoldAndLineBreak(text: string, keyPrefix: string): JSX.Element[] {
+function processBoldAndLineBreak(
+    text: string,
+    keyPrefix: string
+): JSX.Element[] {
     const segments: JSX.Element[] = []
     let index = 0
     const regex = /(\*([^*]+)\*)|(\n\n)|(\n)/g
     let match: RegExpExecArray | null
-    
+
     while ((match = regex.exec(text)) !== null) {
         const start = match.index
         const end = start + match[0].length
-        
+
         // 매칭 전 일반 텍스트
         if (start > index) {
-            const lineHeight = keyPrefix.startsWith('q-') ? "20px" : "1.6em"
+            const lineHeight = keyPrefix.startsWith("q-") ? "20px" : "1.6em"
             segments.push(
                 <span key={`${keyPrefix}-${index}`} style={{ lineHeight }}>
                     {text.slice(index, start)}
                 </span>
             )
         }
-        
+
         if (match[1]) {
             // * * 처리
             const inner = match[2] || ""
-            const lineHeight = keyPrefix.startsWith('q-') ? "20px" : "1.6em"
+            const lineHeight = keyPrefix.startsWith("q-") ? "20px" : "1.6em"
             segments.push(
                 <span
                     key={`${keyPrefix}-b-${start}`}
@@ -101,26 +107,29 @@ function processBoldAndLineBreak(text: string, keyPrefix: string): JSX.Element[]
         } else if (match[3]) {
             // 두 번 줄바꿈 처리 (\n\n) - 0.6em 간격
             segments.push(
-                <div key={`${keyPrefix}-double-br-${start}`} style={{ height: "0.6em" }} />
+                <div
+                    key={`${keyPrefix}-double-br-${start}`}
+                    style={{ height: "0.6em" }}
+                />
             )
         } else if (match[4]) {
             // 한 번 줄바꿈 처리 (\n) - 일반 줄바꿈
             segments.push(<br key={`${keyPrefix}-br-${start}`} />)
         }
-        
+
         index = end
     }
-    
+
     // 남은 텍스트
     if (index < text.length) {
-        const lineHeight = keyPrefix.startsWith('q-') ? "20px" : "1.6em"
+        const lineHeight = keyPrefix.startsWith("q-") ? "20px" : "1.6em"
         segments.push(
             <span key={`${keyPrefix}-${index}`} style={{ lineHeight }}>
                 {text.slice(index)}
             </span>
         )
     }
-    
+
     return segments
 }
 
@@ -246,4 +255,3 @@ addPropertyControls(LocationDetail, {
         placeholder: "예: aeyong",
     },
 })
-

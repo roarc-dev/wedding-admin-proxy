@@ -10442,8 +10442,8 @@ function TransportTab({
     // 레이어 위치 초기화
     const initLayerPosition = () => {
         const width = 300
-        const height = 370 // 닫기 버튼 30px 제외
-        const borderWidth = 1
+        const height = 400
+        const borderWidth = 5
 
         const element_layer = document.getElementById("addressLayer")
         if (element_layer) {
@@ -10452,15 +10452,15 @@ function TransportTab({
             element_layer.style.border = borderWidth + "px solid"
 
             // 모바일 환경에서 화면 크기 제한
-            const maxWidth = Math.min(width, window.innerWidth * 0.95)
+            const maxWidth = Math.min(width, window.innerWidth * 0.9)
             const maxHeight = Math.min(height, window.innerHeight * 0.7)
 
             element_layer.style.width = Math.max(maxWidth, 280) + "px"
             element_layer.style.height = Math.max(maxHeight, 350) + "px"
 
             // 화면 중앙에 위치
-            const left = Math.max(5, (window.innerWidth - maxWidth) / 2)
-            const top = Math.max(5, (window.innerHeight - maxHeight) / 2)
+            const left = Math.max(10, (window.innerWidth - maxWidth) / 2)
+            const top = Math.max(10, (window.innerHeight - maxHeight) / 2)
 
             element_layer.style.left = left + "px"
             element_layer.style.top = top + "px"
@@ -10669,6 +10669,7 @@ function TransportTab({
                         setLocationName(String(result.venue_name || ""))
                     }
                     if (result.venue_address !== undefined) {
+                        console.log("TransportTab 로드 - venue_address:", result.venue_address)
                         setVenue_address(String(result.venue_address || ""))
                     }
                 } else if (mounted) {
@@ -10941,7 +10942,7 @@ function TransportTab({
                         flex: 1,
                         height: 40,
                         padding: 12,
-                        background: "white",
+                        background: "#f5f5f5",
                         border: `1px solid ${theme.color.border}`,
                         outlineOffset: -0.25,
                         fontSize: 14,
@@ -10949,12 +10950,13 @@ function TransportTab({
                         color: venue_address ? "black" : "#ADADAD",
                         width: "100%",
                         marginTop: 0,
+                        cursor: "pointer",
                     }}
-                    placeholder="서울시 강남구 테헤란로 123"
+                    placeholder="도로명 주소 입력 버튼을 클릭하세요"
                     value={venue_address}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        setVenue_address(e.target.value)
-                    }
+                    readOnly={true}
+                    onClick={openDaumPostcode}
+                    onChange={() => {}} // 직접 입력 방지
                 />
 
                 {/* 다음 주소 검색 레이어 */}
@@ -10979,27 +10981,19 @@ function TransportTab({
                         maxHeight: "70vh",
                     }}
                 >
-                    {/* 닫기 버튼 */}
-                    <button
+                    <img
+                        src="//t1.daumcdn.net/postcode/resource/images/close.png"
                         id="btnCloseLayer"
-                        onClick={closeDaumPostcode}
                         style={{
-                            position: "absolute",
-                            bottom: "0",
-                            left: "0",
-                            width: "100%",
-                            height: "30px",
-                            backgroundColor: "#000000",
-                            color: "white",
-                            border: "none",
                             cursor: "pointer",
-                            fontSize: "14px",
-                            fontFamily: "Pretendard Regular",
-                            fontWeight: "500",
+                            position: "absolute",
+                            right: "-3px",
+                            top: "-3px",
+                            zIndex: 1,
                         }}
-                    >
-                        닫기
-                    </button>
+                        onClick={closeDaumPostcode}
+                        alt="닫기 버튼"
+                    />
                 </div>
 
                 {/* 도로명 주소 입력 버튼 */}

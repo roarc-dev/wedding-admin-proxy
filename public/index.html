@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wedding Admin Proxy - QA Environment</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .api-info {
+            margin-top: 20px;
+        }
+        .endpoint {
+            background-color: #f8f9fa;
+            padding: 10px;
+            margin: 5px 0;
+            border-left: 4px solid #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎉 Wedding Admin Proxy</h1>
+        <div class="status success">
+            ✅ QA Environment Successfully Deployed
+        </div>
+
+        <div class="api-info">
+            <h2>📡 Available API Endpoints:</h2>
+            <div class="endpoint">
+                <strong>GET/POST</strong> /api/page-settings<br>
+                <small>Page settings management</small>
+            </div>
+            <div class="endpoint">
+                <strong>GET/POST</strong> /api/images<br>
+                <small>Image upload and management</small>
+            </div>
+            <div class="endpoint">
+                <strong>GET/POST</strong> /api/invite<br>
+                <small>Wedding invitation management</small>
+            </div>
+            <div class="endpoint">
+                <strong>GET/POST</strong> /api/auth<br>
+                <small>User authentication</small>
+            </div>
+        </div>
+
+        <div style="margin-top: 30px; text-align: center; color: #666;">
+            <p>🚀 Deployed on Vercel QA Environment</p>
+            <p>🔧 Environment: Development (develop branch)</p>
+        </div>
+    </div>
+</body>
+</html>
