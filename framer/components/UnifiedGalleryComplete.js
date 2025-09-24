@@ -1,32 +1,13 @@
-// UnifiedGalleryComplete.js — UnifiedGallery.tsx 기반의 브라우저 ESM JS 버전
-// - JSX/TS 미사용 (createElement)
-// - Framer/React 전역 런타임에서 동작
+// UnifiedGalleryComplete.js — UnifiedGallery.tsx 기반의 jsx runtime JS 버전
+// - JSX Runtime 사용 (reference.js 패턴 적용)
+// - React 훅 직접 import
 // - typography.js를 통해 폰트 로딩 보장
 
+import { jsx } from "react/jsx-runtime";
+import { useState, useEffect, useRef, useMemo } from "react";
 import typography from "https://cdn.roarc.kr/fonts/typography.js";
 
-// React 전역은 Framer/Canvas 최적화 단계에서 아직 준비 전일 수 있으므로
-// 즉시 검사/throw하지 않고, 접근 시점에 동적으로 해소하는 Proxy + 폴백을 사용한다.
-const React = (() => {
-  const resolve = () =>
-    (globalThis && (globalThis.React || (globalThis.Framer && globalThis.Framer.React))) || null;
-  const fallback = {
-    createElement: () => null,
-    Fragment: "div",
-  };
-  return new Proxy(
-    {},
-    {
-      get(_t, key) {
-        const r = resolve();
-        if (!r) {
-          return (fallback && fallback[key]) || (() => null);
-        }
-        return r[key];
-      },
-    }
-  );
-})();
+// === reference.js 패턴: React 훅 직접 import로 Proxy 패턴 불필요 ===
 
 // 프록시 서버 URL (고정된 Production URL)
 const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app";
@@ -55,11 +36,9 @@ async function getPageGalleryType(pageId) {
 
 function UnifiedGalleryComplete(props) {
   const { pageId = "default", style } = props || {};
-  const resolveReactNow = () =>
-    (globalThis && (globalThis.React || (globalThis.Framer && globalThis.Framer.React))) || null;
-  const R = resolveReactNow();
-  if (!R) return null;
-  const { useEffect, useMemo, useState, useRef } = R;
+
+  // reference.js 패턴: React 훅을 직접 import했으므로 바로 사용 가능
+  // 더 이상 런타임 확인이나 Proxy 패턴 불필요
 
   // 폰트 로딩 보장
   useEffect(() => {
@@ -237,14 +216,15 @@ function UnifiedGalleryComplete(props) {
   };
 
   if (!hasImages && loading) {
-    return React.createElement("div", { style: { ...baseContainerStyle, ...(style || {}) } },
-      React.createElement("div", { style: labelStyleWithMargin }, "GALLERY")
-    );
+    return jsx("div", {
+      style: { ...baseContainerStyle, ...(style || {}) },
+      children: jsx("div", { style: labelStyleWithMargin, children: "GALLERY" })
+    });
   }
 
   if (!hasImages && !loading) {
     // 이미지가 없으면 완전히 숨김(display: none) 처리됨
-    return React.createElement("div", { style: containerStyle });
+    return jsx("div", { style: containerStyle });
   }
 
 
