@@ -68,7 +68,7 @@ function renderInvitationSegments(text) {
         const chunk = line.slice(lastIndex, start);
         if (chunk) {
           parts.push(
-            React.createElement("span", { key: `t-${i}-${keySeq++}` }, renderBoldSegments(chunk))
+            jsx("span", { key: `t-${i}-${keySeq++}`, children: renderBoldSegments(chunk) })
           );
         }
       }
@@ -76,10 +76,9 @@ function renderInvitationSegments(text) {
       if (inner) {
         const muted = { fontSize: 14, lineHeight: "1em", color: "#6e6e6e" };
         parts.push(
-          React.createElement(
+          jsx(
             "span",
-            { key: `q-${i}-${keySeq++}`, style: muted },
-            renderBoldSegments(inner, muted)
+            { key: `q-${i}-${keySeq++}`, style: muted, children: renderBoldSegments(inner, muted) }
           )
         );
       }
@@ -88,11 +87,11 @@ function renderInvitationSegments(text) {
     if (lastIndex < line.length) {
       const rest = line.slice(lastIndex);
       if (rest) {
-        parts.push(React.createElement("span", { key: `t-${i}-${keySeq++}` }, renderBoldSegments(rest)));
+        parts.push(jsx("span", { key: `t-${i}-${keySeq++}`, children: renderBoldSegments(rest) }));
       }
     }
     rendered.push(
-      React.createElement("span", { key: `line-${i}` }, ...parts, i !== lines.length - 1 ? React.createElement("br") : null)
+      jsx("span", { key: `line-${i}`, children: [...parts, i !== lines.length - 1 ? jsx("br") : null] })
     );
   }
   return rendered;
