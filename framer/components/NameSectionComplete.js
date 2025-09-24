@@ -1,64 +1,13 @@
 // NameSectionComplete.js — NameSection-Old.tsx의 모든 기능을 포함한 완전한 컴포넌트
 // - 브라우저 ESM
-// - JSX/TS 미사용 (createElement)
-// - Framer/React 전역 런타임에서 동작
+// - JSX Runtime 사용 (reference.js 패턴 적용)
+// - React 훅 직접 import
 // - typography.js를 직접 import하여 폰트 CSS를 주입
+import { jsx } from "react/jsx-runtime";
+import { useState, useRef, useEffect, useMemo } from "react";
 import typography from "https://cdn.roarc.kr/fonts/typography.js";
 
-// === 런타임 전역에서 React 확보 (Framer 퍼블리시 환경 대응 강화) ===
-const React = (() => {
-  const resolve = () => {
-    // Framer 퍼블리시 환경에서 다양한 React 접근 경로 시도
-    if (typeof globalThis !== 'undefined') {
-      return globalThis.React || 
-             (globalThis.Framer && globalThis.Framer.React) ||
-             (globalThis.__REACT__ && globalThis.__REACT__) ||
-             (globalThis.window && globalThis.window.React);
-    }
-    if (typeof window !== 'undefined') {
-      return window.React || 
-             (window.Framer && window.Framer.React) ||
-             (window.__REACT__ && window.__REACT__);
-    }
-    return null;
-  };
-  
-  const fallback = {
-    createElement: () => null,
-    Fragment: "div",
-    useState: (initial) => [initial, () => {}],
-    useEffect: () => {},
-    useRef: (initial) => ({ current: initial }),
-  };
-  
-  return new Proxy(
-    {},
-    {
-      get(_t, key) {
-        const r = resolve();
-        if (!r) {
-          console.warn(`[NameSectionComplete] React.${key} not available, using fallback`);
-          return (fallback && fallback[key]) || (() => null);
-        }
-        return r[key];
-      },
-    }
-  );
-})();
-
-// (옵션) framer-motion이 전역에 있으면 쓰고, 없으면 안전 폴백
-const framerNS = (globalThis && globalThis.Framer) || {};
-let motion = null;
-try {
-  const motionEnv = framerNS.motion || globalThis.motion || null;
-  motion = motionEnv && (motionEnv.div || motionEnv.span || motionEnv.button) ? motionEnv : null;
-} catch (_) {
-  motion = null;
-}
-if (!motion) {
-  const factory = (tag) => (props) => React.createElement(tag, props, props && props.children);
-  motion = { div: factory("div"), span: factory("span"), button: factory("button") };
-}
+// === reference.js 패턴: React 훅 직접 import로 Proxy 패턴 불필요 ===
 
 // 프록시 서버 URL (고정된 Production URL)
 const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app";
@@ -170,7 +119,7 @@ function calculateResponsiveSizes(containerWidth, groomName = "", brideName = ""
 // === 서브 컴포넌트: AND 아이콘 ===
 function AndSvg(props = {}) {
   const { scale = 1, size = 42 } = props;
-  return React.createElement(
+  return jsx(
     "img",
     {
       src: "https://cdn.roarc.kr/framer/components/and.svg?v=02545260b5222f9044b9492c4e759031",
@@ -196,50 +145,8 @@ function NameSectionComplete(props) {
     style,
   } = props;
   
-  // React 런타임 확인 (더 강화된 검사)
-  const resolveReactNow = () => {
-    if (typeof globalThis !== 'undefined') {
-      return globalThis.React || 
-             (globalThis.Framer && globalThis.Framer.React) ||
-             (globalThis.__REACT__ && globalThis.__REACT__) ||
-             (globalThis.window && globalThis.window.React);
-    }
-    if (typeof window !== 'undefined') {
-      return window.React || 
-             (window.Framer && window.Framer.React) ||
-             (window.__REACT__ && window.__REACT__);
-    }
-    return null;
-  };
-  
-  const R = resolveReactNow();
-  if (!R) {
-    console.warn('[NameSectionComplete] React runtime not available in published environment');
-    // 퍼블리시 환경에서 React가 없을 때 정적 컨텐츠 반환
-    return React.createElement(
-      "div",
-      {
-        style: {
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          padding: "20px",
-          fontFamily: '"Pretendard Variable", Pretendard, -apple-system, sans-serif',
-          ...style,
-        }
-      },
-      React.createElement("div", { 
-        style: { fontSize: "48px", marginBottom: "14px" } 
-      }, groomName || "GROOM"),
-      React.createElement("div", { 
-        style: { fontSize: "14px", margin: "14px" } 
-      }, "&"),
-      React.createElement("div", { 
-        style: { fontSize: "48px", marginTop: "14px" } 
-      }, brideName || "BRIDE")
-    );
-  }
-  const { useEffect, useRef, useState } = R;
+  // reference.js 패턴: React 훅을 직접 import했으므로 바로 사용 가능
+  // 더 이상 런타임 확인이나 Proxy 패턴 불필요
 
   // 이름 상태 (props 우선, 없으면 페이지에서 로드)
   const [resolvedGroomName, setResolvedGroomName] = useState(groomName);
@@ -261,7 +168,7 @@ function NameSectionComplete(props) {
   let marginSize = 14;
   let animationStarted = false;
 
-  // P22 폰트 CSS 주입 (더 안전하고 직접적인 방식)
+  // P22 폰트 CSS 주입 (reference.js 패턴 적용)
   useEffect(() => {
     // typography.js를 통한 폰트 로딩 시도
     try {
@@ -438,7 +345,8 @@ function NameSectionComplete(props) {
     || `"Goldenbook", -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"`;
   const isEternal = layoutType === 'eternal';
 
-  return React.createElement(
+  // reference.js 패턴: jsx() 함수 사용
+  return jsx(
     "div",
     {
       ref: nameContainerRef,
@@ -457,63 +365,56 @@ function NameSectionComplete(props) {
         fontFamily: isEternal ? goldenbookStack : p22Stack,
         letterSpacing: isEternal ? '0.02em' : undefined,
         ...style,
-      }
-    },
-    // 신랑 이름
-    React.createElement(
-      "div",
-      {
-        ref: groomRef,
-        style: {
-          fontFamily: isEternal ? goldenbookStack : p22Stack,
-          fontSize: `${nameFontSize}px`,
-          textAlign: "center",
-          lineHeight: isEternal ? "32px" : "1.2",
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          opacity: isInView ? 1 : 0,
-          transform: isInView ? "translateY(0)" : "translateY(20px)",
-          transition: "opacity 1s ease-out, transform 1s ease-out",
-          letterSpacing: isEternal ? "0.02em" : undefined,
-        }
       },
-      String(resolvedGroomName || "").toUpperCase()
-    ),
-    // AND SVG
-    React.createElement(
-      "div",
-      {
-        ref: andRef,
-        style: {
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          margin: `${marginSize}px`,
-          height: `${Math.round(42 * (marginSize / 14))}px`,
-        }
-      },
-    React.createElement(AndSvg, { scale: andSvgScale, size: Math.round(42 * (marginSize / 14)) })
-    ),
-    // 신부 이름
-    React.createElement(
-      "div",
-      {
-        ref: brideRef,
-        style: {
-          fontFamily: isEternal ? goldenbookStack : p22Stack,
-          fontSize: `${nameFontSize}px`,
-          textAlign: "center",
-          lineHeight: isEternal ? "32px" : "1.2",
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          opacity: isInView ? 1 : 0,
-          transform: isInView ? "translateY(0)" : "translateY(20px)",
-          transition: "opacity 1s ease-out 1s, transform 1s ease-out 1s",
-          letterSpacing: isEternal ? "0.02em" : undefined,
-        }
-      },
-      String(resolvedBrideName || "").toUpperCase()
-    )
+      children: [
+        // 신랑 이름
+        jsx("div", {
+          ref: groomRef,
+          style: {
+            fontFamily: isEternal ? goldenbookStack : p22Stack,
+            fontSize: `${nameFontSize}px`,
+            textAlign: "center",
+            lineHeight: isEternal ? "32px" : "1.2",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            opacity: isInView ? 1 : 0,
+            transform: isInView ? "translateY(0)" : "translateY(20px)",
+            transition: "opacity 1s ease-out, transform 1s ease-out",
+            letterSpacing: isEternal ? "0.02em" : undefined,
+          },
+          children: String(resolvedGroomName || "").toUpperCase()
+        }),
+        // AND SVG
+        jsx("div", {
+          ref: andRef,
+          style: {
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            margin: `${marginSize}px`,
+            height: `${Math.round(42 * (marginSize / 14))}px`,
+          },
+          children: jsx(AndSvg, { scale: andSvgScale, size: Math.round(42 * (marginSize / 14)) })
+        }),
+        // 신부 이름
+        jsx("div", {
+          ref: brideRef,
+          style: {
+            fontFamily: isEternal ? goldenbookStack : p22Stack,
+            fontSize: `${nameFontSize}px`,
+            textAlign: "center",
+            lineHeight: isEternal ? "32px" : "1.2",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            opacity: isInView ? 1 : 0,
+            transform: isInView ? "translateY(0)" : "translateY(20px)",
+            transition: "opacity 1s ease-out 1s, transform 1s ease-out 1s",
+            letterSpacing: isEternal ? "0.02em" : undefined,
+          },
+          children: String(resolvedBrideName || "").toUpperCase()
+        })
+      ]
+    }
   );
 }
 
