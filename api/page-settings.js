@@ -309,10 +309,10 @@ async function handleGetTransport(req, res) {
       console.error('Transport query error:', transportError)
     }
 
-    // page_settings에서 장소명 조회
+    // page_settings에서 장소명과 주소 조회
     const { data: settingsData, error: settingsError } = await supabase
       .from('page_settings')
-      .select('transport_location_name')
+      .select('transport_location_name, venue_address')
       .eq('page_id', pageId)
       .single()
 
@@ -323,7 +323,8 @@ async function handleGetTransport(req, res) {
     return res.json({
       success: true,
       data: transportData || [],
-      locationName: settingsData?.transport_location_name || ''
+      locationName: settingsData?.transport_location_name || '',
+      venue_address: settingsData?.venue_address || ''
     })
   } catch (error) {
     console.error('Get transport error:', error)
@@ -335,7 +336,7 @@ async function handleGetTransport(req, res) {
 }
 
 async function handleUpdateTransport(req, res, validatedUser) {
-  const { pageId, items, locationName } = req.body
+  const { pageId, items, locationName, venue_address } = req.body
 
   if (!pageId) {
     return res.status(400).json({
@@ -382,21 +383,32 @@ async function handleUpdateTransport(req, res, validatedUser) {
       }
     }
 
-    // 3) page_settings에 장소명 저장
+    // 3) page_settings에 장소명과 주소 저장
+    const updateData: any = {
+      updated_at: new Date().toISOString()
+    }
+
     if (locationName !== undefined) {
+      updateData.transport_location_name = locationName
+    }
+
+    if (venue_address !== undefined) {
+      updateData.venue_address = venue_address
+    }
+
+    if (locationName !== undefined || venue_address !== undefined) {
       const { error: updateError } = await supabase
         .from('page_settings')
         .upsert(
           {
             page_id: pageId,
-            transport_location_name: locationName,
-            updated_at: new Date().toISOString()
+            ...updateData
           },
           { onConflict: 'page_id' }
         )
 
       if (updateError) {
-        console.error('Location name update error:', updateError)
+        console.error('Location/Address update error:', updateError)
         throw updateError
       }
     }
