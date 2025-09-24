@@ -10307,10 +10307,12 @@ function TransportTab({
                 return
             }
 
-            const script = document.createElement('script')
-            script.src = '//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js'
+            const script = document.createElement("script")
+            script.src =
+                "//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"
             script.onload = () => resolve()
-            script.onerror = () => reject(new Error('다음 Postcode API 로드 실패'))
+            script.onerror = () =>
+                reject(new Error("다음 Postcode API 로드 실패"))
             document.head.appendChild(script)
         })
     }
@@ -10324,13 +10326,17 @@ function TransportTab({
             const checkGoogleMaps = () => {
                 attempts++
 
-                if ((window as any).google && (window as any).google.maps && (window as any).google.maps.Geocoder) {
+                if (
+                    (window as any).google &&
+                    (window as any).google.maps &&
+                    (window as any).google.maps.Geocoder
+                ) {
                     resolve()
                     return
                 }
 
                 if (attempts >= maxAttempts) {
-                    reject(new Error('Google Maps API 로드 타임아웃'))
+                    reject(new Error("Google Maps API 로드 타임아웃"))
                     return
                 }
 
@@ -10344,63 +10350,78 @@ function TransportTab({
     // Google Maps API 스크립트 로드
     const loadGoogleMapsScript = (): Promise<void> => {
         return new Promise((resolve, reject) => {
-            if ((window as any).google && (window as any).google.maps && (window as any).google.maps.Geocoder) {
+            if (
+                (window as any).google &&
+                (window as any).google.maps &&
+                (window as any).google.maps.Geocoder
+            ) {
                 resolve()
                 return
             }
 
             // Google Maps API 키 가져오기 (map-config.js에서)
-            fetch('https://wedding-admin-proxy.vercel.app/api/map-config')
-                .then(response => response.json())
+            fetch("https://wedding-admin-proxy.vercel.app/api/map-config")
+                .then((response) => response.json())
                 .then((config: any) => {
                     if (config.success && config.data.googleMapsApiKey) {
                         const apiKey = config.data.googleMapsApiKey
 
                         // 기존 스크립트가 있는지 확인
-                        const existingScript = document.querySelector('script[src*="maps.googleapis.com"]')
+                        const existingScript = document.querySelector(
+                            'script[src*="maps.googleapis.com"]'
+                        )
                         if (existingScript) {
-                            return waitForGoogleMapsAPI().then(resolve).catch(reject)
+                            return waitForGoogleMapsAPI()
+                                .then(resolve)
+                                .catch(reject)
                         }
 
-                        const script = document.createElement('script')
+                        const script = document.createElement("script")
                         script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=geometry`
                         script.onload = () => {
                             waitForGoogleMapsAPI().then(resolve).catch(reject)
                         }
-                        script.onerror = () => reject(new Error('Google Maps API 로드 실패'))
+                        script.onerror = () =>
+                            reject(new Error("Google Maps API 로드 실패"))
 
                         document.head.appendChild(script)
                     } else {
-                        reject(new Error('Google Maps API 키를 찾을 수 없습니다'))
+                        reject(
+                            new Error("Google Maps API 키를 찾을 수 없습니다")
+                        )
                     }
                 })
-                .catch(() => reject(new Error('Map config 로드 실패')))
+                .catch(() => reject(new Error("Map config 로드 실패")))
         })
     }
 
     // 주소를 좌표로 변환
-    const geocodeAddress = (address: string): Promise<{ lat: number; lng: number }> => {
+    const geocodeAddress = (
+        address: string
+    ): Promise<{ lat: number; lng: number }> => {
         return new Promise((resolve, reject) => {
             if (!(window as any).google || !(window as any).google.maps) {
-                reject(new Error('Google Maps API가 로드되지 않았습니다'))
+                reject(new Error("Google Maps API가 로드되지 않았습니다"))
                 return
             }
 
             if (!(window as any).google.maps.Geocoder) {
-                reject(new Error('Google Maps Geocoder가 초기화되지 않았습니다'))
+                reject(
+                    new Error("Google Maps Geocoder가 초기화되지 않았습니다")
+                )
                 return
             }
 
             const geocoder = new (window as any).google.maps.Geocoder()
 
             geocoder.geocode(
-                { address: address, region: 'KR' },
+                { address: address, region: "KR" },
                 (results: GoogleGeocodeResult[] | null, status: string) => {
-                    if (status === 'OK' && results && results.length > 0) {
+                    if (status === "OK" && results && results.length > 0) {
                         const location = results[0].geometry.location
                         resolve({
                             lat: location.lat(),
-                            lng: location.lng()
+                            lng: location.lng(),
                         })
                     } else {
                         reject(new Error(`주소 변환 실패: ${status}`))
@@ -10412,38 +10433,38 @@ function TransportTab({
 
     // 다음 주소 검색 레이어 닫기
     const closeDaumPostcode = () => {
-        const element_layer = document.getElementById('addressLayer')
+        const element_layer = document.getElementById("addressLayer")
         if (element_layer) {
-            element_layer.style.display = 'none'
+            element_layer.style.display = "none"
         }
     }
 
     // 레이어 위치 초기화
     const initLayerPosition = () => {
         const width = 300
-        const height = 400
-        const borderWidth = 5
+        const height = 370 // 닫기 버튼 30px 제외
+        const borderWidth = 1
 
-        const element_layer = document.getElementById('addressLayer')
+        const element_layer = document.getElementById("addressLayer")
         if (element_layer) {
-            element_layer.style.width = width + 'px'
-            element_layer.style.height = height + 'px'
-            element_layer.style.border = borderWidth + 'px solid'
+            element_layer.style.width = width + "px"
+            element_layer.style.height = height + "px"
+            element_layer.style.border = borderWidth + "px solid"
 
             // 모바일 환경에서 화면 크기 제한
-            const maxWidth = Math.min(width, window.innerWidth * 0.9)
+            const maxWidth = Math.min(width, window.innerWidth * 0.95)
             const maxHeight = Math.min(height, window.innerHeight * 0.7)
 
-            element_layer.style.width = Math.max(maxWidth, 280) + 'px'
-            element_layer.style.height = Math.max(maxHeight, 350) + 'px'
+            element_layer.style.width = Math.max(maxWidth, 280) + "px"
+            element_layer.style.height = Math.max(maxHeight, 350) + "px"
 
             // 화면 중앙에 위치
-            const left = Math.max(10, (window.innerWidth - maxWidth) / 2)
-            const top = Math.max(10, (window.innerHeight - maxHeight) / 2)
+            const left = Math.max(5, (window.innerWidth - maxWidth) / 2)
+            const top = Math.max(5, (window.innerHeight - maxHeight) / 2)
 
-            element_layer.style.left = left + 'px'
-            element_layer.style.top = top + 'px'
-            element_layer.style.transform = 'none'
+            element_layer.style.left = left + "px"
+            element_layer.style.top = top + "px"
+            element_layer.style.transform = "none"
         }
     }
 
@@ -10454,11 +10475,11 @@ function TransportTab({
             await loadGoogleMapsScript()
 
             // API 로드 완료 후 잠시 대기 (안정성 확보)
-            await new Promise(resolve => setTimeout(resolve, 500))
+            await new Promise((resolve) => setTimeout(resolve, 500))
 
-            const element_layer = document.getElementById('addressLayer')
+            const element_layer = document.getElementById("addressLayer")
             if (!element_layer) {
-                setErrorMsg('주소 검색 레이어를 찾을 수 없습니다.')
+                setErrorMsg("주소 검색 레이어를 찾을 수 없습니다.")
                 setTimeout(() => setErrorMsg(""), 3000)
                 return
             }
@@ -10473,18 +10494,28 @@ function TransportTab({
                         const coordinates = await geocodeAddress(fullAddress)
 
                         // 페이지 설정에 좌표 저장
-                        await saveCoordinatesToServer(coordinates.lat, coordinates.lng, fullAddress)
+                        await saveCoordinatesToServer(
+                            coordinates.lat,
+                            coordinates.lng,
+                            fullAddress
+                        )
 
-                        setSuccessMsg(`주소와 좌표가 모두 설정되었습니다: ${fullAddress}`)
+                        setSuccessMsg(
+                            `주소와 좌표가 모두 설정되었습니다: ${fullAddress}`
+                        )
                         setTimeout(() => setSuccessMsg(""), 3000)
                     } catch (error) {
                         // 좌표 변환 실패해도 주소는 저장
                         try {
                             await saveCoordinatesToServer(0, 0, fullAddress)
-                            setSuccessMsg(`주소가 설정되었습니다: ${fullAddress} (좌표 변환 실패)`)
+                            setSuccessMsg(
+                                `주소가 설정되었습니다: ${fullAddress} (좌표 변환 실패)`
+                            )
                             setTimeout(() => setSuccessMsg(""), 3000)
                         } catch (saveError) {
-                            setErrorMsg('주소 설정에 실패했습니다. 다시 시도해주세요.')
+                            setErrorMsg(
+                                "주소 설정에 실패했습니다. 다시 시도해주세요."
+                            )
                             setTimeout(() => setErrorMsg(""), 3000)
                         }
                     }
@@ -10492,13 +10523,13 @@ function TransportTab({
                     // 레이어 닫기
                     closeDaumPostcode()
                 },
-                width: '100%',
-                height: '100%',
-                maxSuggestItems: 5
+                width: "100%",
+                height: "100%",
+                maxSuggestItems: 5,
             }).embed(element_layer)
 
             // 레이어 보이기
-            element_layer.style.display = 'block'
+            element_layer.style.display = "block"
 
             // 레이어 위치 초기화
             initLayerPosition()
@@ -10508,30 +10539,38 @@ function TransportTab({
                 initLayerPosition()
             }
 
-            window.addEventListener('resize', handleResize)
-            window.addEventListener('orientationchange', handleResize)
+            window.addEventListener("resize", handleResize)
+            window.addEventListener("orientationchange", handleResize)
         } catch (error) {
             // Google Maps API 실패 시 주소만 저장하는 폴백
             try {
-                const fallbackAddress = prompt('지도 API 로드에 실패했습니다. 주소를 직접 입력해주세요:')
+                const fallbackAddress = prompt(
+                    "지도 API 로드에 실패했습니다. 주소를 직접 입력해주세요:"
+                )
                 if (fallbackAddress && fallbackAddress.trim()) {
                     setVenue_address(fallbackAddress.trim())
                     await saveCoordinatesToServer(0, 0, fallbackAddress.trim())
-                    setSuccessMsg(`주소가 설정되었습니다: ${fallbackAddress} (수동 입력)`)
+                    setSuccessMsg(
+                        `주소가 설정되었습니다: ${fallbackAddress} (수동 입력)`
+                    )
                     setTimeout(() => setSuccessMsg(""), 3000)
                 } else {
-                    setErrorMsg('주소가 입력되지 않았습니다.')
+                    setErrorMsg("주소가 입력되지 않았습니다.")
                     setTimeout(() => setErrorMsg(""), 3000)
                 }
             } catch (fallbackError) {
-                setErrorMsg('주소 검색 및 입력에 실패했습니다.')
+                setErrorMsg("주소 검색 및 입력에 실패했습니다.")
                 setTimeout(() => setErrorMsg(""), 3000)
             }
         }
     }
 
     // 서버에 좌표 저장
-    const saveCoordinatesToServer = async (lat: number, lng: number, address: string) => {
+    const saveCoordinatesToServer = async (
+        lat: number,
+        lng: number,
+        address: string
+    ) => {
         const token = tokenGetter()
         if (!token) {
             throw new Error("로그인이 필요합니다")
@@ -10542,7 +10581,7 @@ function TransportTab({
                 venue_address: address,
                 venue_lat: lat,
                 venue_lng: lng,
-            }
+            },
         }
 
         const response = await fetch(
@@ -10932,29 +10971,37 @@ function TransportTab({
                         transform: "translate(-50%, -50%)",
                         width: "300px",
                         height: "400px",
-                        border: "5px solid #000",
+                        border: "1px solid #e0e0e0",
                         backgroundColor: "white",
                         boxShadow: "0 10px 30px rgba(0, 0, 0, 0.3)",
-                        borderRadius: "8px",
-                        maxWidth: "90vw",
+                        borderRadius: "2px",
+                        maxWidth: "95vw",
                         maxHeight: "70vh",
                     }}
                 >
-                    <img
-                        src="//t1.daumcdn.net/postcode/resource/images/close.png"
+                    {/* 닫기 버튼 */}
+                    <button
                         id="btnCloseLayer"
-                        style={{
-                            cursor: "pointer",
-                            position: "absolute",
-                            right: "-3px",
-                            top: "-3px",
-                            zIndex: 1,
-                        }}
                         onClick={closeDaumPostcode}
-                        alt="닫기 버튼"
-                    />
+                        style={{
+                            position: "absolute",
+                            bottom: "0",
+                            left: "0",
+                            width: "100%",
+                            height: "30px",
+                            backgroundColor: "#000000",
+                            color: "white",
+                            border: "none",
+                            cursor: "pointer",
+                            fontSize: "14px",
+                            fontFamily: "Pretendard Regular",
+                            fontWeight: "500",
+                        }}
+                    >
+                        닫기
+                    </button>
                 </div>
-                
+
                 {/* 도로명 주소 입력 버튼 */}
                 <button
                     type="button"
