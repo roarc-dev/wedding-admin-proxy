@@ -10,6 +10,16 @@ import typography from "https://cdn.roarc.kr/fonts/typography.js";
 
 // === reference.js 패턴: React 훅 직접 import로 Proxy 패턴 불필요 ===
 
+// JSX runtime 브리지: 기존 createElement 호출과 Fragment 사용을 안전하게 처리
+const React = { createElement: jsx, Fragment: "div" };
+
+// framer-motion 안전 폴백 (필요 시 기본 태그로 대체)
+const motion = {
+  div: (props) => jsx("div", props),
+  span: (props) => jsx("span", props),
+  button: (props) => jsx("button", props),
+};
+
 // 프록시 서버 URL (고정된 Production URL)
 const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app";
 
@@ -340,119 +350,247 @@ function CalendarComplete(props) {
 
   // 로딩 상태
   if (loading) {
-    return React.createElement(
+    return jsx(
       "div",
-      { style: { width: "fit-content", height: "fit-content", display: "flex", flexDirection: "column", alignItems: "center", padding: "40px" } },
-      React.createElement(
-        "div",
-        { style: { fontSize: "16px", fontFamily: "Pretendard Regular", textAlign: "center" } },
-        "로딩 중..."
-      )
+      {
+        style: {
+          width: "fit-content",
+          height: "fit-content",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          padding: "40px"
+        },
+        children: jsx(
+          "div",
+          {
+            style: {
+              fontSize: "16px",
+              fontFamily: "Pretendard Regular",
+              textAlign: "center"
+            },
+            children: "로딩 중..."
+          }
+        )
+      }
     );
   }
 
   // 에러 상태
   if (error) {
-    return React.createElement(
+    return jsx(
       "div",
-      { style: { width: "fit-content", height: "fit-content", display: "flex", flexDirection: "column", alignItems: "center", padding: "40px" } },
-      React.createElement(
-        "div",
-        { style: { fontSize: "16px", fontFamily: "Pretendard Regular", textAlign: "center", color: "#888" } },
-        "정보 없음"
-      )
+      {
+        style: {
+          width: "fit-content",
+          height: "fit-content",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          padding: "40px"
+        },
+        children: jsx(
+          "div",
+          {
+            style: {
+              fontSize: "16px",
+              fontFamily: "Pretendard Regular",
+              textAlign: "center",
+              color: "#888"
+            },
+            children: "정보 없음"
+          }
+        )
+      }
     );
   }
 
-  return React.createElement(
+  return jsx(
     "div",
-    { style: { width: "fit-content", height: "fit-content", display: "flex", flexDirection: "column", alignItems: "center", ...(style || {}) } },
-    // 날짜와 시간 표시
-    React.createElement(
-      "div",
-      { style: { fontSize: "16px", lineHeight: "1.8em", fontFamily: "Pretendard Regular", textAlign: "center", marginBottom: "20px" } },
-      formatDateTime()
-    ),
-    // 월 표시 (P22 Late November 사용 기대)
-    React.createElement(
-      "div",
-      { style: { fontSize: "50px", lineHeight: "1.8em", fontFamily: "P22LateNovemberW01-Regular Regular", textAlign: "center", marginBottom: "20px" } },
-      currentMonth
-    ),
-    // 달력 그리드
-    React.createElement(
-      "div",
-      { style: { display: "flex", flexDirection: "row", gap: "11px", padding: "0 20px 0 20px", alignItems: "flex-start", justifyContent: "center" } },
-      ...weeks.map((daysInColumn, columnIndex) =>
-        React.createElement(
+    {
+      style: {
+        width: "fit-content",
+        height: "fit-content",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        ...(style || {})
+      },
+      children: [
+        // 날짜와 시간 표시
+        jsx(
           "div",
-          { key: columnIndex, style: { display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" } },
-          // 요일 헤더
-          React.createElement(
-            "div",
-            { style: { fontSize: "15px", lineHeight: "2.6em", fontFamily: "Pretendard SemiBold", marginBottom: "5px" } },
-            days[columnIndex]
-          ),
-          // 날짜들
-          ...daysInColumn.map((day, dayIndex) =>
-            React.createElement(
+          {
+            style: {
+              fontSize: "16px",
+              lineHeight: "1.8em",
+              fontFamily: "Pretendard Regular",
+              textAlign: "center",
+              marginBottom: "20px"
+            },
+            children: formatDateTime()
+          }
+        ),
+        // 월 표시 (P22 Late November 사용 기대)
+        jsx(
+          "div",
+          {
+            style: {
+              fontSize: "50px",
+              lineHeight: "1.8em",
+              fontFamily: "P22LateNovemberW01-Regular Regular",
+              textAlign: "center",
+              marginBottom: "20px"
+            },
+            children: currentMonth
+          }
+        ),
+        // 달력 그리드
+        jsx(
+          "div",
+          {
+            style: {
+              display: "flex",
+              flexDirection: "row",
+              gap: "11px",
+              padding: "0 20px 0 20px",
+              alignItems: "flex-start",
+              justifyContent: "center"
+            }
+          },
+          ...weeks.map((daysInColumn, columnIndex) =>
+            jsx(
               "div",
-              { key: dayIndex, style: { position: "relative", display: "flex", alignItems: "center", justifyContent: "center", width: "31px", height: "31px", marginBottom: "2px" } },
-              day !== null
-                ? React.createElement(
-                    React.Fragment,
-                    null,
-                    // 하이라이트 배경
-                    isHighlighted(day)
-                      ? (pageSettings && pageSettings.highlight_shape) === "heart"
-                        ? React.createElement(
-                            motion.div,
-                            { style: { position: "absolute", zIndex: 0 }, animate: { scale: [1, 1.2, 1], opacity: [1, 0.8, 1] }, transition: { duration: 2, repeat: Infinity, ease: "easeInOut" } },
-                            React.createElement(HeartShape, { color: (pageSettings && pageSettings.highlight_color) || highlightColor, size: 28 })
+              {
+                key: columnIndex,
+                style: {
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  textAlign: "center"
+                }
+              },
+              [
+                // 요일 헤더
+                jsx(
+                  "div",
+                  {
+                    style: {
+                      fontSize: "15px",
+                      lineHeight: "2.6em",
+                      fontFamily: "Pretendard SemiBold",
+                      marginBottom: "5px"
+                    },
+                    children: days[columnIndex]
+                  }
+                ),
+                // 날짜들
+                ...daysInColumn.map((day, dayIndex) =>
+                  jsx(
+                    "div",
+                    {
+                      key: dayIndex,
+                      style: {
+                        position: "relative",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: "31px",
+                        height: "31px",
+                        marginBottom: "2px"
+                      }
+                    },
+                    day !== null
+                      ? jsx(React.Fragment, {}, [
+                          // 하이라이트 배경
+                          isHighlighted(day)
+                            ? ((pageSettings && pageSettings.highlight_shape) === "heart"
+                                ? jsx(
+                                    motion.div,
+                                    {
+                                      style: { position: "absolute", zIndex: 0 },
+                                      animate: { scale: [1, 1.2, 1], opacity: [1, 0.8, 1] },
+                                      transition: { duration: 2, repeat: Infinity, ease: "easeInOut" }
+                                    },
+                                    jsx(HeartShape, { color: (pageSettings && pageSettings.highlight_color) || highlightColor, size: 28 })
+                                  )
+                                : jsx(motion.div, {
+                                    style: {
+                                      position: "absolute",
+                                      width: "31px",
+                                      height: "31px",
+                                      borderRadius: "50%",
+                                      backgroundColor: (pageSettings && pageSettings.highlight_color) || highlightColor,
+                                      zIndex: 0
+                                    },
+                                    animate: { scale: [1, 1.2, 1], opacity: [1, 0.8, 1] },
+                                    transition: { duration: 2, repeat: Infinity, ease: "easeInOut" },
+                                  }))
+                            : null,
+                          // 날짜 텍스트
+                          jsx(
+                            "div",
+                            {
+                              style: {
+                                fontSize: "15px",
+                                lineHeight: "2.6em",
+                                fontFamily: isHighlighted(day) ? "Pretendard SemiBold" : "Pretendard Regular",
+                                color: isHighlighted(day) ? ((pageSettings && pageSettings.highlight_text_color) || "black") : "black",
+                                zIndex: 1,
+                                position: "relative",
+                              },
+                              children: day
+                            }
                           )
-                        : React.createElement(motion.div, {
-                            style: { position: "absolute", width: "31px", height: "31px", borderRadius: "50%", backgroundColor: (pageSettings && pageSettings.highlight_color) || highlightColor, zIndex: 0 },
-                            animate: { scale: [1, 1.2, 1], opacity: [1, 0.8, 1] },
-                            transition: { duration: 2, repeat: Infinity, ease: "easeInOut" },
-                          })
-                      : null,
-                    // 날짜 텍스트
-                    React.createElement(
-                      "div",
-                      {
-                        style: {
-                          fontSize: "15px",
-                          lineHeight: "2.6em",
-                          fontFamily: isHighlighted(day) ? "Pretendard SemiBold" : "Pretendard Regular",
-                          color: isHighlighted(day) ? ((pageSettings && pageSettings.highlight_text_color) || "black") : "black",
-                          zIndex: 1,
-                          position: "relative",
-                        },
-                      },
-                      day
-                    )
+                        ])
+                      : jsx("div", { style: { width: "31px", height: "31px" } })
                   )
-                : React.createElement("div", { style: { width: "31px", height: "31px" } })
+                )
+              ]
             )
           )
+        ),
+        // 하단 이름과 D-day
+        jsx(
+          "div",
+          {
+            style: {
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              marginTop: `${fixedMarginTop}px`
+            }
+          },
+          [
+            jsx(
+              "div",
+              {
+                style: {
+                  fontSize: "17px",
+                  lineHeight: "1em",
+                  fontFamily: "Pretendard Regular",
+                  textAlign: "center",
+                  marginBottom: "10px"
+                },
+                children: `${(pageSettings && pageSettings.groom_name) || "신랑"} ♥ ${(pageSettings && pageSettings.bride_name) || "신부"}의 결혼식`
+              }
+            ),
+            jsx(
+              "div",
+              {
+                style: {
+                  fontSize: "17px",
+                  lineHeight: "1em",
+                  fontFamily: "Pretendard SemiBold",
+                  textAlign: "center"
+                },
+                children: calculateDday()
+              }
+            )
+          ]
         )
-      )
-    ),
-    // 하단 이름과 D-day
-    React.createElement(
-      "div",
-      { style: { display: "flex", flexDirection: "column", alignItems: "center", marginTop: `${fixedMarginTop}px` } },
-      React.createElement(
-        "div",
-        { style: { fontSize: "17px", lineHeight: "1em", fontFamily: "Pretendard Regular", textAlign: "center", marginBottom: "10px" } },
-        `${(pageSettings && pageSettings.groom_name) || "신랑"} ♥ ${(pageSettings && pageSettings.bride_name) || "신부"}의 결혼식`
-      ),
-      React.createElement(
-        "div",
-        { style: { fontSize: "17px", lineHeight: "1em", fontFamily: "Pretendard SemiBold", textAlign: "center" } },
-        calculateDday()
-      )
-    )
+      ]
+    }
   );
 }
 

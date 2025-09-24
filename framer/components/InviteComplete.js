@@ -44,7 +44,7 @@ function renderBoldSegments(text, baseStyle) {
     const rest = text.slice(last);
     if (rest) {
       children.push(
-        React.createElement("span", { key: `nb-${key++}`, style: baseStyle || undefined }, rest)
+        jsx("span", { key: `nb-${key++}`, style: baseStyle || undefined, children: rest })
       );
     }
   }

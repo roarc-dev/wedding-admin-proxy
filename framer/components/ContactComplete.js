@@ -77,13 +77,14 @@ function normalizePhoneNumber(input) {
 // ChrysanthemumIcon: 현 버전에서 사용되지 않으므로 제거
 
 function ContactList({ contacts, onCall, onSMS, callIcon, smsIcon }) {
-  return React.createElement(
+  return jsx(
     "div",
-    { style: { display: "flex", flexDirection: "column", gap: "12px", marginTop: "0px" } },
-    ...(contacts || []).map((contact, index) =>
-      React.createElement(
-        ContactItem,
-        {
+    {
+      style: { display: "flex", flexDirection: "column", gap: "12px", marginTop: "0px" },
+      children: (contacts || []).map((contact, index) =>
+        jsx(
+          ContactItem,
+          {
           key: `${contact.name}-${contact.phone}-${index}`,
           label: contact.label,
           name: contact.name,
@@ -104,7 +105,7 @@ function ContactItem({ label, name, phone, onCall, onSMS, showBorder = true, cal
   const handleCall = React.useCallback(() => onCall && onCall(phone), [onCall, phone]);
   const handleSMS = React.useCallback(() => onSMS && onSMS(phone), [onSMS, phone]);
 
-  return React.createElement(
+  return jsx(
     "div",
     {
       style: {
@@ -116,80 +117,144 @@ function ContactItem({ label, name, phone, onCall, onSMS, showBorder = true, cal
         padding: 0,
         margin: 0,
       },
-    },
-    // left
-    React.createElement(
-      "div",
-      { style: { display: "flex", flexDirection: "column", alignItems: "flex-start", justifyContent: "flex-start", height: "100%", gap: 0 } },
-      React.createElement(
-        "div",
-        { style: { fontSize: "14px", fontFamily: "Pretendard SemiBold", color: "#707070", marginBottom: 0, lineHeight: 1.4 } },
-        label
-      ),
-      React.createElement(
-        "div",
-        { style: { display: "flex", alignItems: "center", gap: "8px", marginTop: 0 } },
-        React.createElement(
+      children: [
+        // left
+        jsx(
           "div",
-          { style: { fontSize: "16px", fontFamily: "Pretendard SemiBold", color: "#1F2937", lineHeight: 1.4 } },
-          name
+          {
+            style: {
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              justifyContent: "flex-start",
+              height: "100%",
+              gap: 0
+            }
+          },
+          [
+            jsx(
+              "div",
+              {
+                style: {
+                  fontSize: "14px",
+                  fontFamily: "Pretendard SemiBold",
+                  color: "#707070",
+                  marginBottom: 0,
+                  lineHeight: 1.4
+                },
+                children: label
+              }
+            ),
+            jsx(
+              "div",
+              {
+                style: {
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  marginTop: 0
+                }
+              },
+              [
+                jsx(
+                  "div",
+                  {
+                    style: {
+                      fontSize: "16px",
+                      fontFamily: "Pretendard SemiBold",
+                      color: "#1F2937",
+                      lineHeight: 1.4
+                    },
+                    children: name
+                  }
+                ),
+                jsx(
+                  "div",
+                  {
+                    style: {
+                      fontSize: "16px",
+                      fontFamily: "Pretendard Regular",
+                      color: "#000000",
+                      lineHeight: 1
+                    },
+                    children: phone
+                  }
+                )
+              ]
+            )
+          ]
         ),
-        React.createElement(
+        // right icons
+        jsx(
           "div",
-          { style: { fontSize: "16px", fontFamily: "Pretendard Regular", color: "#000000", lineHeight: 1 } },
-          phone
+          {
+            style: {
+              display: "flex",
+              flexDirection: "row",
+              gap: "12px",
+              alignItems: "center",
+              height: "100%",
+              marginBottom: "4px",
+              opacity: "50%"
+            }
+          },
+          [
+            jsx(
+              motion.button,
+              {
+                onClick: handleCall,
+                style: {
+                  width: "18px",
+                  height: "18px",
+                  borderRadius: "50%",
+                  border: "none",
+                  backgroundColor: "white",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                },
+                whileHover: { scale: 1.1 },
+                whileTap: { scale: 0.9 },
+                children: callIcon
+                  ? jsx("img", {
+                      src: callIcon,
+                      alt: "통화",
+                      style: { width: "18px", height: "18px", objectFit: "contain" }
+                    })
+                  : jsx("span", { style: { fontSize: "16px" }, children: "📞" })
+              }
+            ),
+            jsx(
+              motion.button,
+              {
+                onClick: handleSMS,
+                style: {
+                  width: "18px",
+                  height: "18px",
+                  borderRadius: "50%",
+                  border: "none",
+                  backgroundColor: "white",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                },
+                whileHover: { scale: 1.1 },
+                whileTap: { scale: 0.9 },
+                children: smsIcon
+                  ? jsx("img", {
+                      src: smsIcon,
+                      alt: "문자",
+                      style: { width: "18px", height: "18px", objectFit: "contain" }
+                    })
+                  : jsx("span", { style: { fontSize: "16px" }, children: "💬" })
+              }
+            )
+          ]
         )
-      )
-    ),
-    // right icons
-    React.createElement(
-      "div",
-      { style: { display: "flex", flexDirection: "row", gap: "12px", alignItems: "center", height: "100%", marginBottom: "4px", opacity: "50%" } },
-      React.createElement(
-        motion.button,
-        {
-          onClick: handleCall,
-          style: {
-            width: "18px",
-            height: "18px",
-            borderRadius: "50%",
-            border: "none",
-            backgroundColor: "white",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          },
-          whileHover: { scale: 1.1 },
-          whileTap: { scale: 0.9 },
-        },
-        callIcon
-          ? React.createElement("img", { src: callIcon, alt: "통화", style: { width: "18px", height: "18px", objectFit: "contain" } })
-          : React.createElement("span", { style: { fontSize: "16px" } }, "📞")
-      ),
-      React.createElement(
-        motion.button,
-        {
-          onClick: handleSMS,
-          style: {
-            width: "18px",
-            height: "18px",
-            borderRadius: "50%",
-            border: "none",
-            backgroundColor: "white",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          },
-          whileHover: { scale: 1.1 },
-          whileTap: { scale: 0.9 },
-        },
-        smsIcon
-          ? React.createElement("img", { src: smsIcon, alt: "문자", style: { width: "18px", height: "18px", objectFit: "contain" } })
-          : React.createElement("span", { style: { fontSize: "16px" } }, "💬")
-      )
-    )
+      ]
+    }
   );
 }
 
