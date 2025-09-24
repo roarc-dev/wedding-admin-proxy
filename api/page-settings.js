@@ -384,7 +384,7 @@ async function handleUpdateTransport(req, res, validatedUser) {
     }
 
     // 3) page_settings에 장소명과 주소 저장
-    const updateData: any = {
+    const updateData = {
       updated_at: new Date().toISOString()
     }
 
