@@ -362,21 +362,22 @@ function LocationUnified(props) {
     };
 
     // 이미 로드된 경우 바로 초기화
+    let injectedScript = null;
     if (window.naver && window.naver.maps) {
       initMap();
     } else {
       // 네이버 지도 API 로드
-      const script = document.createElement("script");
-      script.src = `https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${naverClientId}`;
-      script.async = true;
-      script.onload = initMap;
-      script.onerror = () => console.error("네이버 지도 API 로드 실패");
-      document.head.appendChild(script);
+      injectedScript = document.createElement("script");
+      injectedScript.src = `https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${naverClientId}`;
+      injectedScript.async = true;
+      injectedScript.onload = initMap;
+      injectedScript.onerror = () => console.error("네이버 지도 API 로드 실패");
+      document.head.appendChild(injectedScript);
     }
 
     return () => {
-      if (script && script.parentNode) {
-        document.head.removeChild(script);
+      if (injectedScript && injectedScript.parentNode) {
+        document.head.removeChild(injectedScript);
       }
     };
   }, [naverClientId, coordinates, locationSettings]);
@@ -463,7 +464,7 @@ function LocationUnified(props) {
               fontFamily: pretendardStack,
             }
           },
-          loading ? "" : displayLocationName.includes("|") ? displayLocationName.split("|").map((part, index, array) =>
+          isLoading ? "" : displayLocationName.includes("|") ? displayLocationName.split("|").map((part, index, array) =>
             React.createElement(
               React.Fragment,
               { key: index },
@@ -527,7 +528,7 @@ function LocationUnified(props) {
                 lineHeight: "32px",
               }
             },
-            loading ? "" : locationSettings.venue_address || "장소 상세주소"
+          isLoading ? "" : locationSettings.venue_address || "장소 상세주소"
           ),
           React.createElement(
             "div",
