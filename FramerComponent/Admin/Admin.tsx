@@ -2869,6 +2869,7 @@ function AdminMainContent(props: any) {
         name: true, // "성함" 섹션은 기본적으로 열림
         photo: false,
         invite: false,
+        rsvp: false, // RSVP 섹션
         transport: false,
         calendar: false,
         images: false,
@@ -3067,6 +3068,7 @@ function AdminMainContent(props: any) {
         highlight_color: "#e0e0e0",
         highlight_text_color: "black",
         gallery_type: "thumbnail",
+        rsvp: "off", // RSVP 활성화 상태
         bgm_url: "",
         bgm_type: "",
         bgm_autoplay: false,
@@ -4088,6 +4090,7 @@ function AdminMainContent(props: any) {
         "highlight_shape",
         "highlight_color",
         "highlight_text_color",
+        "rsvp",
         "gallery_type",
         "bgm_url",
         "bgm_type",
@@ -9607,6 +9610,87 @@ function AdminMainContent(props: any) {
                         </div>
                     </AccordionSection>
 
+                    {/* RSVP 활성화 */}
+                    <AccordionSection
+                        title="RSVP"
+                        sectionKey="rsvp"
+                        openMap={openSections}
+                        onToggle={(key) => toggleSection(key as any)}
+                    >
+                        <div>
+                            <div
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    marginBottom: "16px",
+                                }}
+                            >
+                                <span
+                                    style={{
+                                        fontSize: "14px",
+                                        fontWeight: "500",
+                                        color: theme.color.text,
+                                    }}
+                                >
+                                    RSVP 활성화
+                                </span>
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "8px",
+                                    }}
+                                >
+                                    <button
+                                        onClick={() => {
+                                            const newRsvp =
+                                                pageSettings.rsvp === "on"
+                                                    ? "off"
+                                                    : "on"
+                                            setPageSettings((prev) => ({
+                                                ...prev,
+                                                rsvp: newRsvp,
+                                            }))
+                                            // 즉시 저장
+                                            savePageSettings({ rsvp: newRsvp })
+                                        }}
+                                        style={{
+                                            padding: "6px 12px",
+                                            borderRadius: "4px",
+                                            border: `1px solid ${theme.color.border}`,
+                                            backgroundColor:
+                                                pageSettings.rsvp === "on"
+                                                    ? theme.color.primary
+                                                    : theme.color.surface,
+                                            color:
+                                                pageSettings.rsvp === "on"
+                                                    ? "white"
+                                                    : theme.color.text,
+                                            cursor: "pointer",
+                                            fontSize: "12px",
+                                            fontWeight: "500",
+                                            transition: "all 0.2s",
+                                        }}
+                                    >
+                                        {pageSettings.rsvp === "on"
+                                            ? "ON"
+                                            : "OFF"}
+                                    </button>
+                                </div>
+                            </div>
+                            <div
+                                style={{
+                                    fontSize: "12px",
+                                    color: theme.color.textSecondary,
+                                    lineHeight: "1.4",
+                                }}
+                            >
+                                청첩장 하단에 참석 여부 입력 폼이 표시됩니다.
+                            </div>
+                        </div>
+                    </AccordionSection>
+
                     {/* 추가 기능 */}
                     <AccordionSection
                         title="추가 기능"
@@ -10669,7 +10753,10 @@ function TransportTab({
                         setLocationName(String(result.venue_name || ""))
                     }
                     if (result.venue_address !== undefined) {
-                        console.log("TransportTab 로드 - venue_address:", result.venue_address)
+                        console.log(
+                            "TransportTab 로드 - venue_address:",
+                            result.venue_address
+                        )
                         setVenue_address(String(result.venue_address || ""))
                     }
                 } else if (mounted) {

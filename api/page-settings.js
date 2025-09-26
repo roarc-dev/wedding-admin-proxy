@@ -129,7 +129,8 @@ async function handleGetSettings(req, res) {
         gallery_type: 'thumbnail',
         bgm_url: '',
         bgm_type: '',
-        bgm_autoplay: false
+        bgm_autoplay: false,
+        rsvp: 'off'
       }
 
       const { data: newData, error: insertError } = await supabase
@@ -228,6 +229,7 @@ async function handleUpdateSettings(req, res, validatedUser) {
       'bgm_url',
       'bgm_type',
       'bgm_autoplay',
+      'rsvp',
     ]
 
     let sanitized = Object.fromEntries(

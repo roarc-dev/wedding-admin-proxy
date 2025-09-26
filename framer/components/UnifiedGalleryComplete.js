@@ -3,11 +3,25 @@
 // - React 훅 직접 import
 // - typography.js를 통해 폰트 로딩 보장
 
-import { jsx } from "react/jsx-runtime";
+import { jsx, jsxs, Fragment } from "react/jsx-runtime";
 import { useState, useEffect, useRef, useMemo } from "react";
 import typography from "https://cdn.roarc.kr/fonts/typography.js";
 
 // === reference.js 패턴: React 훅 직접 import로 Proxy 패턴 불필요 ===
+
+const createElement = (type, props, ...children) => {
+  const normalizedProps = props || {};
+  if (children.length === 0) {
+    return jsx(type, normalizedProps);
+  }
+  const childValue = children.length === 1 ? children[0] : children;
+  if (Array.isArray(childValue)) {
+    return jsxs(type, { ...normalizedProps, children: childValue });
+  }
+  return jsx(type, { ...normalizedProps, children: childValue });
+};
+
+const React = { createElement, Fragment };
 
 // 프록시 서버 URL (고정된 Production URL)
 const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app";
@@ -436,5 +450,4 @@ function UnifiedGalleryComplete(props) {
 
 UnifiedGalleryComplete.displayName = "UnifiedGalleryComplete";
 export default UnifiedGalleryComplete;
-
 

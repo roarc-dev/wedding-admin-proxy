@@ -3,12 +3,27 @@
 // - JSX Runtime 사용 (reference.js 패턴 적용)
 // - React 훅 직접 import
 
-import { jsx } from "react/jsx-runtime";
-import { useState, useEffect } from "react";
+import { jsx, jsxs, Fragment } from "react/jsx-runtime";
+import { useState, useEffect, useMemo } from "react";
+import typography from "https://cdn.roarc.kr/fonts/typography.js";
 
 // === reference.js 패턴: React 훅 직접 import로 Proxy 패턴 불필요 ===
 
 const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app";
+
+const createElement = (type, props, ...children) => {
+  const normalizedProps = props || {};
+  if (children.length === 0) {
+    return jsx(type, normalizedProps);
+  }
+  const childValue = children.length === 1 ? children[0] : children;
+  if (Array.isArray(childValue)) {
+    return jsxs(type, { ...normalizedProps, children: childValue });
+  }
+  return jsx(type, { ...normalizedProps, children: childValue });
+};
+
+const React = { createElement, Fragment };
 
 function renderBoldSegments(text, baseStyle) {
   const children = [];
@@ -91,7 +106,10 @@ function renderInvitationSegments(text) {
       }
     }
     rendered.push(
-      jsx("span", { key: `line-${i}`, children: [...parts, i !== lines.length - 1 ? jsx("br") : null] })
+      jsx("span", {
+        key: `line-${i}`,
+        children: [...parts, i !== lines.length - 1 ? jsx("br", {}) : null],
+      })
     );
   }
   return rendered;
@@ -122,11 +140,6 @@ function ChrysanthemumIcon() {
 
 function InviteComplete(props) {
   const { pageId = "default", style } = props || {};
-  const resolveReactNow = () =>
-    (globalThis && (globalThis.React || (globalThis.Framer && globalThis.Framer.React))) || null;
-  const R = resolveReactNow();
-  if (!R) return null;
-  const { useEffect, useState, useMemo } = R;
 
   const [weddingData, setWeddingData] = useState({
     invitationText: "저희 두 사람이 하나 되는 약속의 시간에\n마음을 담아 소중한 분들을 모십니다.\n귀한 걸음으로 축복해 주시면 감사하겠습니다.",
@@ -145,6 +158,12 @@ function InviteComplete(props) {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    try {
+      typography && typeof typography.ensure === "function" && typography.ensure();
+    } catch (_) {}
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -361,5 +380,3 @@ function InviteComplete(props) {
 
 InviteComplete.displayName = "InviteComplete";
 export default InviteComplete;
-
-

@@ -3,7 +3,7 @@
 // - JSX Runtime 사용 (reference.js 패턴 적용)
 // - React 훅 직접 import
 // - typography.js를 직접 import하여 폰트 CSS를 주입
-import { jsx } from "react/jsx-runtime";
+import { jsx, jsxs, Fragment } from "react/jsx-runtime";
 import { useState, useRef, useEffect } from "react";
 import typography from "https://cdn.roarc.kr/fonts/typography.js";
 
@@ -11,6 +11,51 @@ import typography from "https://cdn.roarc.kr/fonts/typography.js";
 
 // 프록시 서버 URL (고정된 Production URL)
 const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app";
+
+const createElement = (type, props, ...children) => {
+  const normalizedProps = props || {};
+  if (children.length === 0) {
+    return jsx(type, normalizedProps);
+  }
+  const childValue = children.length === 1 ? children[0] : children;
+  if (Array.isArray(childValue)) {
+    return jsxs(type, { ...normalizedProps, children: childValue });
+  }
+  return jsx(type, { ...normalizedProps, children: childValue });
+};
+
+const React = { createElement, Fragment };
+
+const encodeSvgToBase64 = (svg) => {
+  try {
+    if (typeof btoa === "function") {
+      return btoa(svg);
+    }
+  } catch (_) {}
+  if (typeof Buffer !== "undefined") {
+    return Buffer.from(svg, "utf-8").toString("base64");
+  }
+  return "";
+};
+
+const NAVER_MARKER_SVG = `
+<svg width="800" height="1000" viewBox="0 0 800 1000" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M676.89 393.29C676.89 561.91 497.9 788.29 427.74 870.55C413.08 887.74 386.6 887.98 371.66 871.04C301.08 791.03 123.11 571.59 123.11 393.3C123.11 240.38 247.08 116.41 400 116.41C552.92 116.41 676.89 240.38 676.89 393.3V393.29Z" fill="url(#paint0_linear_16_59)"/>
+<path d="M400.001 514.31C470.688 514.31 527.991 457.007 527.991 386.32C527.991 315.633 470.688 258.33 400.001 258.33C329.314 258.33 272.011 315.633 272.011 386.32C272.011 457.007 329.314 514.31 400.001 514.31Z" fill="url(#paint1_linear_16_59)"/>
+<defs>
+<linearGradient id="paint0_linear_16_59" x1="400" y1="883.6" x2="400" y2="116.4" gradientUnits="userSpaceOnUse">
+<stop stop-color="#5C5C5C"/>
+<stop offset="1" stop-color="#C8C8C8"/>
+</linearGradient>
+<linearGradient id="paint1_linear_16_59" x1="400.001" y1="514.32" x2="400.001" y2="258.33" gradientUnits="userSpaceOnUse">
+<stop stop-color="white"/>
+<stop offset="1" stop-color="#C8C8C8"/>
+</linearGradient>
+</defs>
+</svg>
+`.trim();
+
+const DEFAULT_MARKER_SVG = `data:image/svg+xml;base64,${encodeSvgToBase64(NAVER_MARKER_SVG)}`;
 
 // === Location.tsx 부분 (위치 정보 표시) ===
 async function getLocationSettings(pageId) {
@@ -228,21 +273,11 @@ function LocationUnified(props) {
   const mapInstance = useRef(null);
   const markerInstance = useRef(null);
 
-  // 기본 마커 SVG
-  const defaultMarkerSvg = `data:image/svg+xml;base64,${btoa(`<svg width="800" height="1000" viewBox="0 0 800 1000" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M676.89 393.29C676.89 561.91 497.9 788.29 427.74 870.55C413.08 887.74 386.6 887.98 371.66 871.04C301.08 791.03 123.11 571.59 123.11 393.3C123.11 240.38 247.08 116.41 400 116.41C552.92 116.41 676.89 240.38 676.89 393.3V393.29Z" fill="url(#paint0_linear_16_59)"/>
-<path d="M400.001 514.31C470.688 514.31 527.991 457.007 527.991 386.32C527.991 315.633 470.688 258.33 400.001 258.33C329.314 258.33 272.011 315.633 272.011 386.32C272.011 457.007 329.314 514.31 400.001 514.31Z" fill="url(#paint1_linear_16_59)"/>
-<defs>
-<linearGradient id="paint0_linear_16_59" x1="400" y1="883.6" x2="400" y2="116.4" gradientUnits="userSpaceOnUse">
-<stop stop-color="#5C5C5C"/>
-<stop offset="1" stop-color="#C8C8C8"/>
-</linearGradient>
-<linearGradient id="paint1_linear_16_59" x1="400.001" y1="514.32" x2="400.001" y2="258.33" gradientUnits="userSpaceOnUse">
-<stop stop-color="white"/>
-<stop offset="1" stop-color="#C8C8C8"/>
-</linearGradient>
-</defs>
-</svg>`)}`;
+  useEffect(() => {
+    try {
+      typography && typeof typography.ensure === "function" && typography.ensure();
+    } catch (_) {}
+  }, []);
 
   // 초기 데이터 로드
   useEffect(() => {
@@ -275,10 +310,11 @@ function LocationUnified(props) {
 
   // 네이버 지도 초기화
   useEffect(() => {
-    if (!naverClientId || !window.naver || !mapRef.current) return;
+    if (typeof window === "undefined" || typeof document === "undefined") return;
+    if (!naverClientId || !mapRef.current) return;
 
     const initMap = () => {
-      if (!window.naver.maps) return;
+      if (!window.naver || !window.naver.maps) return;
 
       const position = new window.naver.maps.LatLng(
         coordinates?.lat || 37.3595704,
@@ -301,7 +337,7 @@ function LocationUnified(props) {
         map: mapInstance.current,
         position,
         icon: {
-          url: defaultMarkerSvg,
+          url: DEFAULT_MARKER_SVG,
           size: iconSize,
           origin: new window.naver.maps.Point(0, 0),
           anchor: iconAnchor,
@@ -310,24 +346,24 @@ function LocationUnified(props) {
         visible: true,
       });
 
-      // 마커 클릭 이벤트
       window.naver.maps.Event.addListener(markerInstance.current, "click", () => {
         const venueName = locationSettings.venue_name || locationSettings.venue_address || "위치";
         const encodedName = encodeURIComponent(venueName);
-        const appName = encodeURIComponent(window.location.hostname) || "framer";
+        const host = typeof window !== "undefined" && window.location ? window.location.hostname : "framer";
+        const appName = encodeURIComponent(host || "framer");
         const mobileUrl = `nmap://route/public?lat=${position.lat}&lng=${position.lng}&name=${encodedName}&appname=${appName}`;
         const webUrl = `https://map.naver.com/p/?c=${position.lng},${position.lat},15,0,0,0,dh`;
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-        window.open(isMobile ? mobileUrl : webUrl, "_blank");
+        const isMobile = typeof navigator !== "undefined" && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || "");
+        if (typeof window !== "undefined" && window.open) {
+          window.open(isMobile ? mobileUrl : webUrl, "_blank");
+        }
       });
     };
 
-    // 이미 로드된 경우 바로 초기화
     let injectedScript = null;
     if (window.naver && window.naver.maps) {
       initMap();
     } else {
-      // 네이버 지도 API 로드
       injectedScript = document.createElement("script");
       injectedScript.src = `https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${naverClientId}`;
       injectedScript.async = true;
@@ -338,19 +374,20 @@ function LocationUnified(props) {
 
     return () => {
       if (injectedScript && injectedScript.parentNode) {
-        document.head.removeChild(injectedScript);
+        injectedScript.parentNode.removeChild(injectedScript);
       }
     };
   }, [naverClientId, coordinates, locationSettings]);
 
   // 복사 기능
   const copyToClipboard = async () => {
+    if (typeof navigator === "undefined" || !navigator.clipboard) return;
     try {
       await navigator.clipboard.writeText(locationSettings.venue_address || "");
       setShowCopyMessage(true);
       setTimeout(() => setShowCopyMessage(false), 2000);
-    } catch {
-      // ignore
+    } catch (_) {
+      // ignore clipboard failures silently
     }
   };
 
