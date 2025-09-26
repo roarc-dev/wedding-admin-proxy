@@ -18,9 +18,13 @@ interface PageSettings {
     wedding_minute?: string
     venue_name?: string
     updated_at?: string
+    // 카카오톡 공유 관련 필드들
+    kko_img?: string
+    kko_title?: string
+    kko_date?: string
 }
 
-// 페이지 설정 로드
+// 페이지 설정 로드 (카카오톡 공유 관련 필드들 포함)
 async function getPageSettings(pageId: string): Promise<PageSettings | null> {
     try {
         const response = await fetch(`${PROXY_BASE_URL}/api/page-settings?pageId=${encodeURIComponent(pageId)}`, {
@@ -43,21 +47,27 @@ async function getOptimizedImageUrl(imageUrl: string): Promise<string> {
     return imageUrl || ""
 }
 
-// PhotoSection 이미지 URL 생성
+// 카카오톡 공유 이미지 URL 생성 (kko_img 우선, PhotoSection 이미지 백업)
 function buildImageUrl(settings: PageSettings | null): string {
     if (!settings) return ""
-    
+
+    // 1. 카카오톡 전용 이미지 우선 사용
+    if (settings.kko_img) {
+        return settings.kko_img
+    }
+
+    // 2. 백업: PhotoSection 이미지 사용
     const derived = (settings as any).photo_section_image_public_url as string | undefined
     if (derived) return derived
-    
+
     const direct = settings.photo_section_image_url
     const fromPath = settings.photo_section_image_path
         ? `https://yjlzizakdjghpfduxcki.supabase.co/storage/v1/object/public/images/${settings.photo_section_image_path}`
         : undefined
-    
+
     const base = direct || fromPath
     if (!base) return ""
-    
+
     // 안정적인 버전 키 (updated_at 기반)만 유지해, 캐시 히트 보존
     if (settings.updated_at) {
         const separator = base.includes("?") ? "&" : "?"
@@ -207,11 +217,12 @@ export default function KakaoShare(props: KakaoShareProps) {
             }
 
             const computedArgs: Record<string, string> = {
+                // 카카오톡 공유 전용 필드들 사용
                 GROOM_NAME: settings.groom_name_kr || "신랑",
                 BRIDE_NAME: settings.bride_name_kr || "신부",
-                WEDDING_DATE: formatWeddingDate(),
-                VENUE_NAME: settings.venue_name || "예식장",
-                WEDDING_IMAGE: imageUrl,
+                KKO_TITLE: settings.kko_title || `${settings.groom_name_kr || "신랑"} ♥ ${settings.bride_name_kr || "신부"} 결혼합니다`,
+                KKO_DATE: settings.kko_date || formatWeddingDate(),
+                WEDDING_IMAGE: imageUrl, // 카카오톡 전용 이미지가 우선 사용됨 (buildImageUrl에서 kko_img 우선)
                 WEDDING_URL: getUrlPath(settings.page_url || (typeof window !== 'undefined' ? window.location.href : '')),
             }
 

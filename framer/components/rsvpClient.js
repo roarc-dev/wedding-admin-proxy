@@ -24,8 +24,10 @@ function RSVPClient(props) {
     checkboxBorderColor = "#88888833",
     checkboxCheckedBgColor = "#000",
     checkboxCheckedBorderColor = "#000",
-    rsvpEnabled = "off", // RSVP 활성화 상태
   } = props || {}
+
+  // API 기본 엔드포인트 (배포 환경 기준)
+  const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app"
 
   const [formData, setFormData] = useState({
     guestName: "",
@@ -41,12 +43,30 @@ function RSVPClient(props) {
   const [submitStatus, setSubmitStatus] = useState("")
   const [errors, setErrors] = useState({})
   const [isPrivacyExpanded, setIsPrivacyExpanded] = useState(false)
-  const [displayStyle, setDisplayStyle] = useState(rsvpEnabled === "off" ? "none" : "block")
+  const [displayStyle, setDisplayStyle] = useState("none")
 
-  // rsvpEnabled prop이 변경될 때마다 display 스타일 업데이트
+  // 서버에서 page_settings.rsvp 값을 조회해 표시 상태를 동기화
   useEffect(() => {
-    setDisplayStyle(rsvpEnabled === "off" ? "none" : "block")
-  }, [rsvpEnabled])
+    let cancelled = false
+    async function fetchRsvp() {
+      try {
+        if (!pageId) return
+        const url = `${PROXY_BASE_URL}/api/page-settings?pageId=${encodeURIComponent(pageId)}`
+        const res = await fetch(url, { cache: "no-store" })
+        if (!res.ok) return
+        const json = await res.json()
+        const serverRsvp = (json && json.data && json.data.rsvp) || json?.rsvp
+        if (!cancelled && (serverRsvp === "on" || serverRsvp === "off")) {
+          setDisplayStyle(serverRsvp === "on" ? "block" : "none")
+        }
+      } catch (_) {
+      }
+    }
+    fetchRsvp()
+    return () => {
+      cancelled = true
+    }
+  }, [pageId])
 
   const formatPhoneNumber = useCallback((value) => {
     const numbers = value.replace(/[^\d]/g, "")
