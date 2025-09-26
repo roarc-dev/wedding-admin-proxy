@@ -4,7 +4,7 @@
 // - Framer 캔버스와 브라우저 양쪽에서 동작
 
 import { jsx } from "react/jsx-runtime"
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 
 function RSVPClient(props) {
   const {
@@ -41,6 +41,12 @@ function RSVPClient(props) {
   const [submitStatus, setSubmitStatus] = useState("")
   const [errors, setErrors] = useState({})
   const [isPrivacyExpanded, setIsPrivacyExpanded] = useState(false)
+  const [displayStyle, setDisplayStyle] = useState(rsvpEnabled === "off" ? "none" : "block")
+
+  // rsvpEnabled prop이 변경될 때마다 display 스타일 업데이트
+  useEffect(() => {
+    setDisplayStyle(rsvpEnabled === "off" ? "none" : "block")
+  }, [rsvpEnabled])
 
   const formatPhoneNumber = useCallback((value) => {
     const numbers = value.replace(/[^\d]/g, "")
@@ -152,12 +158,12 @@ function RSVPClient(props) {
     })
   }
 
-  // RSVP가 비활성화된 경우 숨김
-  if (rsvpEnabled === "off") {
+  // RSVP가 비활성화된 경우 숨김 (displayStyle로 제어)
+  if (displayStyle === "none") {
     return jsx("div", { style: { display: "none" }, children: null })
   }
 
-  return jsx("div", { style: { backgroundColor: "#F5F5F5", padding: "80px 0" }, children: [
+  return jsx("div", { style: { backgroundColor: "#F5F5F5", padding: "80px 0", display: displayStyle }, children: [
     jsx("div", { style: { width: "100%", height: "fit-content", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "P22 Late November, serif", fontSize: "25px", letterSpacing: "0.05em", lineHeight: "0.7em", textAlign: "center", whiteSpace: "nowrap", marginBottom: "20px" }, children: "RSVP" }),
     jsx("div", { style: { fontFamily: "Pretendard Regular", fontSize: "15px", color: "#8c8c8c", lineHeight: "1.8em", textAlign: "center", marginBottom: "30px" }, children: "결혼식 참석 여부를 알려주세요" }),
     jsx("div", { style: { ...style, width: "75%", height: "fit-content", maxWidth: "400px", margin: "0 auto", padding: "0px", backgroundColor, borderRadius: "0px" }, children: [
