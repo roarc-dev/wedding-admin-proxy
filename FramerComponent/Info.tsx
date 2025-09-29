@@ -191,6 +191,11 @@ function Info({
     const [currentIndex, setCurrentIndex] = useState(0)
     const [isAutoPlaying, setIsAutoPlaying] = useState(true)
 
+    // infoItems 정렬 (display_order 기준)
+    const sortedInfoItems = useMemo(() => {
+        return [...infoItems].sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
+    }, [infoItems])
+
     // 자동 슬라이드 타이머
     useEffect(() => {
         if (!isAutoPlaying || sortedInfoItems.length <= 1) return
@@ -300,11 +305,6 @@ function Info({
         if (dragOffset < 0) return 1 // 다음
         return 0
     }, [dragOffset])
-
-    // infoItems 정렬 (display_order 기준)
-    const sortedInfoItems = useMemo(() => {
-        return [...infoItems].sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
-    }, [infoItems])
 
     if (!sortedInfoItems || sortedInfoItems.length === 0) {
         return null
