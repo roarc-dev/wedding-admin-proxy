@@ -3083,6 +3083,9 @@ function AdminMainContent(props: any) {
     const audioRef = React.useRef<HTMLAudioElement | null>(null)
     const [selectedBgmId, setSelectedBgmId] = useState<string | null>(null)
     const [playingBgmId, setPlayingBgmId] = useState<string | null>(null)
+    const kakaoImageInputRef = useRef<HTMLInputElement | null>(null)
+    const [kakaoUploadLoading, setKakaoUploadLoading] = useState(false)
+    const [kkoDefaultsApplied, setKkoDefaultsApplied] = useState(false)
 
     React.useEffect(() => {
         const match = FREE_BGM_LIST.find((b) => b.url === pageSettings.bgm_url)
@@ -3098,6 +3101,10 @@ function AdminMainContent(props: any) {
             el.removeEventListener("ended", onEnded)
         }
     }, [])
+
+    useEffect(() => {
+        setKkoDefaultsApplied(false)
+    }, [currentPageId])
     // 미리보기용 포맷터 및 프롭 빌더
     const formatPhotoDisplayDateTime = (): string => {
         const locale =
@@ -3196,6 +3203,101 @@ function AdminMainContent(props: any) {
                     | "#000000") || "#ffffff",
         }
     }
+
+    const getKakaoShareNames = () => {
+        const groom =
+            pageSettings.groomName ||
+            (pageSettings as any)?.groom_name_kr ||
+            inviteData.groomName ||
+            ""
+        const bride =
+            pageSettings.brideName ||
+            (pageSettings as any)?.bride_name_kr ||
+            inviteData.brideName ||
+            ""
+        return { groom, bride }
+    }
+
+    const buildKakaoDefaultTitle = () => {
+        const { groom, bride } = getKakaoShareNames()
+        if (!groom || !bride) return ""
+        return `${groom} ♥ ${bride} 결혼합니다`
+    }
+
+    const buildKakaoDefaultDate = () => {
+        const dateStr = pageSettings.wedding_date
+        if (!dateStr) return ""
+        const parts = dateStr.split("-")
+        if (parts.length !== 3) return ""
+        const [yearStr, monthStr, dayStr] = parts
+        const year = Number(yearStr)
+        const month = Number(monthStr)
+        const day = Number(dayStr)
+        if (!year || !month || !day) return ""
+
+        const hourRaw = pageSettings.wedding_hour ?? ""
+        const minuteRaw = pageSettings.wedding_minute ?? ""
+
+        const hour = Number(hourRaw)
+        const minute = Number(minuteRaw)
+
+        const hasHour = hourRaw !== "" && !Number.isNaN(hour)
+        const hasMinute = minuteRaw !== "" && !Number.isNaN(minute)
+
+        const hourText = hasHour ? `${hour}시` : ""
+        const minuteText =
+            hasMinute && minute > 0
+                ? ` ${minute.toString().padStart(2, "0")}분`
+                : ""
+
+        const timeText = hourText ? ` ${hourText}${minuteText}` : ""
+        return `${year}년 ${month}월 ${day}일${timeText}`.trim()
+    }
+
+    useEffect(() => {
+        if (!currentPageId || kkoDefaultsApplied) return
+
+        const defaults: Partial<typeof pageSettings> = {}
+
+        if (!pageSettings.kko_title) {
+            const title = buildKakaoDefaultTitle()
+            if (title) {
+                defaults.kko_title = title
+            }
+        }
+
+        if (!pageSettings.kko_date) {
+            const dateText = buildKakaoDefaultDate()
+            if (dateText) {
+                defaults.kko_date = dateText
+            }
+        }
+
+        if (Object.keys(defaults).length > 0) {
+            setPageSettings((prev) => ({ ...prev, ...defaults }))
+            void savePageSettings(defaults)
+            const nextTitle = defaults.kko_title ?? pageSettings.kko_title
+            const nextDate = defaults.kko_date ?? pageSettings.kko_date
+            if (nextTitle && nextDate) {
+                setKkoDefaultsApplied(true)
+            }
+        } else if (pageSettings.kko_title && pageSettings.kko_date) {
+            setKkoDefaultsApplied(true)
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [
+        currentPageId,
+        kkoDefaultsApplied,
+        pageSettings.kko_title,
+        pageSettings.kko_date,
+        pageSettings.groomName,
+        pageSettings.brideName,
+        pageSettings.wedding_date,
+        pageSettings.wedding_hour,
+        pageSettings.wedding_minute,
+        inviteData.groomName,
+        inviteData.brideName,
+    ])
 
     // 초대글 텍스트 포맷팅(볼드/인용) 삽입
     const insertInviteFormat = (format: "bold" | "quote") => {
@@ -4780,6 +4882,90 @@ function AdminMainContent(props: any) {
             setError(`자동재생 설정에 실패했습니다: ${message}`)
         } finally {
             setSettingsLoading(false)
+        }
+    }
+
+    const handleKakaoImageChange = async (
+        event: React.ChangeEvent<HTMLInputElement>
+    ) => {
+        const file = event.target.files?.[0]
+        if (!file) return
+        if (!currentPageId) {
+            alert("페이지 ID가 설정되지 않았습니다.")
+            event.target.value = ""
+            return
+        }
+
+        try {
+            validateImageFileSize(file)
+        } catch (validationError) {
+            const message =
+                validationError instanceof Error
+                    ? validationError.message
+                    : String(validationError)
+            alert(message)
+            event.target.value = ""
+            return
+        }
+
+        try {
+            setKakaoUploadLoading(true)
+
+            const key = makeGalleryKey(currentPageId, file)
+            const { publicUrl } = await uploadToR2(file, currentPageId, key)
+
+            if (pageSettings.kko_img) {
+                try {
+                    await deleteFromR2(pageSettings.kko_img)
+                } catch (deleteError) {
+                    console.warn(
+                        "기존 카카오톡 공유 이미지 삭제 중 경고:",
+                        deleteError
+                    )
+                }
+            }
+
+            setPageSettings((prev) => ({ ...prev, kko_img: publicUrl }))
+            await savePageSettings({ kko_img: publicUrl })
+        } catch (error: unknown) {
+            console.error("카카오톡 공유 이미지 업로드 실패:", error)
+            const message =
+                error instanceof Error ? error.message : String(error)
+            alert(`카카오톡 공유 이미지를 업로드하지 못했습니다: ${message}`)
+        } finally {
+            setKakaoUploadLoading(false)
+            event.target.value = ""
+        }
+    }
+
+    const handleKakaoImageRemove = async () => {
+        if (!pageSettings.kko_img) return
+        if (
+            typeof window !== "undefined" &&
+            !window.confirm("등록된 카카오톡 공유 이미지를 삭제하시겠습니까?")
+        ) {
+            return
+        }
+
+        setKakaoUploadLoading(true)
+
+        try {
+            await deleteFromR2(pageSettings.kko_img)
+        } catch (error) {
+            console.warn("카카오톡 공유 이미지 삭제 중 경고:", error)
+        }
+
+        setPageSettings((prev) => ({ ...prev, kko_img: "" }))
+
+        try {
+            await savePageSettings({ kko_img: "" })
+        } catch (error: unknown) {
+            console.error("카카오톡 공유 이미지 상태 저장 실패:", error)
+            const message =
+                error instanceof Error ? error.message : String(error)
+            alert(`이미지 정보를 저장하지 못했습니다: ${message}`)
+        } finally {
+            setKakaoUploadLoading(false)
         }
     }
 
@@ -8173,6 +8359,41 @@ function AdminMainContent(props: any) {
                             </div>
                         </div>
                     </AccordionSection>
+
+                    {/* 안내 사항 */}
+                    <AccordionSection
+                        title="안내 사항"
+                        sectionKey="info"
+                        openMap={openSections}
+                        onToggle={(key) => toggleSection(key as any)}
+                    >
+                        <div
+                            style={{
+                                padding: "16px 16px",
+                                backgroundColor: "white",
+                                display: "flex",
+                                justifyContent: "flex-start",
+                                alignItems: "flex-start",
+                                gap: "10px",
+                            }}
+                        >
+                            <div
+                                style={{
+                                    width: "100%",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: theme.gap.sm,
+                                    alignItems: "flex-start",
+                                }}
+                            >
+                                <InfoTab
+                                    pageId={currentPageId}
+                                    tokenGetter={getAuthToken}
+                                />
+                            </div>
+                        </div>
+                    </AccordionSection>
+
                     {/* 계좌 안내 */}
                     <AccordionSection
                         title="계좌 안내"
@@ -9706,12 +9927,206 @@ function AdminMainContent(props: any) {
                     >
                         <div
                             style={{
-                                padding: "16px",
-                                textAlign: "center",
-                                color: "#666",
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: theme.gap.lg,
+                                padding: 16,
+                                backgroundColor: "white",
                             }}
                         >
-                            카카오톡 공유 설정 준비 중입니다.
+                            <FormField
+                                label="카카오톡 공유 이미지"
+                                helpText={
+                                    <span
+                                        style={{
+                                            display: "block", // inline이면 textAlign 안먹을 수 있어서 block으로
+                                            textAlign: "center",
+                                            lineHeight: 1.4,
+                                        }}
+                                    >
+                                        설정하지 않아도 메인 사진이 적용됩니다.
+                                    </span>
+                                }
+                            >
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        gap: theme.gap.sm,
+                                        alignItems: "center",
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            width: "100%",
+                                            maxWidth: 240,
+                                            margin: "12px 24px",
+                                            height: 360,
+                                            border: `1px solid ${theme.color.border}`,
+                                            borderRadius: theme.border.radius,
+                                            background: "#FAFAFA",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            overflow: "hidden",
+                                        }}
+                                    >
+                                        {pageSettings.kko_img ? (
+                                            <img
+                                                src={pageSettings.kko_img}
+                                                alt="카카오톡 공유 미리보기"
+                                                style={{
+                                                    width: "100%",
+                                                    height: "100%",
+                                                    objectFit: "cover",
+                                                }}
+                                            />
+                                        ) : (
+                                            <span
+                                                style={{
+                                                    color: theme.color.muted,
+                                                    fontSize: 13,
+                                                    fontFamily:
+                                                        "Pretendard Regular",
+                                                    textAlign: "center",
+                                                    lineHeight: 1.5,
+                                                    whiteSpace: "pre-line",
+                                                }}
+                                            >
+                                                이미지를 업로드해주세요.{"\n"}
+                                                2:3 비율로 표시됩니다.
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div
+                                        style={{
+                                            display: "flex",
+                                            gap: 8,
+                                            justifyContent: "center",
+                                        }}
+                                    >
+                                        <ButtonBase
+                                            onClick={() =>
+                                                kakaoImageInputRef.current?.click()
+                                            }
+                                            disabled={
+                                                kakaoUploadLoading ||
+                                                settingsLoading
+                                            }
+                                            style={{
+                                                minWidth: 120,
+                                            }}
+                                        >
+                                            {kakaoUploadLoading
+                                                ? "업로드 중..."
+                                                : pageSettings.kko_img
+                                                  ? "이미지 변경"
+                                                  : "이미지 업로드"}
+                                        </ButtonBase>
+                                        {pageSettings.kko_img ? (
+                                            <ButtonBase
+                                                onClick={handleKakaoImageRemove}
+                                                disabled={
+                                                    kakaoUploadLoading ||
+                                                    settingsLoading
+                                                }
+                                                style={{
+                                                    minWidth: 100,
+                                                    background:
+                                                        theme.color.surface,
+                                                }}
+                                            >
+                                                삭제
+                                            </ButtonBase>
+                                        ) : null}
+                                    </div>
+                                    <input
+                                        ref={kakaoImageInputRef}
+                                        type="file"
+                                        accept="image/*"
+                                        style={{ display: "none" }}
+                                        onChange={handleKakaoImageChange}
+                                        disabled={
+                                            kakaoUploadLoading ||
+                                            settingsLoading
+                                        }
+                                    />
+                                </div>
+                            </FormField>
+
+                            <FormField
+                                label="제목"
+                                helpText={
+                                    <>
+                                        카카오톡 공유 카드에 굵은 글씨로
+                                        표시됩니다. <br />
+                                        설정하지 않아도 신랑 신부의 이름이
+                                        표시됩니다.
+                                    </>
+                                }
+                            >
+                                <InputBase
+                                    value={pageSettings.kko_title || ""}
+                                    onChange={(e) =>
+                                        setPageSettings((prev) => ({
+                                            ...prev,
+                                            kko_title: e.target.value,
+                                        }))
+                                    }
+                                    onBlur={(e) =>
+                                        void savePageSettings({
+                                            kko_title: e.target.value,
+                                        })
+                                    }
+                                    placeholder="예: 민준 ♥ 서윤 결혼합니다"
+                                    disabled={settingsLoading}
+                                />
+                            </FormField>
+
+                            <FormField
+                                label="본문"
+                                helpText={
+                                    <>
+                                        카카오톡 공유 카드에 작은 글씨로
+                                        표시됩니다.
+                                        <br />
+                                        설정하지 않아도 날짜가 표시됩니다.
+                                    </>
+                                }
+                            >
+                                <textarea
+                                    value={pageSettings.kko_date || ""}
+                                    onChange={(e) =>
+                                        setPageSettings((prev) => ({
+                                            ...prev,
+                                            kko_date: e.target.value,
+                                        }))
+                                    }
+                                    onBlur={(e) =>
+                                        void savePageSettings({
+                                            kko_date: e.target.value,
+                                        })
+                                    }
+                                    rows={3}
+                                    placeholder="예: 2026년 1월 1일 12시 30분"
+                                    disabled={settingsLoading}
+                                    style={{
+                                        width: "100%",
+                                        minHeight: 96,
+                                        padding: "10px 12px",
+                                        borderStyle: "solid",
+                                        borderWidth: theme.border.width,
+                                        borderColor: theme.color.border,
+                                        borderRadius: theme.border.radius,
+                                        background: theme.color.surface,
+                                        color: theme.color.text,
+                                        fontFamily: "Pretendard Regular",
+                                        fontSize: 14,
+                                        lineHeight: 1.5,
+                                        resize: "vertical",
+                                    }}
+                                />
+                            </FormField>
                         </div>
                     </AccordionSection>
 
@@ -10333,6 +10748,567 @@ function AdminMainContent(props: any) {
         </div>
     )
 }
+// 안내 사항 입력 탭 컴포넌트
+function InfoTab({
+    pageId,
+    tokenGetter,
+}: {
+    pageId: string
+    tokenGetter: () => string | null
+}): JSX.Element {
+    type InfoItem = {
+        id?: string
+        title: string
+        description: string
+        display_order: number
+    }
+
+    const DEFAULT_ITEMS: InfoItem[] = [
+        {
+            title: "안내 사항 제목",
+            description: "안내 사항 내용을 입력해주세요. **굵은글씨**와 {작은글씨}를 사용할 수 있습니다.",
+            display_order: 1,
+        },
+    ]
+
+    const [items, setItems] = React.useState<InfoItem[]>(DEFAULT_ITEMS)
+    const [loading, setLoading] = React.useState(false)
+    const [saving, setSaving] = React.useState(false)
+    const [errorMsg, setErrorMsg] = React.useState<string>("")
+    const [successMsg, setSuccessMsg] = React.useState<string>("")
+
+    // 교통안내와 동일한 패턴으로 구현
+    const addItem = () => {
+        setItems((prev) => [
+            ...prev,
+            {
+                title: "안내 사항 제목",
+                description: "안내 사항 내용을 입력해주세요",
+                display_order: prev.length + 1,
+            },
+        ])
+    }
+
+    const move = (index: number, dir: -1 | 1) => {
+        setItems((prev) => {
+            const next = [...prev]
+            const ni = index + dir
+            if (ni < 0 || ni >= next.length) return prev
+            const temp = next[index]
+            next[index] = next[ni]
+            next[ni] = temp
+            return next.map((it, i) => ({ ...it, display_order: i + 1 }))
+        })
+    }
+
+    const change = (
+        index: number,
+        field: "title" | "description",
+        value: string
+    ) => {
+        setItems((prev) =>
+            prev.map((it, i) => (i === index ? { ...it, [field]: value } : it))
+        )
+    }
+
+    // 텍스트 포맷팅 함수들 (교통안내와 동일)
+    const insertFormat = (index: number, format: "bold" | "small") => {
+        if (typeof document === "undefined") return
+        const textareaId = `info-description-${index}`
+        const textarea = document.getElementById(
+            textareaId
+        ) as HTMLTextAreaElement
+        if (!textarea) return
+
+        const start = textarea.selectionStart
+        const end = textarea.selectionEnd
+        const selectedText = textarea.value.substring(start, end)
+        const beforeText = textarea.value.substring(0, start)
+        const afterText = textarea.value.substring(end)
+
+        let newText = ""
+        let cursorOffset = 0
+
+        if (format === "bold") {
+            if (selectedText) {
+                newText = `${beforeText}**${selectedText}**${afterText}`
+                cursorOffset = start + selectedText.length + 4
+            } else {
+                newText = `${beforeText}**텍스트**${afterText}`
+                cursorOffset = start + 2
+            }
+        } else if (format === "small") {
+            if (selectedText) {
+                newText = `${beforeText}{${selectedText}}${afterText}`
+                cursorOffset = start + selectedText.length + 2
+            } else {
+                newText = `${beforeText}{텍스트}${afterText}`
+                cursorOffset = start + 1
+            }
+        }
+
+        // 값 업데이트
+        change(index, "description", newText)
+
+        // 커서 위치 복원 (다음 렌더링 이후)
+        setTimeout(() => {
+            if (typeof document !== "undefined") {
+                const updatedTextarea = document.getElementById(
+                    textareaId
+                ) as HTMLTextAreaElement
+                if (updatedTextarea) {
+                    updatedTextarea.focus()
+                    updatedTextarea.setSelectionRange(
+                        cursorOffset,
+                        cursorOffset
+                    )
+                }
+            }
+        }, 0)
+    }
+
+    const save = async () => {
+        if (!pageId) {
+            setErrorMsg("페이지 ID가 필요합니다")
+            return
+        }
+        setSaving(true)
+        setErrorMsg("")
+        setSuccessMsg("")
+        try {
+            const token = tokenGetter?.() || ""
+            const getApiBases = () => {
+                const bases: string[] = []
+                try {
+                    if (
+                        typeof window !== "undefined" &&
+                        window.location?.origin
+                    ) {
+                        bases.push(window.location.origin)
+                    }
+                } catch {}
+                bases.push(PROXY_BASE_URL)
+                return Array.from(new Set(bases.filter(Boolean)))
+            }
+            const bases = getApiBases()
+            let res: Response | null = null
+            let text = ""
+            for (const base of bases) {
+                try {
+                    const tryRes = await fetch(
+                        `${base}/api/page-settings?info`,
+                        {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                                ...(token
+                                    ? { Authorization: `Bearer ${token}` }
+                                    : {}),
+                            },
+                            body: JSON.stringify({
+                                pageId,
+                                items,
+                            }),
+                        }
+                    )
+                    res = tryRes
+                    text = await tryRes.text()
+                    if (tryRes.ok) break
+                } catch (e) {
+                    // continue to next base
+                }
+            }
+            if (!res) throw new Error("network error")
+            let result: any = {}
+            try {
+                result = JSON.parse(text)
+            } catch {
+                result = { raw: text }
+            }
+            if (!res.ok || !result?.success) {
+                throw new Error(
+                    result?.message || result?.error || text || "저장 실패"
+                )
+            }
+            setSuccessMsg("안내 사항이 저장되었습니다.")
+        } catch (e: any) {
+            setErrorMsg(e?.message || "저장 중 오류가 발생했습니다")
+        } finally {
+            setSaving(false)
+            setTimeout(() => {
+                setErrorMsg("")
+                setSuccessMsg("")
+            }, 3000)
+        }
+    }
+
+    React.useEffect(() => {
+        let mounted = true
+        const getApiBases = () => {
+            const bases: string[] = []
+            try {
+                if (typeof window !== "undefined" && window.location?.origin) {
+                    bases.push(window.location.origin)
+                }
+            } catch {
+                // window.location 접근 실패 시 무시
+            }
+            bases.push(PROXY_BASE_URL)
+            return Array.from(new Set(bases.filter(Boolean)))
+        }
+        const request = async (path: string, init?: RequestInit) => {
+            const bases = getApiBases()
+            let lastRes: Response | null = null
+            let lastErr: any = null
+            for (const base of bases) {
+                try {
+                    const res = await fetch(`${base}${path}`, init)
+                    if (res.ok) return res
+                    lastRes = res
+                } catch (e) {
+                    lastErr = e
+                }
+            }
+            if (lastRes) return lastRes
+            throw lastErr || new Error("Network error")
+        }
+        async function load() {
+            if (!pageId) return
+            setLoading(true)
+            setErrorMsg("")
+            try {
+                const res = await request(
+                    `/api/page-settings?info&pageId=${encodeURIComponent(pageId)}`
+                )
+                if (!res.ok) throw new Error(`load failed: ${res.status}`)
+                const result = await res.json()
+                if (mounted && result?.success) {
+                    if (Array.isArray(result.data)) {
+                        const loaded: InfoItem[] = result.data.map(
+                            (it: any, idx: number) => ({
+                                id: it.id,
+                                title: String(it.title ?? ""),
+                                description: String(it.description ?? ""),
+                                display_order: Number(
+                                    it.display_order ?? idx + 1
+                                ),
+                            })
+                        )
+                        setItems(loaded.length > 0 ? loaded : DEFAULT_ITEMS)
+                    }
+                } else if (mounted) {
+                    setItems(DEFAULT_ITEMS)
+                }
+            } catch (_e) {
+                if (mounted) setItems(DEFAULT_ITEMS)
+            } finally {
+                if (mounted) setLoading(false)
+            }
+        }
+        load()
+        return () => {
+            mounted = false
+        }
+    }, [pageId])
+
+    return (
+        <div
+            style={{
+                width: "100%",
+                display: "flex",
+                flexDirection: "column",
+                gap: 24,
+                alignItems: "stretch",
+            }}
+        >
+            {loading ? (
+                <div style={{ padding: 12, color: "#6b7280" }}>
+                    불러오는 중...
+                </div>
+            ) : (
+                <div>
+                    {items.map((item, index) => (
+                        <div
+                            key={index}
+                            style={{
+                                width: "100%",
+                                padding: 16,
+                                border: `1px solid ${theme.color.border}`,
+                                outlineOffset: -0.5,
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: theme.gap.sm,
+                                marginBottom: 16,
+                                alignItems: "flex-start",
+                            }}
+                        >
+                            <div
+                                style={{
+                                    width: "100%",
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "center",
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        textAlign: "center",
+                                        color: "black",
+                                        fontSize: 14,
+                                        fontFamily: "Pretendard SemiBold",
+                                    }}
+                                >
+                                    안내 사항
+                                </div>
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        gap: 4,
+                                        alignItems: "center",
+                                    }}
+                                >
+                                    <button
+                                        onClick={() => move(index, -1)}
+                                        disabled={index === 0}
+                                        style={{
+                                            padding: 6,
+                                            border: `1px solid ${theme.color.border}`,
+                                            outlineOffset: -1,
+                                            background: "white",
+                                            cursor:
+                                                index === 0
+                                                    ? "not-allowed"
+                                                    : "pointer",
+                                            opacity: index === 0 ? 0.5 : 1,
+                                        }}
+                                    >
+                                        <div
+                                            style={{
+                                                width: 16,
+                                                height: 16,
+                                                padding: "13px 9px",
+                                                display: "flex",
+                                                flexDirection: "column",
+                                                justifyContent: "center",
+                                                alignItems: "center",
+                                            }}
+                                        >
+                                            <div
+                                                style={{
+                                                    width: 12,
+                                                    height: 5.5,
+                                                    border: "1.5px solid #757575",
+                                                    borderRadius: 1,
+                                                }}
+                                            />
+                                        </div>
+                                    </button>
+                                    <button
+                                        onClick={() => move(index, 1)}
+                                        disabled={index === items.length - 1}
+                                        style={{
+                                            padding: 6,
+                                            border: `1px solid ${theme.color.border}`,
+                                            outlineOffset: -1,
+                                            background: "white",
+                                            cursor:
+                                                index === items.length - 1
+                                                    ? "not-allowed"
+                                                    : "pointer",
+                                            opacity:
+                                                index === items.length - 1
+                                                    ? 0.5
+                                                    : 1,
+                                        }}
+                                    >
+                                        <div
+                                            style={{
+                                                width: 16,
+                                                height: 16,
+                                                padding: "13px 9px",
+                                                display: "flex",
+                                                flexDirection: "column",
+                                                justifyContent: "center",
+                                                alignItems: "center",
+                                            }}
+                                        >
+                                            <div
+                                                style={{
+                                                    width: 12,
+                                                    height: 5.5,
+                                                    border: "1.5px solid #757575",
+                                                    borderRadius: 1,
+                                                    transform: "rotate(180deg)",
+                                                }}
+                                            />
+                                        </div>
+                                    </button>
+                                </div>
+                            </div>
+                            <input
+                                style={{
+                                    width: "100%",
+                                    height: 40,
+                                    padding: 12,
+                                    background: "white",
+                                    border: `1px solid ${theme.color.border}`,
+                                    outlineOffset: -0.25,
+                                    fontSize: 14,
+                                    fontFamily: "Pretendard Regular",
+                                    color:
+                                        item.title === "" ? "#ADADAD" : "black",
+                                }}
+                                placeholder="안내 사항 제목"
+                                value={item.title}
+                                onChange={(e) =>
+                                    change(index, "title", e.target.value)
+                                }
+                            />
+                            <textarea
+                                id={`info-description-${index}`}
+                                style={{
+                                    width: "100%",
+                                    height: 120,
+                                    padding: 12,
+                                    background: "white",
+                                    border: `1px solid ${theme.color.border}`,
+                                    outlineOffset: -0.25,
+                                    fontSize: 14,
+                                    fontFamily: "Pretendard Regular",
+                                    color:
+                                        item.description === ""
+                                            ? "#ADADAD"
+                                            : "black",
+                                    resize: "none",
+                                }}
+                                placeholder="안내 사항 내용을 입력해주세요. **굵은글씨**와 {작은글씨}를 사용할 수 있습니다."
+                                value={item.description}
+                                onChange={(e) =>
+                                    change(index, "description", e.target.value)
+                                }
+                            />
+                            <div
+                                style={{
+                                    width: "100%",
+                                    display: "flex",
+                                    justifyContent: "flex-end",
+                                    gap: 4,
+                                    alignItems: "center",
+                                }}
+                            >
+                                <button
+                                    type="button"
+                                    onClick={() => insertFormat(index, "bold")}
+                                    style={{
+                                        padding: "4px 8px",
+                                        border: `1px solid ${theme.color.border}`,
+                                        outlineOffset: -0.5,
+                                        background: "white",
+                                        cursor: "pointer",
+                                        fontSize: 10,
+                                        fontFamily: "Pretendard SemiBold",
+                                        color: "#7F7F7F",
+                                        lineHeight: "20px",
+                                    }}
+                                    title="선택한 텍스트를 두껍게 (**텍스트**)"
+                                >
+                                    볼드
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => insertFormat(index, "small")}
+                                    style={{
+                                        padding: "4px 8px",
+                                        border: `1px solid ${theme.color.border}`,
+                                        outlineOffset: -0.5,
+                                        background: "white",
+                                        cursor: "pointer",
+                                        fontSize: 10,
+                                        fontFamily: "Pretendard Regular",
+                                        color: "#7F7F7F",
+                                        lineHeight: "20px",
+                                    }}
+                                    title="선택한 텍스트를 작게 ({텍스트})"
+                                >
+                                    작게
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                    <button
+                        onClick={addItem}
+                        style={{
+                            width: "100%",
+                            height: 40,
+                            padding: 12,
+                            background: "#ECECEC",
+                            border: `1px solid ${theme.color.border}`,
+                            outlineOffset: -0.25,
+                            display: "flex",
+                            justifyContent: "center",
+                            alignItems: "center",
+                            cursor: "pointer",
+                            fontSize: 14,
+                            fontFamily: "Pretendard Regular",
+                            color: "black",
+                        }}
+                    >
+                        + 안내 사항 추가
+                    </button>
+                </div>
+            )}
+
+            {/* 저장 버튼 */}
+            <button
+                onClick={save}
+                disabled={saving}
+                style={{
+                    width: "100%",
+                    height: 44,
+                    background: saving ? "#9ca3af" : "#111827",
+                    color: "white",
+                    border: "none",
+                    borderRadius: 2,
+                    fontSize: 14,
+                    fontFamily: "Pretendard SemiBold",
+                    cursor: saving ? "not-allowed" : "pointer",
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                }}
+            >
+                {saving ? "저장 중..." : "저장"}
+            </button>
+
+            {errorMsg && (
+                <div
+                    style={{
+                        marginTop: 8,
+                        color: "#dc2626",
+                        fontSize: 13,
+                        textAlign: "center",
+                    }}
+                >
+                    {errorMsg}
+                </div>
+            )}
+
+            {successMsg && (
+                <div
+                    style={{
+                        marginTop: 8,
+                        color: "#059669",
+                        fontSize: 13,
+                        textAlign: "center",
+                    }}
+                >
+                    {successMsg}
+                </div>
+            )}
+        </div>
+    )
+}
+
 // 교통안내 입력 탭 컴포넌트
 function TransportTab({
     pageId,

@@ -52,9 +52,24 @@ export default async function handler(req, res) {
         case 'POST':
           return await handleUpdateTransport(req, res, validatedUser)
         default:
-          return res.status(405).json({ 
-            success: false, 
-            error: 'Method not allowed' 
+          return res.status(405).json({
+            success: false,
+            error: 'Method not allowed'
+          })
+      }
+    }
+
+    // 안내 사항 요청인지 확인
+    if (req.query.info !== undefined) {
+      switch (req.method) {
+        case 'GET':
+          return await handleGetInfo(req, res)
+        case 'POST':
+          return await handleUpdateInfo(req, res, validatedUser)
+        default:
+          return res.status(405).json({
+            success: false,
+            error: 'Method not allowed'
           })
       }
     }
@@ -435,20 +450,117 @@ async function handleUpdateTransport(req, res, validatedUser) {
   }
 }
 
+async function handleGetInfo(req, res) {
+  const { pageId } = req.query
+
+  if (!pageId) {
+    return res.status(400).json({
+      success: false,
+      error: 'pageId is required'
+    })
+  }
+
+  try {
+    // info_item 테이블에서 안내 사항 정보 조회
+    const { data: infoData, error: infoError } = await supabase
+      .from('info_item')
+      .select('*')
+      .eq('page_id', pageId)
+      .order('display_order')
+
+    if (infoError && infoError.code !== 'PGRST116') {
+      console.error('Info query error:', infoError)
+    }
+
+    return res.json({
+      success: true,
+      data: infoData || []
+    })
+  } catch (error) {
+    console.error('Get info error:', error)
+    return res.status(500).json({
+      success: false,
+      error: '안내 사항 조회 중 오류가 발생했습니다'
+    })
+  }
+}
+
+async function handleUpdateInfo(req, res, validatedUser) {
+  const { pageId, items } = req.body
+
+  if (!pageId) {
+    return res.status(400).json({
+      success: false,
+      error: 'pageId is required'
+    })
+  }
+
+  try {
+    // 1) 사용자 인증 확인
+    const userId = validatedUser?.userId
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: '인증 사용자 정보를 찾을 수 없습니다'
+      })
+    }
+
+    // 2) info_item 테이블 업데이트
+    if (Array.isArray(items)) {
+      // 기존 데이터 삭제
+      await supabase
+        .from('info_item')
+        .delete()
+        .eq('page_id', pageId)
+
+      // 새 데이터 삽입
+      if (items.length > 0) {
+        const infoItems = items.map((item, index) => ({
+          page_id: pageId,
+          title: item.title || '',
+          description: item.description || '',
+          display_order: item.display_order || index + 1
+        }))
+
+        const { error: insertError } = await supabase
+          .from('info_item')
+          .insert(infoItems)
+
+        if (insertError) {
+          console.error('Info insert error:', insertError)
+          throw insertError
+        }
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: '안내 사항 정보가 저장되었습니다'
+    })
+  } catch (error) {
+    console.error('Update info error:', error)
+    return res.status(500).json({
+      success: false,
+      error: '안내 사항 저장 중 오류가 발생했습니다',
+      message: error?.message || String(error)
+    })
+  }
+}
+
 function validateToken(token) {
   try {
     const decoded = JSON.parse(Buffer.from(token, 'base64').toString('utf-8'))
-    
+
     // 토큰 만료 확인
     if (Date.now() > decoded.expires) {
       return null
     }
-    
+
     // 추가 검증 로직 (필요시)
     if (!decoded.userId || !decoded.username) {
       return null
     }
-    
+
     return decoded
   } catch (error) {
     console.error('Token validation error:', error)

@@ -1,26 +1,26 @@
-// AccountComplete.nomod.js — Framer TSX를 대체하는 순수 JS 버전
-// - React/Framer 전역 의존 (bare import 제거)
-// - 경량 JSX runtime shim 포함
-// - motion 구성요소는 주입 → 전역 → 폴백 순으로 해결
-// - typography.js URL import 유지
+// AccountComplete.js — Framer용 계좌 안내 컴포넌트 (브라우저 ESM)
+// - JSX Runtime 사용 (reference.js 패턴)
+// - React 훅 직접 import
+// - motion 환경 주입/전역/폴백 순서 유지
 
-// === JSX runtime shim =========================================================
-const __ReactNS = (typeof globalThis !== "undefined" && globalThis.React) || {};
-const __createEl = __ReactNS.createElement
-  ? __ReactNS.createElement.bind(__ReactNS)
-  : (type, props, ...children) => ({ type, props: props || {}, children });
-const Fragment = __ReactNS.Fragment || "div";
-const jsx  = (type, props) => __createEl(type, props ?? null, props?.children);
-const jsxs = jsx;
-
-const { useState, useEffect, useMemo } = __ReactNS;
-
-const createElement = (type, props, ...children) => __createEl(type, props ?? null, ...children);
-
-const renderFragment = (...children) => createElement(Fragment, null, ...children);
-
-// === 외부 URL 의존성 ===========================================================
+import { jsx, jsxs, Fragment } from "react/jsx-runtime";
+import { useState, useEffect, useMemo } from "react";
 import typography from "https://cdn.roarc.kr/fonts/typography.js?v=73ec350103c71ae8190673accafe44f1";
+
+const createElement = (type, props, ...children) => {
+  const normalizedProps = props || {};
+  if (children.length === 0) {
+    return jsx(type, normalizedProps);
+  }
+  const childValue = children.length === 1 ? children[0] : children;
+  if (Array.isArray(childValue)) {
+    return jsxs(type, { ...normalizedProps, children: childValue });
+  }
+  return jsx(type, { ...normalizedProps, children: childValue });
+};
+
+const renderFragment = (...children) =>
+  createElement(Fragment, null, ...children);
 
 // === 모션 폴백 ================================================================
 const fallbackMotionFactory = (tag) => {
@@ -66,9 +66,11 @@ const resolveMotionEnv = (injected = {}) => {
   const motionButton = motionEnv?.button || fallbackMotion.button;
   const motionSvg = motionEnv?.svg || fallbackMotion.svg;
 
-  const AnimatePresence = injected.AnimatePresence || framerNS.AnimatePresence || fallbackAnimatePresence;
+  const AnimatePresence =
+    injected.AnimatePresence || framerNS.AnimatePresence || fallbackAnimatePresence;
 
-  const MotionConfigComponent = injected.MotionConfig || framerNS.MotionConfig || fallbackMotionConfig;
+  const MotionConfigComponent =
+    injected.MotionConfig || framerNS.MotionConfig || fallbackMotionConfig;
 
   return {
     motion: { div: motionDiv, button: motionButton, svg: motionSvg },
@@ -81,10 +83,13 @@ const resolveMotionEnv = (injected = {}) => {
 const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app";
 
 async function getAccountInfoByPageId(pageId) {
-  const response = await fetch(`${PROXY_BASE_URL}/api/contacts?action=getByPageId&pageId=${encodeURIComponent(pageId)}`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-  });
+  const response = await fetch(
+    `${PROXY_BASE_URL}/api/contacts?action=getByPageId&pageId=${encodeURIComponent(pageId)}`,
+    {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    }
+  );
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
   }
@@ -96,42 +101,29 @@ async function getAccountInfoByPageId(pageId) {
 }
 
 // === 컴포넌트 =================================================================
-function AccountComplete(props) {
-  const {
-    pageId = "default",
-    style,
-    __motion,
-    __AnimatePresence,
-    __MotionConfig,
-  } = props || {};
+function AccountComplete(props = {}) {
+  const { pageId = "default", style, __motion, __AnimatePresence, __MotionConfig } =
+    props || {};
 
-  if (typeof useState !== "function" || typeof useEffect !== "function") {
-    return null;
-  }
-
-  const { motion, AnimatePresence, MotionConfig: MotionConfigComponent } =
-    typeof useMemo === "function"
-      ? useMemo(
-          () => resolveMotionEnv({
-            motion: __motion,
-            AnimatePresence: __AnimatePresence,
-            MotionConfig: __MotionConfig,
-          }),
-          [__motion, __AnimatePresence, __MotionConfig]
-        )
-      : resolveMotionEnv({
-          motion: __motion,
-          AnimatePresence: __AnimatePresence,
-          MotionConfig: __MotionConfig,
-        });
+  const { motion, AnimatePresence, MotionConfig: MotionConfigComponent } = useMemo(
+    () =>
+      resolveMotionEnv({
+        motion: __motion,
+        AnimatePresence: __AnimatePresence,
+        MotionConfig: __MotionConfig,
+      }),
+    [__motion, __AnimatePresence, __MotionConfig]
+  );
 
   useEffect(() => {
     try {
-      typography && typeof typography.ensure === "function" && typography.ensure();
+      typography &&
+        typeof typography.ensure === "function" &&
+        typography.ensure();
     } catch (_) {}
   }, []);
 
-  const [groomViewState, setGroomViewState] = useState("closed"); // "closed" | "open"
+  const [groomViewState, setGroomViewState] = useState("closed");
   const [brideViewState, setBrideViewState] = useState("closed");
   const [accountInfo, setAccountInfo] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -140,22 +132,30 @@ function AccountComplete(props) {
   const [showCopyMessage, setShowCopyMessage] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
         setLoading(true);
         setError("");
         const data = await getAccountInfoByPageId(pageId);
-        if (data && data.length > 0) {
-          setAccountInfo(data[0]);
-        } else {
-          setError("계좌 정보가 없습니다");
+        if (!cancelled) {
+          if (data && data.length > 0) {
+            setAccountInfo(data[0]);
+          } else {
+            setError("계좌 정보가 없습니다");
+          }
         }
       } catch (e) {
-        setError((e && e.message) || "알 수 없는 오류가 발생했습니다");
+        if (!cancelled) {
+          setError((e && e.message) || "알 수 없는 오류가 발생했습니다");
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [pageId]);
 
   const copyToClipboard = async (text, type) => {
@@ -339,302 +339,151 @@ function AccountComplete(props) {
         title
       ),
       createElement(
-        motion.svg,
+        "div",
         {
-          width: 15,
-          height: 8,
-          viewBox: "0 0 15 8",
-          fill: "none",
-          xmlns: "http://www.w3.org/2000/svg",
-          animate: { rotate: isOpen ? 180 : 0 },
-          transition: { duration: 0, ease: "easeInOut" },
+          style: {
+            width: 12,
+            height: 7,
+            justifyContent: "center",
+            alignItems: "center",
+            display: "flex",
+          },
         },
         createElement(
-          "g",
-          { id: "Group 2117912660" },
-          createElement("path", { id: "Vector 1121", d: "M1.5 1L7.5 6.5L13.5 1", stroke: "black", strokeWidth: 1.5 })
+          "svg",
+          {
+            width: 12,
+            height: 7,
+            viewBox: "0 0 12 7",
+            fill: "none",
+            xmlns: "http://www.w3.org/2000/svg",
+            style: {
+              transform: isOpen ? "scaleY(-1)" : "scaleY(1)",
+              transition: "transform 0.2s",
+            },
+          },
+          createElement("path", {
+            d: "M1 1L6 6L11 1",
+            stroke: "black",
+            strokeWidth: "1.5",
+            strokeLinecap: "round",
+            strokeLinejoin: "round",
+          })
         )
       )
     );
 
-    const list = isOpen
-      ? createElement(
-          motion.div,
-          {
-            style: {
-              alignSelf: "stretch",
-              padding: "15px 15px 0px 15px",
-              flexDirection: "column",
-              justifyContent: "flex-start",
-              alignItems: "flex-start",
-              gap: 10,
-              display: "flex",
-              boxSizing: "border-box",
-            },
-            initial: { opacity: 0, y: -10 },
-            animate: { opacity: 1, y: 0 },
-            exit: { opacity: 0, y: -10 },
-            transition: { duration: 0.2, ease: "easeOut" },
-          },
-          accounts.items()
-        )
-      : null;
-
     return createElement(
-      motion.div,
-      {
-        style: {
-          width: "100%",
-          maxWidth: 378,
-          background: "white",
-          overflow: "hidden",
-          flexDirection: "column",
-          justifyContent: "flex-start",
-          alignItems: "center",
-          display: "inline-flex",
-          boxSizing: "border-box",
-        },
-        initial: false,
-        animate: { height: isOpen ? "auto" : 54 },
-        transition: { duration: 0.3, ease: "easeInOut" },
-      },
+      "div",
+      { style: { alignSelf: "stretch", flexDirection: "column", display: "flex" } },
       header,
-      createElement(
-        AnimatePresence,
-        null,
-        isOpen
-          ? createElement(
-              motion.div,
-              {
-                style: {
-                  alignSelf: "stretch",
-                  padding: "15px 15px 0px 15px",
-                  flexDirection: "column",
-                  justifyContent: "flex-start",
-                  alignItems: "flex-start",
-                  gap: 10,
-                  display: "flex",
-                  boxSizing: "border-box",
-                },
-                key: "list",
-                initial: { opacity: 0, y: -10 },
-                animate: { opacity: 1, y: 0 },
-                exit: { opacity: 0, y: -10 },
-                transition: { duration: 0.2, ease: "easeOut" },
-              },
-              accounts.items()
-            )
-          : null
-      )
+      isOpen &&
+        createElement(
+          "div",
+          { style: { alignSelf: "stretch", flexDirection: "column", display: "flex" } },
+          accounts.items.map((account, index) =>
+            createElement(AccountItem, {
+              key: account.id || index,
+              label: account.label,
+              name: account.name,
+              account: account.account,
+              bank: account.bank,
+              onCopy: () => copyTriple(account.bank, account.account, account.name),
+              isLast: index === accounts.items.length - 1,
+            })
+          )
+        )
     );
   };
 
-  const groomSection = createElement(ExpandSection, {
-    title: "신랑측 계좌번호",
-    accounts: {
-      open: groomViewState === "open",
-      onToggle: () => setGroomViewState(groomViewState === "closed" ? "open" : "closed"),
-      items: () => {
-        const list = [];
-        if (accountInfo.groom_name && accountInfo.groom_account && accountInfo.groom_bank) {
-          list.push(
-            createElement(AccountItem, {
-              key: "groom",
-              label: "신랑",
-              name: accountInfo.groom_name,
-              account: accountInfo.groom_account,
-              bank: accountInfo.groom_bank,
-              onCopy: () => copyTriple(accountInfo.groom_bank, accountInfo.groom_account, accountInfo.groom_name),
-              isLast: false,
-            })
-          );
-        }
-        if (accountInfo.groom_father_name && accountInfo.groom_father_account && accountInfo.groom_father_bank) {
-          list.push(
-            createElement(AccountItem, {
-              key: "groom-father",
-              label: "혼주",
-              name: accountInfo.groom_father_name,
-              account: accountInfo.groom_father_account,
-              bank: accountInfo.groom_father_bank,
-              onCopy: () => copyTriple(accountInfo.groom_father_bank, accountInfo.groom_father_account, accountInfo.groom_father_name),
-              isLast: false,
-            })
-          );
-        }
-        if (accountInfo.groom_mother_name && accountInfo.groom_mother_account && accountInfo.groom_mother_bank) {
-          list.push(
-            createElement(AccountItem, {
-              key: "groom-mother",
-              label: "혼주",
-              name: accountInfo.groom_mother_name,
-              account: accountInfo.groom_mother_account,
-              bank: accountInfo.groom_mother_bank,
-              onCopy: () => copyTriple(accountInfo.groom_mother_bank, accountInfo.groom_mother_account, accountInfo.groom_mother_name),
-              isLast: true,
-            })
-          );
-        }
-        return list;
-      },
-    },
-  });
+  const groomAccount = accountInfo.groomAccount || {};
+  const brideAccount = accountInfo.brideAccount || {};
 
-  const brideSection = createElement(ExpandSection, {
-    title: "신부측 계좌번호",
-    accounts: {
-      open: brideViewState === "open",
-      onToggle: () => setBrideViewState(brideViewState === "closed" ? "open" : "closed"),
-      items: () => {
-        const list = [];
-        if (accountInfo.bride_name && accountInfo.bride_account && accountInfo.bride_bank) {
-          list.push(
-            createElement(AccountItem, {
-              key: "bride",
-              label: "신부",
-              name: accountInfo.bride_name,
-              account: accountInfo.bride_account,
-              bank: accountInfo.bride_bank,
-              onCopy: () => copyTriple(accountInfo.bride_bank, accountInfo.bride_account, accountInfo.bride_name),
-              isLast: false,
-            })
-          );
-        }
-        if (accountInfo.bride_father_name && accountInfo.bride_father_account && accountInfo.bride_father_bank) {
-          list.push(
-            createElement(AccountItem, {
-              key: "bride-father",
-              label: "혼주",
-              name: accountInfo.bride_father_name,
-              account: accountInfo.bride_father_account,
-              bank: accountInfo.bride_father_bank,
-              onCopy: () => copyTriple(accountInfo.bride_father_bank, accountInfo.bride_father_account, accountInfo.bride_father_name),
-              isLast: false,
-            })
-          );
-        }
-        if (accountInfo.bride_mother_name && accountInfo.bride_mother_account && accountInfo.bride_mother_bank) {
-          list.push(
-            createElement(AccountItem, {
-              key: "bride-mother",
-              label: "혼주",
-              name: accountInfo.bride_mother_name,
-              account: accountInfo.bride_mother_account,
-              bank: accountInfo.bride_mother_bank,
-              onCopy: () => copyTriple(accountInfo.bride_mother_bank, accountInfo.bride_mother_account, accountInfo.bride_mother_name),
-              isLast: true,
-            })
-          );
-        }
-        return list;
-      },
+  const groomItems = [
+    {
+      id: "groom-father",
+      label: accountInfo.groomFatherName || "신랑측 부",
+      name: accountInfo.groomFatherName || "신랑측 부",
+      account: accountInfo.groomFatherAccount || "",
+      bank: accountInfo.groomFatherBank || "",
     },
-  });
+    {
+      id: "groom-mother",
+      label: accountInfo.groomMotherName || "신랑측 모",
+      name: accountInfo.groomMotherName || "신랑측 모",
+      account: accountInfo.groomMotherAccount || "",
+      bank: accountInfo.groomMotherBank || "",
+    },
+  ];
 
-  const toast = createElement(
-    AnimatePresence,
-    null,
-    showCopyMessage
-      ? createElement(
-          motion.div,
-          {
-            style: {
-              position: "fixed",
-              bottom: 60,
-              left: "50%",
-              transform: "translateX(-50%)",
-              backgroundColor: "rgba(0, 0, 0, 0.7)",
-              color: "white",
-              padding: "12px 20px",
-              borderRadius: 999,
-              fontSize: 14,
-              fontFamily: "Pretendard SemiBold",
-              zIndex: 9999,
-            },
-            initial: { opacity: 0, y: 20 },
-            animate: { opacity: 1, y: 0 },
-            exit: { opacity: 0, y: 20 },
-            transition: { duration: 0.2 },
-          },
-          copyMessage
-        )
-      : null
-  );
+  const brideItems = [
+    {
+      id: "bride-father",
+      label: accountInfo.brideFatherName || "신부측 부",
+      name: accountInfo.brideFatherName || "신부측 부",
+      account: accountInfo.brideFatherAccount || "",
+      bank: accountInfo.brideFatherBank || "",
+    },
+    {
+      id: "bride-mother",
+      label: accountInfo.brideMotherName || "신부측 모",
+      name: accountInfo.brideMotherName || "신부측 모",
+      account: accountInfo.brideMotherAccount || "",
+      bank: accountInfo.brideMotherBank || "",
+    },
+  ];
+
+  const groomAccounts = {
+    items: groomItems,
+    open: groomViewState === "open",
+    onToggle: () => setGroomViewState(groomViewState === "open" ? "closed" : "open"),
+  };
+
+  const brideAccounts = {
+    items: brideItems,
+    open: brideViewState === "open",
+    onToggle: () => setBrideViewState(brideViewState === "open" ? "closed" : "open"),
+  };
 
   return createElement(
-    MotionConfigComponent,
-    { transition: { duration: 0.3, ease: "easeInOut" } },
+    "div",
+    {
+      style: {
+        width: "100%",
+        height: "fit-content",
+        display: "flex",
+        flexDirection: "column",
+        gap: 20,
+        ...(style || {}),
+      },
+    },
     createElement(
       "div",
-      {
-        style: {
-          marginTop: 80,
-          marginBottom: 80,
-          display: "flex",
-          justifyContent: "center",
-        },
-      },
+      { style: { width: "100%", display: "flex", flexDirection: "column", gap: 8 } },
+      titleText,
+      subText
+    ),
+    createElement(ExpandSection, { title: "신랑측", accounts: groomAccounts }),
+    createElement(ExpandSection, { title: "신부측", accounts: brideAccounts }),
+    showCopyMessage &&
       createElement(
         "div",
         {
           style: {
-            width: "100%",
-            display: "flex",
-            flexDirection: "column",
-            gap: 10,
-            ...(style || {}),
+            position: "fixed",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            backgroundColor: "rgba(0, 0, 0, 0.8)",
+            color: "white",
+            padding: "12px 20px",
+            borderRadius: "8px",
+            fontSize: "14px",
+            zIndex: 9999,
           },
         },
-        createElement(
-          motion.div,
-          {
-            style: {
-              width: "100%",
-              paddingBottom: 30,
-              display: "flex",
-              flexDirection: "column",
-              gap: 20,
-              boxSizing: "border-box",
-              alignItems: "center",
-            },
-            initial: { opacity: 0, y: 16 },
-            whileInView: { opacity: 1, y: 0 },
-            transition: { duration: 0.5, ease: "easeOut", delay: 0 },
-            viewport: { once: true, amount: 0.3 },
-          },
-          titleText,
-          subText
-        ),
-        createElement(
-          motion.div,
-          {
-            style: {
-              width: "88%",
-              display: "flex",
-              flexDirection: "column",
-              gap: 10,
-              alignSelf: "center",
-            },
-            initial: { opacity: 0, y: 16 },
-            whileInView: { opacity: 1, y: 0 },
-            transition: { duration: 0.5, ease: "easeOut", delay: 0.15 },
-            viewport: { once: true, amount: 0.3 },
-          },
-          groomSection,
-          createElement(
-            motion.div,
-            {
-              initial: { opacity: 0, y: 16 },
-              whileInView: { opacity: 1, y: 0 },
-              transition: { duration: 0.5, ease: "easeOut", delay: 0.3 },
-              viewport: { once: true, amount: 0.3 },
-            },
-            brideSection
-          )
-        ),
-        toast
+        copyMessage
       )
-    )
   );
 }
 
