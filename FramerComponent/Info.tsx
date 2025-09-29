@@ -5,8 +5,20 @@ import { addPropertyControls, ControlType } from "framer"
 // P22 폰트 로딩을 위한 typography import
 import typography from "https://cdn.roarc.kr/fonts/typography.js?v=6fdc95bcc8fd197d879c051a8c2d5a03"
 
+const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app"
+
+interface InfoItem {
+    id?: string
+    title: string
+    description: string
+    display_order: number
+}
+
 // 텍스트 포맷팅 유틸리티 함수들 (Admin.tsx에서 가져옴)
-function renderBoldSegments(text: string, baseStyle?: React.CSSProperties): JSX.Element[] {
+function renderBoldSegments(
+    text: string,
+    baseStyle?: React.CSSProperties
+): JSX.Element[] {
     const out: JSX.Element[] = []
     let last = 0
     let key = 0
@@ -50,7 +62,10 @@ function renderBoldSegments(text: string, baseStyle?: React.CSSProperties): JSX.
     return out
 }
 
-function renderSmallSegments(text: string, baseStyle?: React.CSSProperties): JSX.Element[] {
+function renderSmallSegments(
+    text: string,
+    baseStyle?: React.CSSProperties
+): JSX.Element[] {
     const lines = (text || "").split("\n")
     const rendered: JSX.Element[] = []
     for (let i = 0; i < lines.length; i++) {
@@ -115,21 +130,57 @@ function renderSmallSegments(text: string, baseStyle?: React.CSSProperties): JSX
 
 // Info 컴포넌트
 function Info({
-    infoItems = [],
+    pageId = "default",
     style,
 }: {
-    infoItems?: Array<{
-        id?: string
-        title: string
-        description: string
-        display_order: number
-    }>
+    pageId?: string
     style?: React.CSSProperties
 }) {
+    const [infoItems, setInfoItems] = useState<InfoItem[]>([])
+    const [loading, setLoading] = useState(false)
+    // 데이터 로딩
+    useEffect(() => {
+        let mounted = true
+        async function load() {
+            setLoading(true)
+            try {
+                const bases = [
+                    typeof window !== "undefined" ? window.location.origin : "",
+                    PROXY_BASE_URL,
+                ].filter(Boolean)
+                let res: Response | null = null
+                for (const base of bases) {
+                    try {
+                        const tryRes = await fetch(
+                            `${base}/api/page-settings?info&pageId=${encodeURIComponent(pageId)}`
+                        )
+                        res = tryRes
+                        if (tryRes.ok) break
+                    } catch {}
+                }
+                if (!res) throw new Error("network error")
+                const result = await res.json()
+                if (mounted && result?.success && Array.isArray(result.data)) {
+                    setInfoItems(result.data)
+                }
+            } catch {
+                // ignore
+            } finally {
+                if (mounted) setLoading(false)
+            }
+        }
+        load()
+        return () => {
+            mounted = false
+        }
+    }, [pageId])
+
     // P22 폰트 로딩
     useEffect(() => {
         try {
-            typography && typeof typography.ensure === "function" && typography.ensure()
+            typography &&
+                typeof typography.ensure === "function" &&
+                typography.ensure()
         } catch (_) {}
     }, [])
 
@@ -142,14 +193,14 @@ function Info({
 
     // 자동 슬라이드 타이머
     useEffect(() => {
-        if (!isAutoPlaying || infoItems.length <= 1) return
+        if (!isAutoPlaying || sortedInfoItems.length <= 1) return
 
         const timer = setInterval(() => {
-            setCurrentIndex((prev) => (prev + 1) % infoItems.length)
+            setCurrentIndex((prev) => (prev + 1) % sortedInfoItems.length)
         }, 5000)
 
         return () => clearInterval(timer)
-    }, [isAutoPlaying, infoItems.length])
+    }, [isAutoPlaying, sortedInfoItems.length])
 
     // 드래그 상태
     const [isDragging, setIsDragging] = useState(false)
@@ -160,7 +211,7 @@ function Info({
     const maxCardHeight = useMemo(() => {
         const heights: number[] = []
 
-        infoItems.forEach((item) => {
+        sortedInfoItems.forEach((item) => {
             // 제목 높이 계산 (예상)
             const titleHeight = 32 // 18px * 1.8em ≈ 32px
             // 본문 높이 계산 (예상)
@@ -172,24 +223,30 @@ function Info({
             heights.push(totalHeight)
         })
 
-        return Math.max(...heights, 200) // 최소 높이 200px
-    }, [infoItems])
+        return Math.max(...heights, 280) // 최소 높이 280px
+    }, [sortedInfoItems])
 
     // 드래그 핸들러
-    const handleDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-        setIsDragging(true)
-        setIsAutoPlaying(false)
-        const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
-        setStartX(clientX)
-    }, [])
+    const handleDragStart = useCallback(
+        (e: React.MouseEvent | React.TouchEvent) => {
+            setIsDragging(true)
+            setIsAutoPlaying(false)
+            const clientX = "touches" in e ? e.touches[0].clientX : e.clientX
+            setStartX(clientX)
+        },
+        []
+    )
 
-    const handleDragMove = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-        if (!isDragging) return
+    const handleDragMove = useCallback(
+        (e: React.MouseEvent | React.TouchEvent) => {
+            if (!isDragging) return
 
-        const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
-        const deltaX = clientX - startX
-        setDragOffset(deltaX)
-    }, [isDragging, startX])
+            const clientX = "touches" in e ? e.touches[0].clientX : e.clientX
+            const deltaX = clientX - startX
+            setDragOffset(deltaX)
+        },
+        [isDragging, startX]
+    )
 
     const handleDragEnd = useCallback(() => {
         if (!isDragging) return
@@ -201,16 +258,18 @@ function Info({
         if (Math.abs(dragOffset) > threshold) {
             if (dragOffset > 0) {
                 // 오른쪽으로 드래그 (이전)
-                setCurrentIndex((prev) => (prev - 1 + infoItems.length) % infoItems.length)
+                setCurrentIndex(
+                    (prev) => (prev - 1 + sortedInfoItems.length) % sortedInfoItems.length
+                )
             } else {
                 // 왼쪽으로 드래그 (다음)
-                setCurrentIndex((prev) => (prev + 1) % infoItems.length)
+                setCurrentIndex((prev) => (prev + 1) % sortedInfoItems.length)
             }
         }
 
         // 5초 후 자동 재생 재개
         setTimeout(() => setIsAutoPlaying(true), 5000)
-    }, [isDragging, dragOffset, infoItems.length])
+    }, [isDragging, dragOffset, sortedInfoItems.length])
 
     // 페이지네이션 클릭
     const handlePaginationClick = useCallback((index: number) => {
@@ -238,11 +297,16 @@ function Info({
     // 현재 슬라이드 방향 계산
     const slideDirection = useMemo(() => {
         if (dragOffset > 0) return -1 // 이전
-        if (dragOffset < 0) return 1  // 다음
+        if (dragOffset < 0) return 1 // 다음
         return 0
     }, [dragOffset])
 
-    if (!infoItems || infoItems.length === 0) {
+    // infoItems 정렬 (display_order 기준)
+    const sortedInfoItems = useMemo(() => {
+        return [...infoItems].sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
+    }, [infoItems])
+
+    if (!sortedInfoItems || sortedInfoItems.length === 0) {
         return null
     }
 
@@ -253,8 +317,7 @@ function Info({
                 overflow: "hidden",
                 width: "100%",
                 height: "fit-content",
-                marginTop: 80,
-                marginBottom: 80,
+                padding: "80px 0px",
                 display: "flex",
                 flexDirection: "column",
                 gap: 40,
@@ -297,18 +360,29 @@ function Info({
                         width: "88%",
                         height: maxCardHeight,
                         backgroundColor: "white",
-                        borderRadius: 8,
                         position: "relative",
                         overflow: "hidden",
-                        cursor: infoItems.length > 1 ? "grab" : "default",
+                        cursor: sortedInfoItems.length > 1 ? "grab" : "default",
                     }}
-                    onMouseDown={infoItems.length > 1 ? handleDragStart : undefined}
-                    onMouseMove={infoItems.length > 1 ? handleDragMove : undefined}
-                    onMouseUp={infoItems.length > 1 ? handleDragEnd : undefined}
-                    onMouseLeave={infoItems.length > 1 ? handleDragEnd : undefined}
-                    onTouchStart={infoItems.length > 1 ? handleDragStart : undefined}
-                    onTouchMove={infoItems.length > 1 ? handleDragMove : undefined}
-                    onTouchEnd={infoItems.length > 1 ? handleDragEnd : undefined}
+                    onMouseDown={
+                        sortedInfoItems.length > 1 ? handleDragStart : undefined
+                    }
+                    onMouseMove={
+                        sortedInfoItems.length > 1 ? handleDragMove : undefined
+                    }
+                    onMouseUp={sortedInfoItems.length > 1 ? handleDragEnd : undefined}
+                    onMouseLeave={
+                        sortedInfoItems.length > 1 ? handleDragEnd : undefined
+                    }
+                    onTouchStart={
+                        sortedInfoItems.length > 1 ? handleDragStart : undefined
+                    }
+                    onTouchMove={
+                        sortedInfoItems.length > 1 ? handleDragMove : undefined
+                    }
+                    onTouchEnd={
+                        sortedInfoItems.length > 1 ? handleDragEnd : undefined
+                    }
                 >
                     <AnimatePresence initial={false} custom={slideDirection}>
                         <motion.div
@@ -319,10 +393,14 @@ function Info({
                             animate="center"
                             exit="exit"
                             transition={{
-                                x: { type: "spring", stiffness: 300, damping: 30 },
+                                x: {
+                                    type: "spring",
+                                    stiffness: 300,
+                                    damping: 30,
+                                },
                                 opacity: { duration: 0.2 },
                             }}
-                            drag={infoItems.length > 1 ? "x" : false}
+                            drag={sortedInfoItems.length > 1 ? "x" : false}
                             dragConstraints={{ left: 0, right: 0 }}
                             dragElastic={0.2}
                             onDragStart={() => {
@@ -335,9 +413,15 @@ function Info({
 
                                 const swipe = Math.abs(offset.x) * velocity.x
                                 if (swipe < -500) {
-                                    setCurrentIndex((prev) => (prev + 1) % infoItems.length)
+                                    setCurrentIndex(
+                                        (prev) => (prev + 1) % sortedInfoItems.length
+                                    )
                                 } else if (swipe > 500) {
-                                    setCurrentIndex((prev) => (prev - 1 + infoItems.length) % infoItems.length)
+                                    setCurrentIndex(
+                                        (prev) =>
+                                            (prev - 1 + sortedInfoItems.length) %
+                                            sortedInfoItems.length
+                                    )
                                 }
 
                                 setTimeout(() => setIsAutoPlaying(true), 5000)
@@ -352,8 +436,12 @@ function Info({
                                 justifyContent: "center",
                                 padding: 40,
                                 boxSizing: "border-box",
-                                transform: isDragging ? `translateX(${dragOffset}px)` : "translateX(0)",
-                                transition: isDragging ? "none" : "transform 0.1s ease-out",
+                                transform: isDragging
+                                    ? `translateX(${dragOffset}px)`
+                                    : "translateX(0)",
+                                transition: isDragging
+                                    ? "none"
+                                    : "transform 0.1s ease-out",
                             }}
                         >
                             {/* 제목 */}
@@ -369,7 +457,7 @@ function Info({
                                     marginBottom: 20,
                                 }}
                             >
-                                {infoItems[currentIndex]?.title || ""}
+                                {sortedInfoItems[currentIndex]?.title || ""}
                             </div>
 
                             {/* 본문 */}
@@ -387,7 +475,9 @@ function Info({
                                     justifyContent: "center",
                                 }}
                             >
-                                {renderSmallSegments(infoItems[currentIndex]?.description || "")}
+                                {renderSmallSegments(
+                                    sortedInfoItems[currentIndex]?.description || ""
+                                )}
                             </div>
                         </motion.div>
                     </AnimatePresence>
@@ -395,7 +485,7 @@ function Info({
             </div>
 
             {/* 페이지네이션 */}
-            {infoItems.length > 1 && (
+            {sortedInfoItems.length > 1 && (
                 <div
                     style={{
                         display: "flex",
@@ -404,7 +494,7 @@ function Info({
                         gap: 8,
                     }}
                 >
-                    {infoItems.map((_, index) => (
+                    {sortedInfoItems.map((_, index) => (
                         <button
                             key={index}
                             onClick={() => handlePaginationClick(index)}
@@ -412,7 +502,10 @@ function Info({
                                 width: 8,
                                 height: 8,
                                 borderRadius: "50%",
-                                backgroundColor: index === currentIndex ? "#000000" : "rgba(0, 0, 0, 0.25)",
+                                backgroundColor:
+                                    index === currentIndex
+                                        ? "#000000"
+                                        : "rgba(0, 0, 0, 0.25)",
                                 border: "none",
                                 cursor: "pointer",
                                 transition: "background-color 0.2s ease",
@@ -427,37 +520,11 @@ function Info({
 
 // Property Controls
 addPropertyControls(Info, {
-    infoItems: {
-        type: ControlType.Array,
-        control: {
-            type: ControlType.Object,
-            controls: {
-                title: {
-                    type: ControlType.String,
-                    title: "제목",
-                },
-                description: {
-                    type: ControlType.String,
-                    title: "내용",
-                    control: {
-                        type: ControlType.Textarea,
-                    },
-                },
-                display_order: {
-                    type: ControlType.Number,
-                    title: "순서",
-                    min: 1,
-                },
-            },
-        },
-        title: "안내 사항 목록",
-        defaultValue: [
-            {
-                title: "첫 번째 안내 사항",
-                description: "첫 번째 안내 사항 내용입니다. **굵은글씨**와 {작은글씨}를 사용할 수 있습니다.",
-                display_order: 1,
-            },
-        ],
+    pageId: {
+        type: ControlType.String,
+        title: "page_id",
+        defaultValue: "default",
+        placeholder: "예: aeyong",
     },
 })
 
