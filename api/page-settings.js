@@ -146,6 +146,7 @@ async function handleGetSettings(req, res) {
         bgm_type: '',
         bgm_autoplay: false,
         rsvp: 'off',
+        comments: 'off',
         kko_img: '',
         kko_title: '',
         kko_date: ''
@@ -248,6 +249,7 @@ async function handleUpdateSettings(req, res, validatedUser) {
       'bgm_type',
       'bgm_autoplay',
       'rsvp',
+      'comments',
       'kko_img',
       'kko_title',
       'kko_date',
