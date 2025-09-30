@@ -98,7 +98,7 @@ export default async function handler(req, res) {
 }
 
 async function handleGetSettings(req, res) {
-  const { pageId } = req.query
+  let { pageId } = req.query
 
   if (!pageId) {
     return res.status(400).json({
@@ -108,6 +108,24 @@ async function handleGetSettings(req, res) {
   }
 
   try {
+    // GET이라도 Authorization 헤더가 있으면 검증 후 admin_users.page_id를 우선 사용
+    try {
+      const authHeader = req.headers.authorization
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7)
+        const decoded = validateToken(token)
+        if (decoded?.userId) {
+          const { data: adminUser, error: adminErr } = await supabase
+            .from('admin_users')
+            .select('id, page_id')
+            .eq('id', decoded.userId)
+            .single()
+          if (!adminErr && adminUser?.page_id) {
+            pageId = adminUser.page_id
+          }
+        }
+      }
+    } catch (_) {}
     const { data, error } = await supabase
       .from('page_settings')
       .select('*')
