@@ -2269,15 +2269,16 @@ async function getAllPages(): Promise<any> {
 
 async function getImagesByPageId(pageId: string): Promise<any> {
     try {
-        // 캐시 방지를 위한 타임스탬프 추가
-        const timestamp = new Date().getTime()
+        // 캐시 버스팅: 타임스탬프 추가로 항상 최신 이미지 목록 로드
+        const cacheBuster = `_=${Date.now()}`
         const response = await fetch(
-            `${PROXY_BASE_URL}/api/images?action=getByPageId&pageId=${pageId}&t=${timestamp}`,
+            `${PROXY_BASE_URL}/api/images?action=getByPageId&pageId=${pageId}&${cacheBuster}`,
             {
                 headers: {
                     Authorization: `Bearer ${getAuthToken()}`,
                     "Cache-Control": "no-cache, no-store, must-revalidate",
-                    "Pragma": "no-cache",
+                    Pragma: "no-cache",
+                    Expires: "0",
                 },
             }
         )
@@ -2346,18 +2347,21 @@ async function updateImageOrder(
 // 연락처 관련 함수들
 async function getAllContacts(pageId: string | null = null): Promise<any> {
     try {
-        // 캐시 방지를 위한 타임스탬프 추가
-        const timestamp = new Date().getTime()
-        let url = `${PROXY_BASE_URL}/api/contacts?t=${timestamp}`
+        // 캐시 버스팅: 타임스탬프 추가로 항상 최신 연락처 목록 로드
+        const cacheBuster = `_=${Date.now()}`
+        let url = `${PROXY_BASE_URL}/api/contacts`
         if (pageId) {
-            url += `&pageId=${pageId}`
+            url += `?pageId=${pageId}&${cacheBuster}`
+        } else {
+            url += `?${cacheBuster}`
         }
 
         const response = await fetch(url, {
             headers: {
                 Authorization: `Bearer ${getAuthToken()}`,
                 "Cache-Control": "no-cache, no-store, must-revalidate",
-                "Pragma": "no-cache",
+                Pragma: "no-cache",
+                Expires: "0",
             },
         })
 
@@ -3017,7 +3021,7 @@ function AdminMainContent(props: any) {
                         d.groom_mother_name ?? prev.groomMotherName,
                     groomName:
                         d.groom_name ||
-                        (pageSettings as any).groom_name_kr ||
+                        pageSettings.groomName ||
                         prev.groomName, // invite_cards.groom_name 우선 사용
                     brideFatherName:
                         d.bride_father_name ?? prev.brideFatherName,
@@ -3025,7 +3029,7 @@ function AdminMainContent(props: any) {
                         d.bride_mother_name ?? prev.brideMotherName,
                     brideName:
                         d.bride_name ||
-                        (pageSettings as any).bride_name_kr ||
+                        pageSettings.brideName ||
                         prev.brideName, // invite_cards.bride_name 우선 사용
                     showGroomFatherChrysanthemum:
                         !!d.show_groom_father_chrysanthemum,
@@ -3041,8 +3045,8 @@ function AdminMainContent(props: any) {
             } else {
                 setInviteData((prev) => ({
                     ...prev,
-                    groomName: (pageSettings as any).groom_name_kr || prev.groomName, // invite_cards 데이터 없을 때 page_settings에서 가져옴
-                    brideName: (pageSettings as any).bride_name_kr || prev.brideName, // invite_cards 데이터 없을 때 page_settings에서 가져옴
+                    groomName: pageSettings.groomName || prev.groomName, // invite_cards 데이터 없을 때 page_settings에서 가져옴
+                    brideName: pageSettings.brideName || prev.brideName, // invite_cards 데이터 없을 때 page_settings에서 가져옴
                 }))
             }
         } catch (_err) {
@@ -3126,9 +3130,9 @@ function AdminMainContent(props: any) {
 
     // 페이지 설정 관련 상태
     const [pageSettings, setPageSettings] = useState({
-        groom_name_kr: "",
+        groomName: "",
         groom_name_en: "",
-        bride_name_kr: "",
+        brideName: "",
         bride_name_en: "",
         wedding_date: "",
         wedding_hour: "14",
@@ -3232,9 +3236,9 @@ function AdminMainContent(props: any) {
 
     const buildNameSectionProps = () => ({
         groomName:
-            pageSettings.groom_name_en || (pageSettings as any).groom_name_kr || "GROOM",
+            pageSettings.groom_name_en || pageSettings.groomName || "GROOM",
         brideName:
-            pageSettings.bride_name_en || (pageSettings as any).bride_name_kr || "BRIDE",
+            pageSettings.bride_name_en || pageSettings.brideName || "BRIDE",
     })
 
     const [photoSectionPreviewUrl, setPhotoSectionPreviewUrl] = React.useState<
@@ -3283,18 +3287,21 @@ function AdminMainContent(props: any) {
 
     const getKakaoShareNames = () => {
         const groom =
+            pageSettings.groomName ||
             (pageSettings as any)?.groom_name_kr ||
             inviteData.groomName ||
-            "신랑"
+            ""
         const bride =
+            pageSettings.brideName ||
             (pageSettings as any)?.bride_name_kr ||
             inviteData.brideName ||
-            "신부"
+            ""
         return { groom, bride }
     }
 
     const buildKakaoDefaultTitle = () => {
         const { groom, bride } = getKakaoShareNames()
+        if (!groom || !bride) return ""
         return `${groom} ♥ ${bride} 결혼합니다`
     }
 
@@ -3365,8 +3372,8 @@ function AdminMainContent(props: any) {
         kkoDefaultsApplied,
         pageSettings.kko_title,
         pageSettings.kko_date,
-        (pageSettings as any).groom_name_kr,
-        (pageSettings as any).bride_name_kr,
+        pageSettings.groomName,
+        pageSettings.brideName,
         pageSettings.wedding_date,
         pageSettings.wedding_hour,
         pageSettings.wedding_minute,
@@ -3567,9 +3574,9 @@ function AdminMainContent(props: any) {
                     case "name":
                         // 성함 섹션 저장 (페이지 설정 저장)
                         await savePageSettings({
-                            groom_name_kr: (pageSettings as any).groom_name_kr,
+                            groomName: pageSettings.groomName,
                             groom_name_en: pageSettings.groom_name_en,
-                            bride_name_kr: (pageSettings as any).bride_name_kr,
+                            brideName: pageSettings.brideName,
                             bride_name_en: pageSettings.bride_name_en,
                         })
                         break
@@ -4242,6 +4249,42 @@ function AdminMainContent(props: any) {
             loginForm.password
         )
         if (result.success) {
+            // 먼저 모든 상태 초기화 (이전 계정 데이터 제거)
+            setPageSettings({
+                groomName: "",
+                groom_name_en: "",
+                brideName: "",
+                bride_name_en: "",
+                wedding_date: "",
+                wedding_hour: "14",
+                wedding_minute: "00",
+                venue_name: "",
+                venue_address: "",
+                photo_section_image_url: "",
+                photo_section_image_path: "",
+                photo_section_location: "",
+                photo_section_overlay_position: "bottom",
+                photo_section_overlay_color: "#ffffff",
+                photo_section_locale: "en",
+                highlight_shape: "circle",
+                highlight_color: "#e0e0e0",
+                highlight_text_color: "black",
+                gallery_type: "thumbnail",
+                rsvp: "off",
+                comments: "off",
+                kko_img: "",
+                kko_title: "",
+                kko_date: "",
+                bgm_url: "",
+                bgm_type: "",
+                bgm_autoplay: false,
+            })
+            setExistingImages([])
+            setContactList([])
+            setHasLoadedSettings(false)
+            setKkoDefaultsApplied(false)
+            setOriginalOrder([])
+
             if (typeof window !== "undefined") {
                 try {
                     localStorage.setItem(
@@ -4252,10 +4295,8 @@ function AdminMainContent(props: any) {
                     console.warn("localStorage 저장 실패:", error)
                 }
             }
-            
             setIsAuthenticated(true)
             setCurrentUser(result.user)
-            
             // 로그인 사용자에 page_id가 할당되어 있으면 강제 적용 (비관리자용)
             const assigned =
                 (result.user && (result.user as any).page_id) || null
@@ -4265,7 +4306,6 @@ function AdminMainContent(props: any) {
                 assigned.trim().length > 0
             ) {
                 setAssignedPageId(assigned)
-                // currentPageId 설정 - useEffect가 자동으로 데이터 로드함
                 setCurrentPageId(assigned)
                 if (typeof window !== "undefined") {
                     try {
@@ -4285,8 +4325,13 @@ function AdminMainContent(props: any) {
                 }
             }
             setLoginForm({ username: "", password: "" })
-            // currentPageId가 설정되면 useEffect가 자동으로 데이터를 로드하므로 
-            // 여기서는 수동 호출하지 않음
+            
+            // 상태 초기화 후 새로운 데이터 로드
+            setTimeout(() => {
+                loadAllPages()
+                loadContactList()
+                loadPageSettings()
+            }, 100)
         } else {
             setLoginError(result.error)
         }
@@ -4299,15 +4344,12 @@ function AdminMainContent(props: any) {
         setCurrentUser(null)
         setCurrentPageId("")
         setAssignedPageId(null)
-        // 페이지 리스트 사용 안함
-        setExistingImages([])
-        setContactList([])
         
-        // 페이지 설정 초기화 (캐시 문제 해결)
+        // 모든 상태 완전 초기화
         setPageSettings({
-            groom_name_kr: "",
+            groomName: "",
             groom_name_en: "",
-            bride_name_kr: "",
+            brideName: "",
             bride_name_en: "",
             wedding_date: "",
             wedding_hour: "14",
@@ -4333,8 +4375,11 @@ function AdminMainContent(props: any) {
             bgm_type: "",
             bgm_autoplay: false,
         })
+        setExistingImages([])
+        setContactList([])
         setHasLoadedSettings(false)
         setKkoDefaultsApplied(false)
+        setOriginalOrder([])
         
         if (typeof window !== "undefined") {
             try {
@@ -4355,22 +4400,32 @@ function AdminMainContent(props: any) {
         if (currentPageId) {
             try {
                 const images = await getImagesByPageId(currentPageId)
-                // 캐시 버스팅 제거: API가 최신 목록을 반환하며, 변경 시 파일 경로가 달라짐
+                // 캐시 버스팅: 항상 최신 이미지 목록 로드
                 setExistingImages(images)
                 setOriginalOrder([...images]) // 원본 순서 저장
             } catch (err) {
                 console.error("이미지 목록 로드 실패:", err)
             }
+        } else {
+            // currentPageId가 없으면 이미지 목록 초기화
+            setExistingImages([])
+            setOriginalOrder([])
         }
     }
 
     const loadContactList = async () => {
+        if (!currentPageId) {
+            setContactList([])
+            return
+        }
+        
         setLoading(true)
         try {
             const contacts = await getAllContacts(currentPageId)
             setContactList(contacts)
         } catch (err) {
             setError("연락처 목록을 불러오는데 실패했습니다.")
+            setContactList([])
         } finally {
             setLoading(false)
         }
@@ -4381,15 +4436,16 @@ function AdminMainContent(props: any) {
 
         setSettingsLoading(true)
         try {
-            // 캐시 방지를 위한 타임스탬프 추가
-            const timestamp = new Date().getTime()
+            // 캐시 버스팅: 타임스탬프 추가로 항상 최신 데이터 로드
+            const cacheBuster = `_=${Date.now()}`
             const response = await fetch(
-                `${PROXY_BASE_URL}/api/page-settings?pageId=${currentPageId}&t=${timestamp}`,
+                `${PROXY_BASE_URL}/api/page-settings?pageId=${currentPageId}&${cacheBuster}`,
                 {
                     headers: {
                         Authorization: `Bearer ${getAuthToken()}`,
                         "Cache-Control": "no-cache, no-store, must-revalidate",
-                        "Pragma": "no-cache",
+                        Pragma: "no-cache",
+                        Expires: "0",
                     },
                 }
             )
@@ -4407,9 +4463,9 @@ function AdminMainContent(props: any) {
     }
 
     const allowedSettingKeys = [
-        "groom_name_kr",
+        "groomName",
         "groom_name_en",
-        "bride_name_kr",
+        "brideName",
         "bride_name_en",
         "wedding_date",
         "wedding_hour",
@@ -4501,14 +4557,8 @@ function AdminMainContent(props: any) {
 
             if (result.success) {
                 setSuccess("설정이 저장되었습니다.")
-                // 저장 완료 - 재로드 제거 (불필요한 덮어쓰기 방지)
-                // 서버에서 반환된 데이터가 있으면 해당 필드만 업데이트
-                if (result.data) {
-                    setPageSettings((prev) => ({
-                        ...prev,
-                        ...result.data,
-                    }))
-                }
+                // 저장 후 다시 로드해서 동기화
+                setTimeout(() => loadPageSettings(), 500)
                 return result
             } else {
                 setError(
@@ -5433,11 +5483,10 @@ function AdminMainContent(props: any) {
         if (isAuthenticated && currentPageId) {
             loadContactList()
             loadPageSettings()
-            loadExistingImages()
             // 페이지 변경 시 선택된 이미지 초기화
             setSelectedImages(new Set())
         }
-    }, [currentPageId, isAuthenticated])
+    }, [currentPageId])
 
     // 알림 메시지 자동 제거
     useEffect(() => {
