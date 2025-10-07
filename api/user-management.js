@@ -136,6 +136,8 @@ async function handlePostRequest(req, res) {
       return handleRegister(req, res, body)
     case 'login':
       return handleLogin(req, res, body)
+    case 'loginGeneral':
+      return handleGeneralLogin(req, res, body)
     case 'createUser':
       return handleCreateUser(req, res, body)
     case 'approveUser':
@@ -572,7 +574,114 @@ async function handleRegister(req, res, body) {
   }
 }
 
-// 로그인 처리
+// 일반 로그인 처리 (Admin.tsx용 - 모든 권한 허용)
+async function handleGeneralLogin(req, res, body) {
+  const { username, password } = body
+
+  if (!username || !password) {
+    return res.status(400).json({
+      success: false,
+      error: '아이디와 비밀번호를 입력하세요'
+    })
+  }
+
+  try {
+    const { data: user, error } = await supabase
+      .from('admin_users')
+      .select('id, username, name, password, is_active, approval_status, role, page_id')
+      .eq('username', username)
+      .single()
+
+    if (error) {
+      console.error('General login error:', error)
+      return res.status(401).json({
+        success: false,
+        error: '아이디 또는 비밀번호가 올바르지 않습니다.'
+      })
+    }
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        error: '아이디 또는 비밀번호가 올바르지 않습니다.'
+      })
+    }
+
+    if (user.approval_status !== 'approved') {
+      return res.status(401).json({
+        success: false,
+        error: '승인되지 않은 계정입니다.'
+      })
+    }
+
+    if (!user.is_active) {
+      return res.status(401).json({
+        success: false,
+        error: '비활성화된 계정입니다.'
+      })
+    }
+
+    // 비밀번호 검증
+    let isValidPassword = false
+
+    if (user.password) {
+      try {
+        isValidPassword = await bcrypt.compare(password, user.password)
+      } catch (bcryptError) {
+        console.error('비밀번호 검증 오류:', bcryptError)
+        return res.status(500).json({
+          success: false,
+          error: '비밀번호 검증 중 오류가 발생했습니다.'
+        })
+      }
+    }
+
+    if (!isValidPassword) {
+      return res.status(401).json({
+        success: false,
+        error: '아이디 또는 비밀번호가 올바르지 않습니다.'
+      })
+    }
+
+    // 마지막 로그인 시간 업데이트
+    await supabase
+      .from('admin_users')
+      .update({ last_login: new Date().toISOString() })
+      .eq('id', user.id)
+
+    // 토큰 생성
+    const tokenPayload = {
+      userId: user.id,
+      username: user.username,
+      name: user.name,
+      role: user.role,
+      expires: Date.now() + (24 * 60 * 60 * 1000) // 24시간
+    }
+
+    const token = Buffer.from(JSON.stringify(tokenPayload)).toString('base64')
+
+    return res.status(200).json({
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        role: user.role,
+        page_id: user.page_id
+      }
+    })
+
+  } catch (error) {
+    console.error('General login exception:', error)
+    return res.status(500).json({
+      success: false,
+      error: '로그인 처리 중 오류가 발생했습니다.'
+    })
+  }
+}
+
+// 로그인 처리 (UserManagement용 - admin만 허용)
 async function handleLogin(req, res, body) {
   const { username, password } = body
 
@@ -620,7 +729,7 @@ async function handleLogin(req, res, body) {
       })
     }
 
-    // role 검증 - admin만 로그인 가능
+    // role 검증 - admin만 로그인 가능 (UserManagement용)
     if (user.role !== 'admin') {
       return res.status(403).json({
         success: false,

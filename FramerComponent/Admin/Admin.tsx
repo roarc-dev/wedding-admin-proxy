@@ -11,6 +11,282 @@ import { addPropertyControls, ControlType } from "framer"
 // @ts-ignore
 import typography from "https://cdn.roarc.kr/fonts/typography.js?v=27c65dba30928cbbce6839678016d9ac"
 
+// ======= Focal Point 모달 컴포넌트 =======
+function FocalPointModal({
+    isOpen,
+    imageSrc,
+    currentFocalPoint,
+    onFocalPointComplete,
+    onClose,
+}: {
+    isOpen: boolean
+    imageSrc: string
+    currentFocalPoint: { x: number; y: number }
+    onFocalPointComplete: (focalPoint: { x: number; y: number }) => void
+    onClose: () => void
+}) {
+    const canvasRef = useRef<HTMLCanvasElement>(null)
+    const imageRef = useRef<HTMLImageElement>(null)
+    const [focalPoint, setFocalPoint] = useState(currentFocalPoint)
+    const [imageLoaded, setImageLoaded] = useState(false)
+    const [isDragging, setIsDragging] = useState(false)
+
+    // 이미지 로드
+    useEffect(() => {
+        if (!isOpen || !imageSrc) return
+        
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        img.onload = () => {
+            if (imageRef.current) {
+                imageRef.current.src = imageSrc
+                setImageLoaded(true)
+            }
+        }
+        img.src = imageSrc
+    }, [isOpen, imageSrc])
+
+    // 캔버스 그리기
+    const drawCanvas = useCallback(() => {
+        const canvas = canvasRef.current
+        const img = imageRef.current
+        if (!canvas || !img || !imageLoaded) return
+
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return
+
+        const rect = canvas.getBoundingClientRect()
+        canvas.width = rect.width
+        canvas.height = rect.height
+
+        // 이미지 비율에 맞게 캔버스에 맞춰 그리기
+        const imageAspect = img.width / img.height
+        const canvasAspect = rect.width / rect.height
+        
+        let drawWidth, drawHeight, drawX, drawY
+        
+        if (imageAspect > canvasAspect) {
+            // 이미지가 더 넓음 - 너비에 맞춤
+            drawWidth = rect.width
+            drawHeight = rect.width / imageAspect
+            drawX = 0
+            drawY = (rect.height - drawHeight) / 2
+        } else {
+            // 이미지가 더 높음 - 높이에 맞춤
+            drawHeight = rect.height
+            drawWidth = rect.height * imageAspect
+            drawX = (rect.width - drawWidth) / 2
+            drawY = 0
+        }
+
+        // 이미지 그리기
+        ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight)
+
+        // Focal Point 표시 (십자 모양)
+        const centerX = focalPoint.x
+        const centerY = focalPoint.y
+        
+        // 십자 선 그리기
+        ctx.strokeStyle = '#ff0000'
+        ctx.lineWidth = 2
+        ctx.beginPath()
+        // 수평선
+        ctx.moveTo(Math.max(0, centerX - 20), centerY)
+        ctx.lineTo(Math.min(rect.width, centerX + 20), centerY)
+        // 수직선
+        ctx.moveTo(centerX, Math.max(0, centerY - 20))
+        ctx.lineTo(centerX, Math.min(rect.height, centerY + 20))
+        ctx.stroke()
+
+        // 중앙점 원 그리기
+        ctx.fillStyle = '#ff0000'
+        ctx.beginPath()
+        ctx.arc(centerX, centerY, 4, 0, 2 * Math.PI)
+        ctx.fill()
+        
+        // 외곽 원 (가시성 향상)
+        ctx.strokeStyle = '#ffffff'
+        ctx.lineWidth = 2
+        ctx.beginPath()
+        ctx.arc(centerX, centerY, 6, 0, 2 * Math.PI)
+        ctx.stroke()
+    }, [focalPoint, imageLoaded])
+
+    useEffect(() => {
+        drawCanvas()
+    }, [drawCanvas])
+
+    // 마우스 이벤트 처리
+    const handleMouseDown = (e: React.MouseEvent) => {
+        const canvas = canvasRef.current
+        if (!canvas) return
+
+        const rect = canvas.getBoundingClientRect()
+        const x = e.clientX - rect.left
+        const y = e.clientY - rect.top
+
+        // Focal Point 주변 영역인지 확인 (20px 반경)
+        const distance = Math.sqrt((x - focalPoint.x) ** 2 + (y - focalPoint.y) ** 2)
+        if (distance <= 20) {
+            setIsDragging(true)
+        }
+    }
+
+    const handleMouseMove = (e: React.MouseEvent) => {
+        if (!isDragging) return
+
+        const canvas = canvasRef.current
+        if (!canvas) return
+
+        const rect = canvas.getBoundingClientRect()
+        const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width))
+        const y = Math.max(0, Math.min(e.clientY - rect.top, rect.height))
+
+        setFocalPoint({ x, y })
+    }
+
+    const handleMouseUp = () => {
+        setIsDragging(false)
+    }
+
+    // Focal Point 적용
+    const handleApply = () => {
+        onFocalPointComplete(focalPoint)
+        onClose()
+    }
+
+    if (!isOpen) return null
+
+    return (
+        <div
+            style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                zIndex: 9999,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+            }}
+        >
+            <div
+                style={{
+                    backgroundColor: 'white',
+                    borderRadius: '8px',
+                    padding: '20px',
+                    maxWidth: '90vw',
+                    maxHeight: '90vh',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '16px',
+                }}
+            >
+                <div
+                    style={{
+                        fontSize: '18px',
+                        fontWeight: 'bold',
+                        textAlign: 'center',
+                        marginBottom: '10px',
+                    }}
+                >
+                    Focal Point 설정
+                </div>
+                
+                <div
+                    style={{
+                        fontSize: '14px',
+                        color: '#666',
+                        textAlign: 'center',
+                        marginBottom: '10px',
+                    }}
+                >
+                    이미지에서 중심이 될 지점을 클릭하여 설정하세요
+                </div>
+                
+                <div
+                    style={{
+                        width: '400px',
+                        height: '300px',
+                        position: 'relative',
+                        backgroundColor: '#f0f0f0',
+                        border: '1px solid #ddd',
+                        borderRadius: '4px',
+                    }}
+                >
+                    <canvas
+                        ref={canvasRef}
+                        style={{
+                            width: '100%',
+                            height: '100%',
+                            cursor: isDragging ? 'grabbing' : 'crosshair',
+                        }}
+                        onMouseDown={handleMouseDown}
+                        onMouseMove={handleMouseMove}
+                        onMouseUp={handleMouseUp}
+                        onMouseLeave={handleMouseUp}
+                        onClick={(e) => {
+                            if (!isDragging) {
+                                const canvas = canvasRef.current
+                                if (!canvas) return
+
+                                const rect = canvas.getBoundingClientRect()
+                                const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width))
+                                const y = Math.max(0, Math.min(e.clientY - rect.top, rect.height))
+                                setFocalPoint({ x, y })
+                            }
+                        }}
+                    />
+                    <img
+                        ref={imageRef}
+                        style={{ display: 'none' }}
+                        alt="Focal Point 설정할 이미지"
+                    />
+                </div>
+
+                <div
+                    style={{
+                        display: 'flex',
+                        gap: '10px',
+                        justifyContent: 'center',
+                    }}
+                >
+                    <button
+                        onClick={onClose}
+                        style={{
+                            padding: '10px 20px',
+                            backgroundColor: '#6c757d',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                        }}
+                    >
+                        취소
+                    </button>
+                    <button
+                        onClick={handleApply}
+                        disabled={!imageLoaded}
+                        style={{
+                            padding: '10px 20px',
+                            backgroundColor: !imageLoaded ? '#ccc' : '#007bff',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: !imageLoaded ? 'not-allowed' : 'pointer',
+                        }}
+                    >
+                        적용
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
 // ======= Gallery Minis (single-file, inline styles) =======
 // Key generation utilities for R2
 function slugifyName(name: string): string {
@@ -1099,13 +1375,32 @@ function Section({
     onToggle,
     children,
     style,
+    sectionKey,
 }: React.PropsWithChildren<{
     title: string
     right?: React.ReactNode
     isOpen?: boolean
     onToggle?: () => void
     style?: React.CSSProperties
+    sectionKey?: string
 }>) {
+    const headerRef = React.useRef<HTMLDivElement>(null)
+    
+    // 섹션이 열릴 때 스크롤 조정
+    React.useEffect(() => {
+        if (isOpen && sectionKey && headerRef.current) {
+            // 상단 고정 헤더 높이를 고려한 오프셋 (대략 80px)
+            const headerOffset = 80
+            const elementPosition = headerRef.current.getBoundingClientRect().top
+            const offsetPosition = elementPosition + window.pageYOffset - headerOffset
+            
+            window.scrollTo({
+                top: offsetPosition,
+                behavior: 'smooth'
+            })
+        }
+    }, [isOpen, sectionKey])
+    
     return (
         <div
             style={mergeStyles({
@@ -1118,6 +1413,7 @@ function Section({
         >
             {/* 헤더 영역 - Roarc 디자인 시스템 */}
             <div
+                ref={headerRef}
                 style={{
                     alignSelf: "stretch",
                     padding: "14px 16px",
@@ -1563,7 +1859,7 @@ function AccordionSection({
     children: React.ReactNode
 }) {
     return (
-        <Section title={title} isOpen={isOpen} onToggle={onToggle}>
+        <Section title={title} isOpen={isOpen} onToggle={onToggle} sectionKey={sectionKey}>
             {children}
         </Section>
     )
@@ -2063,9 +2359,11 @@ function InlineCalendarPreview({
                                                 color: isHighlighted(d)
                                                     ? textColorCss
                                                     : undefined,
-                                                fontFamily: isHighlighted(d)
+                                                // 기본 폰트는 body, 하이라이트 시 bodyBold 객체를 전개하여 굵기 등 포함
+                                                fontFamily: theme.font.body,
+                                                ...(isHighlighted(d)
                                                     ? theme.font.bodyBold
-                                                    : theme.font.body,
+                                                    : {}),
                                                 zIndex: 1,
                                                 position: "relative",
                                             }}
@@ -2117,135 +2415,6 @@ function InlineCalendarPreview({
 
 // 프록시 서버 URL (고정된 Production URL)
 const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app"
-
-// ============ 유저별 캐시 무효화 유틸리티 ============
-
-/**
- * 이미지 URL에 캐시 버스터 쿼리 파라미터 추가
- * @param url 원본 URL
- * @param userId 현재 로그인한 사용자 ID
- * @returns 캐시 버스터가 추가된 URL
- */
-function withCacheBuster(url: string, userId: string): string {
-    if (!url) return url
-    try {
-        const urlObj = new URL(url)
-        urlObj.searchParams.set("uid", userId)
-        urlObj.searchParams.set("ts", Date.now().toString())
-        return urlObj.toString()
-    } catch {
-        // URL 파싱 실패 시 쿼리스트링 직접 추가
-        const separator = url.includes("?") ? "&" : "?"
-        return `${url}${separator}uid=${userId}&ts=${Date.now()}`
-    }
-}
-
-/**
- * fetch URL에 캐시 무효화 쿼리 파라미터 추가
- * @param url 원본 URL
- * @param userId 현재 로그인한 사용자 ID
- * @returns 캐시 무효화 파라미터가 추가된 URL
- */
-function withFetchCacheBuster(url: string, userId: string): string {
-    if (!url) return url
-    const separator = url.includes("?") ? "&" : "?"
-    return `${url}${separator}uid=${userId}&ts=${Date.now()}`
-}
-
-/**
- * 유저별 localStorage 키 생성
- * @param userId 현재 로그인한 사용자 ID
- * @param key 저장할 키
- * @returns 유저별 prefix가 추가된 키
- */
-function getUserStorageKey(userId: string, key: string): string {
-    return `admin:user:${userId}::${key}`
-}
-
-/**
- * 유저별 localStorage 값 가져오기
- */
-function getUserStorage(userId: string, key: string): string | null {
-    if (typeof window === "undefined") return null
-    return localStorage.getItem(getUserStorageKey(userId, key))
-}
-
-/**
- * 유저별 localStorage 값 저장
- */
-function setUserStorage(userId: string, key: string, value: string): void {
-    if (typeof window === "undefined") return
-    localStorage.setItem(getUserStorageKey(userId, key), value)
-}
-
-/**
- * 유저별 localStorage 값 삭제
- */
-function removeUserStorage(userId: string, key: string): void {
-    if (typeof window === "undefined") return
-    localStorage.removeItem(getUserStorageKey(userId, key))
-}
-
-/**
- * 특정 유저의 모든 localStorage 데이터 삭제
- */
-function clearUserStorage(userId: string): void {
-    if (typeof window === "undefined") return
-    const prefix = `admin:user:${userId}::`
-    const keysToRemove: string[] = []
-    for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i)
-        if (key && key.startsWith(prefix)) {
-            keysToRemove.push(key)
-        }
-    }
-    keysToRemove.forEach((key) => localStorage.removeItem(key))
-}
-
-/**
- * 브라우저 CacheStorage 초기화
- */
-async function clearBrowserCache(): Promise<void> {
-    if (typeof window === "undefined") return
-    if (typeof caches === "undefined") return
-    
-    try {
-        const cacheNames = await caches.keys()
-        if (cacheNames && cacheNames.length > 0) {
-            await Promise.all(cacheNames.map((name) => caches.delete(name)))
-            console.log("[Admin] Browser cache cleared")
-        }
-    } catch (error) {
-        console.warn("[Admin] Failed to clear browser cache:", error)
-    }
-}
-
-/**
- * 캐시 무효화가 적용된 fetch 래퍼
- * @param url 요청 URL
- * @param userId 현재 사용자 ID
- * @param options fetch 옵션
- * @param signal AbortSignal (선택)
- */
-async function fetchWithCacheBuster(
-    url: string,
-    userId: string,
-    options?: RequestInit,
-    signal?: AbortSignal
-): Promise<Response> {
-    const urlWithCache = withFetchCacheBuster(url, userId)
-    const mergedOptions: RequestInit = {
-        ...options,
-        cache: "no-store",
-        headers: {
-            ...options?.headers,
-            "Cache-Control": "no-store, no-cache, must-revalidate",
-            Pragma: "no-cache",
-        },
-        signal: signal || options?.signal,
-    }
-    return fetch(urlWithCache, mergedOptions)
-}
 
 // 전역 헬퍼 함수 - 이미지 순서 변경
 function reorderImages(
@@ -2318,7 +2487,7 @@ async function authenticateAdmin(
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
-                action: "login",
+                action: "loginGeneral",
                 username,
                 password,
             }),
@@ -2997,6 +3166,60 @@ const FREE_BGM_LIST = [
     { id: "10", name: "10", url: "https://cdn.roarc.kr/bgm/free/10.m4a" },
 ]
 
+const DEFAULT_INVITATION_TEXT =
+    "저희 두 사람이 하나 되는 약속의 시간에\n마음을 담아 소중한 분들을 모십니다.\n귀한 걸음으로 축복해 주시면 감사하겠습니다."
+
+const createInitialInviteData = () => ({
+    invitationText: DEFAULT_INVITATION_TEXT,
+    groomFatherName: "",
+    groomMotherName: "",
+    groomName: "",
+    brideFatherName: "",
+    brideMotherName: "",
+    brideName: "",
+    showGroomFatherChrysanthemum: false,
+    showGroomMotherChrysanthemum: false,
+    showBrideFatherChrysanthemum: false,
+    showBrideMotherChrysanthemum: false,
+    sonLabel: "아들",
+    daughterLabel: "딸",
+})
+
+type InviteDataState = ReturnType<typeof createInitialInviteData>
+
+const createInitialPageSettings = () => ({
+    groomName: "",
+    groom_name_en: "",
+    brideName: "",
+    bride_name_en: "",
+    wedding_date: "",
+    wedding_hour: "14",
+    wedding_minute: "00",
+    venue_name: "",
+    venue_address: "",
+    photo_section_image_url: "",
+    photo_section_image_path: "",
+    photo_section_location: "",
+    photo_section_overlay_position: "bottom",
+    photo_section_focal_point: { x: 0.5, y: 0.5 },
+    photo_section_overlay_color: "#ffffff",
+    photo_section_locale: "en",
+    highlight_shape: "circle",
+    highlight_color: "#e0e0e0",
+    highlight_text_color: "black",
+    gallery_type: "thumbnail",
+    rsvp: "off",
+    comments: "off",
+    kko_img: "",
+    kko_title: "",
+    kko_date: "",
+    bgm_url: "",
+    bgm_type: "",
+    bgm_autoplay: false,
+})
+
+type PageSettingsState = ReturnType<typeof createInitialPageSettings>
+
 // 메인 Admin 컴포넌트 (내부 로직)
 function AdminMainContent(props: any) {
     const { maxSizeKB = 1024, style, updateSaveState } = props
@@ -3066,7 +3289,6 @@ function AdminMainContent(props: any) {
     // 공통 상태
     const [isAuthenticated, setIsAuthenticated] = useState(false)
     const [currentUser, setCurrentUser] = useState<any>(null)
-    const [currentUserId, setCurrentUserId] = useState<string>("")
     const [loginForm, setLoginForm] = useState({ username: "", password: "" })
     const [loginError, setLoginError] = useState("")
     const [isLoggingIn, setIsLoggingIn] = useState(false)
@@ -3081,9 +3303,6 @@ function AdminMainContent(props: any) {
     // 페이지 선택/리스트 관련 로직 제거 (사전 부여된 page_id만 사용)
     const [assignedPageId, setAssignedPageId] = useState<string | null>(null)
 
-    // AbortController for canceling in-flight requests
-    const abortControllerRef = useRef<AbortController | null>(null)
-
     // 이미지 관련 상태
     const [existingImages, setExistingImages] = useState<ImageInfo[]>([])
     const [showImageManager, setShowImageManager] = useState(true)
@@ -3093,22 +3312,9 @@ function AdminMainContent(props: any) {
     const [imagesVersion, setImagesVersion] = useState<number>(0)
 
     // 청첩장 상태 및 업데이트 함수
-    const [inviteData, setInviteData] = useState({
-        invitationText:
-            "저희 두 사람이 하나 되는 약속의 시간에\n마음을 담아 소중한 분들을 모십니다.\n귀한 걸음으로 축복해 주시면 감사하겠습니다.",
-        groomFatherName: "",
-        groomMotherName: "",
-        groomName: "",
-        brideFatherName: "",
-        brideMotherName: "",
-        brideName: "",
-        showGroomFatherChrysanthemum: false,
-        showGroomMotherChrysanthemum: false,
-        showBrideFatherChrysanthemum: false,
-        showBrideMotherChrysanthemum: false,
-        sonLabel: "아들",
-        daughterLabel: "딸",
-    })
+    const [inviteData, setInviteData] = useState<InviteDataState>(
+        createInitialInviteData
+    )
 
     const updateInviteField = (
         field: keyof typeof inviteData,
@@ -3250,35 +3456,9 @@ function AdminMainContent(props: any) {
     const [success, setSuccess] = useState<string | null>(null)
 
     // 페이지 설정 관련 상태
-    const [pageSettings, setPageSettings] = useState({
-        groomName: "",
-        groom_name_en: "",
-        brideName: "",
-        bride_name_en: "",
-        wedding_date: "",
-        wedding_hour: "14",
-        wedding_minute: "00",
-        venue_name: "",
-        venue_address: "",
-        photo_section_image_url: "",
-        photo_section_image_path: "",
-        photo_section_location: "",
-        photo_section_overlay_position: "bottom",
-        photo_section_overlay_color: "#ffffff",
-        photo_section_locale: "en",
-        highlight_shape: "circle",
-        highlight_color: "#e0e0e0",
-        highlight_text_color: "black",
-        gallery_type: "thumbnail",
-        rsvp: "off", // RSVP 활성화 상태
-        comments: "off", // 방명록 활성화 상태
-        kko_img: "", // 카카오톡 공유 이미지
-        kko_title: "", // 카카오톡 공유 제목
-        kko_date: "", // 카카오톡 공유 날짜
-        bgm_url: "",
-        bgm_type: "",
-        bgm_autoplay: false,
-    })
+    const [pageSettings, setPageSettings] = useState<PageSettingsState>(
+        createInitialPageSettings
+    )
     const [settingsLoading, setSettingsLoading] = useState(false)
     const [hasLoadedSettings, setHasLoadedSettings] = useState(false)
     const [compressProgress, setCompressProgress] = useState<number | null>(
@@ -3367,6 +3547,11 @@ function AdminMainContent(props: any) {
     >(null)
     const [photoSectionImageVersion, setPhotoSectionImageVersion] =
         React.useState<number>(0)
+    
+    // Focal Point 관련 상태
+    const [focalPointModalOpen, setFocalPointModalOpen] = useState(false)
+    const [focalPointImageSrc, setFocalPointImageSrc] = useState<string>("")
+    const [focalPoint, setFocalPoint] = useState({ x: 0.5, y: 0.5 }) // 정규화된 좌표 (0-1)
 
     const addPhotoVersionParam = (url?: string): string | undefined => {
         if (!url) return url
@@ -3457,7 +3642,7 @@ function AdminMainContent(props: any) {
     }
 
     useEffect(() => {
-        if (!currentPageId || kkoDefaultsApplied) return
+        if (!currentPageId || kkoDefaultsApplied || !hasLoadedSettings) return
 
         const defaults: Partial<typeof pageSettings> = {}
 
@@ -3500,6 +3685,7 @@ function AdminMainContent(props: any) {
         pageSettings.wedding_minute,
         inviteData.groomName,
         inviteData.brideName,
+        hasLoadedSettings,
     ])
 
     // 초대글 텍스트 포맷팅(볼드/인용) 삽입
@@ -4109,24 +4295,9 @@ function AdminMainContent(props: any) {
         isSaving: isCurrentlySaving,
     }: {
         hasUnsavedChanges: boolean
-        onSave: () => void | Promise<void>
+        onSave: () => Promise<void>
         isSaving: boolean
     }) => {
-        const handleClick = async () => {
-            if (isCurrentlySaving) return
-            try {
-                const maybePromise = onSaveAction()
-                if (
-                    maybePromise &&
-                    typeof (maybePromise as Promise<void>).then === "function"
-                ) {
-                    await maybePromise
-                }
-            } catch (error) {
-                console.error("갤러리 순서 저장 중 오류:", error)
-            }
-        }
-
         if (!hasChanges) return null
 
         return (
@@ -4148,7 +4319,7 @@ function AdminMainContent(props: any) {
                 }}
             >
                 <button
-                    onClick={handleClick}
+                    onClick={onSaveAction}
                     disabled={isCurrentlySaving}
                     style={{
                         width: "100%",
@@ -4346,6 +4517,51 @@ function AdminMainContent(props: any) {
         })
     }
 
+    const resetAdminSessionState = () => {
+        setActiveTab("basic")
+        setCurrentOpenSection("name")
+        setCurrentPageId("")
+        setAssignedPageId(null)
+        setExistingImages([])
+        setOriginalOrder([])
+        setSelectedImages(() => new Set<string>())
+        setHasUnsavedChanges(false)
+        setIsSavingOrder(false)
+        setImagesVersion(0)
+        setUploading(false)
+        setProgress(0)
+        setUploadSuccess(0)
+        setInviteData(createInitialInviteData())
+        setInviteSaving(false)
+        setContactList([])
+        setSelectedContact(null)
+        setIsEditingContact(false)
+        setLoading(false)
+        setError(null)
+        setSuccess(null)
+        setPageSettings(createInitialPageSettings())
+        setSettingsLoading(false)
+        setHasLoadedSettings(false)
+        setCompressProgress(null)
+        setPhotoSectionPreviewUrl((prev) => {
+            if (prev) {
+                try {
+                    URL.revokeObjectURL(prev)
+                } catch {
+                    // ignore revoke failures
+                }
+            }
+            return null
+        })
+        setPhotoSectionImageVersion(0)
+        setSelectedBgmId(null)
+        setPlayingBgmId(null)
+        setKakaoUploadLoading(false)
+        setKkoDefaultsApplied(false)
+        setLoginForm({ username: "", password: "" })
+        setLoginError("")
+    }
+
     // 세션 확인
     useEffect(() => {
         if (typeof window === "undefined") return
@@ -4360,12 +4576,17 @@ function AdminMainContent(props: any) {
                     // 저장된 사전 할당 페이지 ID 적용 (관리자가 미리 설정한 경우)
                     const storedAssigned =
                         localStorage.getItem("assigned_page_id")
-                    if (storedAssigned && storedAssigned.trim().length > 0) {
-                        setAssignedPageId(storedAssigned)
-                        setCurrentPageId(storedAssigned)
+                    const normalizedStored =
+                        storedAssigned && storedAssigned.trim().length > 0
+                            ? storedAssigned
+                            : null
+                    if (normalizedStored) {
+                        setAssignedPageId(normalizedStored)
+                        setCurrentPageId(normalizedStored)
                     }
                     loadAllPages()
-                    loadContactList()
+                    loadContactList(normalizedStored ?? undefined)
+                    loadPageSettings(normalizedStored ?? undefined)
                 } else {
                     localStorage.removeItem("admin_session")
                 }
@@ -4385,131 +4606,34 @@ function AdminMainContent(props: any) {
             loginForm.password
         )
         if (result.success) {
-            const userId = result.user?.id || result.user?.username || ""
-            const pageId =
-                (result.user && (result.user as any).page_id) || null
-
-            // 이전 유저 데이터 정리
-            if (currentUserId && currentUserId !== userId) {
-                // 진행 중인 fetch 취소
-                if (abortControllerRef.current) {
-                    abortControllerRef.current.abort()
-                    abortControllerRef.current = null
-                }
-                // 이전 유저 localStorage 삭제
-                clearUserStorage(currentUserId)
-                // 브라우저 캐시 삭제 (비동기 처리)
-                clearBrowserCache().catch(error => {
-                    console.warn("[Admin] Cache clear failed:", error)
-                })
-            }
-
-            // 새 유저 정보 저장
-            setCurrentUserId(userId)
-
-            // 유저 전환 시 상태 초기화
-            if (currentUserId && currentUserId !== userId) {
-                console.log("[Admin] User switched, resetting states")
-                
-                // 모든 in-memory 상태 초기화
-                setExistingImages([])
-                setShowImageManager(true)
-                setUploading(false)
-                setProgress(0)
-                setUploadSuccess(0)
-                setImagesVersion(0)
-
-                setInviteData({
-                    invitationText:
-                        "저희 두 사람이 하나 되는 약속의 시간에\n마음을 담아 소중한 분들을 모십니다.\n귀한 걸음으로 축복해 주시면 감사하겠습니다.",
-                    groomFatherName: "",
-                    groomMotherName: "",
-                    groomName: "",
-                    brideFatherName: "",
-                    brideMotherName: "",
-                    brideName: "",
-                    showGroomFatherChrysanthemum: false,
-                    showGroomMotherChrysanthemum: false,
-                    showBrideFatherChrysanthemum: false,
-                    showBrideMotherChrysanthemum: false,
-                    sonLabel: "아들",
-                    daughterLabel: "딸",
-                })
-
-                setContactList([])
-                setIsEditingContact(false)
-                setLoading(false)
-                setError(null)
-
-                setPageSettings({
-                    groomName: "",
-                    groom_name_en: "",
-                    brideName: "",
-                    bride_name_en: "",
-                    wedding_date: "",
-                    wedding_hour: "14",
-                    wedding_minute: "00",
-                    venue_name: "",
-                    venue_address: "",
-                    photo_section_image_url: "",
-                    photo_section_image_path: "",
-                    photo_section_location: "",
-                    photo_section_overlay_position: "bottom",
-                    photo_section_overlay_color: "#ffffff",
-                    photo_section_locale: "en",
-                    highlight_shape: "circle",
-                    highlight_color: "#e0e0e0",
-                    highlight_text_color: "black",
-                    gallery_type: "thumbnail",
-                    rsvp: "off",
-                    comments: "off",
-                    kko_img: "",
-                    kko_title: "",
-                    kko_date: "",
-                    bgm_url: "",
-                    bgm_type: "",
-                    bgm_autoplay: false,
-                })
-
-                setSettingsLoading(false)
-                setHasLoadedSettings(false)
-                setCompressProgress(null)
-                setKakaoUploadLoading(false)
-                setKkoDefaultsApplied(false)
-
-                setHasUnsavedChanges(false)
-                setIsSavingOrder(false)
-                setOriginalOrder([])
-
-                setCurrentOpenSection("name")
-            }
-
             if (typeof window !== "undefined") {
                 try {
-                    const sessionToken = generateSessionToken(result.user)
-                    localStorage.setItem("admin_session", sessionToken)
-                    // 유저별 스토리지에 저장
-                    setUserStorage(userId, "session", sessionToken)
-                    setUserStorage(userId, "last_login", new Date().toISOString())
+                    localStorage.setItem(
+                        "admin_session",
+                        generateSessionToken(result.user)
+                    )
                 } catch (error) {
                     console.warn("localStorage 저장 실패:", error)
                 }
             }
-
+            resetAdminSessionState()
             setIsAuthenticated(true)
             setCurrentUser(result.user)
-
             // 로그인 사용자에 page_id가 할당되어 있으면 강제 적용 (비관리자용)
-            if (
-                pageId &&
-                typeof pageId === "string" &&
-                pageId.trim().length > 0
-            ) {
-                setAssignedPageId(pageId)
-                setCurrentPageId(pageId)
+            const assigned =
+                (result.user && (result.user as any).page_id) || null
+            const nextPageId =
+                assigned &&
+                typeof assigned === "string" &&
+                assigned.trim().length > 0
+                    ? assigned
+                    : null
+            if (nextPageId) {
+                setAssignedPageId(nextPageId)
+                setCurrentPageId(nextPageId)
                 if (typeof window !== "undefined") {
                     try {
-                        setUserStorage(userId, "assigned_page_id", pageId)
+                        localStorage.setItem("assigned_page_id", nextPageId)
                     } catch (error) {
                         console.warn("localStorage 저장 실패:", error)
                     }
@@ -4518,17 +4642,16 @@ function AdminMainContent(props: any) {
                 setAssignedPageId(null)
                 if (typeof window !== "undefined") {
                     try {
-                        removeUserStorage(userId, "assigned_page_id")
+                        localStorage.removeItem("assigned_page_id")
                     } catch (error) {
                         console.warn("localStorage 삭제 실패:", error)
                     }
                 }
             }
-
             setLoginForm({ username: "", password: "" })
             loadAllPages()
-            loadContactList()
-            loadPageSettings()
+            loadContactList(nextPageId ?? undefined)
+            loadPageSettings(nextPageId ?? undefined)
         } else {
             setLoginError(result.error)
         }
@@ -4536,31 +4659,13 @@ function AdminMainContent(props: any) {
     }
 
     const handleLogout = () => {
-        // 진행 중인 fetch 취소
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort()
-            abortControllerRef.current = null
-        }
-
-        // 현재 유저 데이터 삭제
-        if (currentUserId) {
-            clearUserStorage(currentUserId)
-        }
-
         removeAuthToken()
+        resetAdminSessionState()
         setIsAuthenticated(false)
         setCurrentUser(null)
-        setCurrentUserId("")
-        setCurrentPageId("")
-        setAssignedPageId(null)
-        // 페이지 리스트 사용 안함
-        setExistingImages([])
-        setContactList([])
-
         if (typeof window !== "undefined") {
             try {
                 localStorage.removeItem("assigned_page_id")
-                localStorage.removeItem("admin_session")
             } catch (error) {
                 console.warn("localStorage 삭제 실패:", error)
             }
@@ -4586,10 +4691,17 @@ function AdminMainContent(props: any) {
         }
     }
 
-    const loadContactList = async () => {
+    const loadContactList = async (pageId?: string | null) => {
+        const targetPageId = pageId ?? currentPageId
+        if (!targetPageId) {
+            setContactList([])
+            setLoading(false)
+            return
+        }
+
         setLoading(true)
         try {
-            const contacts = await getAllContacts(currentPageId)
+            const contacts = await getAllContacts(targetPageId)
             setContactList(contacts)
         } catch (err) {
             setError("연락처 목록을 불러오는데 실패했습니다.")
@@ -4598,30 +4710,19 @@ function AdminMainContent(props: any) {
         }
     }
 
-    // 컴포넌트 언마운트 시 AbortController 정리
-    useEffect(() => {
-        return () => {
-            if (abortControllerRef.current) {
-                abortControllerRef.current.abort()
-                abortControllerRef.current = null
-            }
-        }
-    }, [])
-
-    const loadPageSettings = async () => {
-        if (!currentPageId) return
+    const loadPageSettings = async (pageId?: string | null) => {
+        const targetPageId = pageId ?? currentPageId
+        if (!targetPageId) return
 
         setSettingsLoading(true)
         try {
-            const response = await fetchWithCacheBuster(
-                `${PROXY_BASE_URL}/api/page-settings?pageId=${currentPageId}`,
-                currentUserId,
+            const response = await fetch(
+                `${PROXY_BASE_URL}/api/page-settings?pageId=${targetPageId}`,
                 {
                     headers: {
                         Authorization: `Bearer ${getAuthToken()}`,
                     },
-                },
-                abortControllerRef.current?.signal
+                }
             )
 
             const result = await response.json()
@@ -4650,6 +4751,7 @@ function AdminMainContent(props: any) {
         "photo_section_image_path",
         "photo_section_location",
         "photo_section_overlay_position",
+        "photo_section_focal_point",
         "photo_section_overlay_color",
         "photo_section_locale",
         "highlight_shape",
@@ -4750,7 +4852,7 @@ function AdminMainContent(props: any) {
         }
     }
 
-    // 포토섹션 메인 이미지 업로드 (압축 포함)
+    // 포토섹션 메인 이미지 업로드 (Focal Point 기능 포함)
     const handlePhotoSectionImageUpload = async (
         event: React.ChangeEvent<HTMLInputElement>
     ) => {
@@ -4855,19 +4957,25 @@ function AdminMainContent(props: any) {
                 throw e
             }
 
+            // Focal Point를 정중앙으로 초기화
+            const initialFocalPoint = { x: 0.5, y: 0.5 }
+
             // 로컬 상태 선반영
             setPageSettings((prev: any) => ({
                 ...prev,
                 photo_section_image_path: imagePath,
                 photo_section_image_url: imageUrl,
+                photo_section_focal_point: initialFocalPoint,
             }))
+            setFocalPoint(initialFocalPoint)
             // CDN 캐시 무효화를 위한 버전 업데이트
             setPhotoSectionImageVersion((v) => v + 1)
 
-            // 즉시 서버 저장: R2 public URL을 컬럼에 기록
+            // 즉시 서버 저장: R2 public URL과 Focal Point를 컬럼에 기록
             await savePageSettings({
                 photo_section_image_path: imagePath,
                 photo_section_image_url: imageUrl,
+                photo_section_focal_point: initialFocalPoint,
             })
 
             setSuccess("메인 사진이 업로드되었습니다.")
@@ -4876,6 +4984,57 @@ function AdminMainContent(props: any) {
             const message =
                 error instanceof Error ? error.message : String(error)
             setError("메인 사진 업로드 중 오류가 발생했습니다: " + message)
+        } finally {
+            setSettingsLoading(false)
+            // 파일 입력 초기화
+            event.target.value = ''
+        }
+    }
+
+    // Focal Point 수정 핸들러
+    const handleFocalPointEdit = () => {
+        if (!pageSettings.photo_section_image_url) {
+            setError("먼저 메인 사진을 업로드해주세요.")
+            return
+        }
+        
+        // 현재 Focal Point를 정규화된 좌표로 변환
+        const currentFocalPoint = pageSettings.photo_section_focal_point || { x: 0.5, y: 0.5 }
+        
+        // 모달 열기
+        setFocalPointImageSrc(pageSettings.photo_section_image_url)
+        setFocalPointModalOpen(true)
+    }
+
+    // Focal Point 완료 핸들러
+    const handleFocalPointComplete = async (newFocalPoint: { x: number; y: number }) => {
+        if (!currentPageId) return
+
+        setSettingsLoading(true)
+        try {
+            // 정규화된 좌표로 변환 (0-1 범위)
+            const normalizedFocalPoint = {
+                x: newFocalPoint.x / 400, // 캔버스 너비 400px 기준
+                y: newFocalPoint.y / 300  // 캔버스 높이 300px 기준
+            }
+
+            // 로컬 상태 업데이트
+            setPageSettings((prev: any) => ({
+                ...prev,
+                photo_section_focal_point: normalizedFocalPoint,
+            }))
+            setFocalPoint(normalizedFocalPoint)
+
+            // 서버에 저장
+            await savePageSettings({
+                photo_section_focal_point: normalizedFocalPoint,
+            })
+
+            setSuccess("Focal Point가 설정되었습니다.")
+        } catch (error: unknown) {
+            console.error("Focal Point 설정 오류:", error)
+            const message = error instanceof Error ? error.message : String(error)
+            setError("Focal Point 설정 중 오류가 발생했습니다: " + message)
         } finally {
             setSettingsLoading(false)
         }
@@ -5595,11 +5754,29 @@ function AdminMainContent(props: any) {
         }
     }
 
+    // 연락처 전화번호 필드 식별 및 정규화
+    const PHONE_FIELDS = new Set<string>([
+        "groom_phone",
+        "groom_father_phone",
+        "groom_mother_phone",
+        "bride_phone",
+        "bride_father_phone",
+        "bride_mother_phone",
+    ])
+
+    const normalizePhoneInput = (raw: string): string => {
+        const digitsOnly = String(raw).replace(/\D/g, "")
+        return digitsOnly.slice(0, 11)
+    }
+
     const handleContactInputChange = (field: string, value: string) => {
         if (selectedContact) {
             // page_id는 직접 수정 불가
             if (field === "page_id") return
-            setSelectedContact({ ...selectedContact, [field]: value })
+            const nextValue = PHONE_FIELDS.has(field)
+                ? normalizePhoneInput(value)
+                : value
+            setSelectedContact({ ...selectedContact, [field]: nextValue })
         }
     }
 
@@ -5677,7 +5854,6 @@ function AdminMainContent(props: any) {
     if (!isAuthenticated) {
         return (
             <div
-                key={`login::${Date.now()}`}
                 style={{
                     ...style,
                     width: "100%",
@@ -5833,7 +6009,6 @@ function AdminMainContent(props: any) {
     // 관리자 화면
     return (
         <div
-            key={`admin::${currentUserId}::${currentPageId}`}
             style={{
                 ...style,
                 width: "100%",
@@ -6033,29 +6208,7 @@ function AdminMainContent(props: any) {
                                     gap: theme.gap.sm,
                                 }}
                             >
-                                {/* NameSection 미리보기 */}
-                                <div
-                                    style={{
-                                        border: `1px solid ${theme.color.border}`,
-                                        padding: theme.space(3),
-                                        marginBottom: 0,
-                                        background: theme.color.surface,
-                                    }}
-                                >
-                                    <InlineNameSection
-                                        {...buildNameSectionProps()}
-                                    />
-                                </div>
-                                <div
-                                    style={{
-                                        fontSize: theme.text.xs,
-                                        color: theme.color.muted,
-                                        marginBottom: theme.space(2),
-                                        textAlign: "center",
-                                    }}
-                                >
-                                    미리보기
-                                </div>
+                                {/* 미리보기 제거됨 */}
 
                                 {/* 입력 필드들 */}
                                 <div
@@ -6141,26 +6294,48 @@ function AdminMainContent(props: any) {
                                     gap: theme.gap.sm,
                                 }}
                             >
-                                {/* 미리보기 박스 */}
+                                {/* 사진만 미리보기 */}
                                 <div
                                     style={{
                                         width: "100%",
                                         background: "#FAFAFA",
                                         border: `1px solid ${theme.color.border}`,
                                         outlineOffset: "-0.25px",
+                                        borderRadius: theme.radius.sm,
+                                        overflow: "hidden",
                                     }}
                                 >
                                     <div
                                         style={{
                                             width: "100%",
-                                            height: 468,
-                                            overflow: "hidden",
+                                            height: 300,
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            background: "#f5f5f5",
                                         }}
                                     >
-                                        <InlinePhotoSection
-                                            {...buildPhotoSectionProps()}
-                                            style={{ height: "100%" }}
-                                        />
+                                        {getPhotoSectionDisplayUrl() ? (
+                                            <img
+                                                src={`${getPhotoSectionDisplayUrl()}?v=${photoSectionImageVersion}`}
+                                                alt="메인 사진 미리보기"
+                                                style={{
+                                                    width: "100%",
+                                                    height: "100%",
+                                                    objectFit: "cover",
+                                                }}
+                                            />
+                                        ) : (
+                                            <div
+                                                style={{
+                                                    color: "#999",
+                                                    fontSize: 14,
+                                                    fontFamily: theme.font.body,
+                                                }}
+                                            >
+                                                사진을 업로드해주세요
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                                 <div
@@ -6171,7 +6346,7 @@ function AdminMainContent(props: any) {
                                         textAlign: "center",
                                     }}
                                 >
-                                    미리보기
+                                    사진 미리보기
                                 </div>
 
                                 {/* 메인 사진 업로드 */}
@@ -6256,6 +6431,41 @@ function AdminMainContent(props: any) {
                                             }
                                             style={{ display: "none" }}
                                         />
+                                        {pageSettings.photo_section_image_url && (
+                                            <button
+                                                onClick={handleFocalPointEdit}
+                                                style={{
+                                                    width: "100%",
+                                                    height: 50,
+                                                    paddingLeft: 12,
+                                                    paddingRight: 12,
+                                                    paddingTop: 8,
+                                                    paddingBottom: 8,
+                                                    background: "white",
+                                                    outline: `${theme.border.width}px #AEAEAE solid`,
+                                                    outlineOffset: "-0.50px",
+                                                    justifyContent: "center",
+                                                    alignItems: "center",
+                                                    gap: 8,
+                                                    display: "flex",
+                                                    border: "none",
+                                                    borderRadius: "2px",
+                                                    cursor: "pointer",
+                                                    opacity: 1,
+                                                }}
+                                            >
+                                                <div
+                                                    style={{
+                                                        color: "var(--Black, black)",
+                                                        fontSize: 14,
+                                                        fontFamily: theme.font.body,
+                                                        wordWrap: "break-word",
+                                                    }}
+                                                >
+                                                    크롭 수정
+                                                </div>
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
 
@@ -6666,7 +6876,7 @@ function AdminMainContent(props: any) {
 
                                 {/* 식장 이름 */}
                                 <FormField
-                                    label="식장 이름"
+                                    label="식장 이름 (영문)"
                                     style={{ marginTop: 12 }}
                                 >
                                     <InputBase
@@ -6683,7 +6893,7 @@ function AdminMainContent(props: any) {
                                                 venue_name: e.target.value,
                                             })
                                         }
-                                        placeholder="식장 이름을 입력하세요"
+                                        placeholder="식장 이름을 영문으로 입력하세요"
                                     />
                                 </FormField>
 
@@ -7750,10 +7960,20 @@ function AdminMainContent(props: any) {
                                         >
                                             <input
                                                 type="tel"
-                                                value={
+                                                value={(
                                                     selectedContact?.groom_phone ||
                                                     ""
-                                                }
+                                                )
+                                                    .replace(/\D/g, "")
+                                                    .replace(
+                                                        /^(\d{3})(\d{3,4})(\d{0,4}).*$/,
+                                                        (m, a, b, c) =>
+                                                            c
+                                                                ? `${a}-${b}-${c}`
+                                                                : b
+                                                                  ? `${a}-${b}`
+                                                                  : `${a}`
+                                                    )}
                                                 onChange={(e) =>
                                                     handleContactInputChange(
                                                         "groom_phone",
@@ -7849,10 +8069,20 @@ function AdminMainContent(props: any) {
                                         >
                                             <input
                                                 type="tel"
-                                                value={
+                                                value={(
                                                     selectedContact?.groom_father_phone ||
                                                     ""
-                                                }
+                                                )
+                                                    .replace(/\D/g, "")
+                                                    .replace(
+                                                        /^(\d{3})(\d{3,4})(\d{0,4}).*$/,
+                                                        (m, a, b, c) =>
+                                                            c
+                                                                ? `${a}-${b}-${c}`
+                                                                : b
+                                                                  ? `${a}-${b}`
+                                                                  : `${a}`
+                                                    )}
                                                 onChange={(e) =>
                                                     handleContactInputChange(
                                                         "groom_father_phone",
@@ -7948,10 +8178,20 @@ function AdminMainContent(props: any) {
                                         >
                                             <input
                                                 type="tel"
-                                                value={
+                                                value={(
                                                     selectedContact?.groom_mother_phone ||
                                                     ""
-                                                }
+                                                )
+                                                    .replace(/\D/g, "")
+                                                    .replace(
+                                                        /^(\d{3})(\d{3,4})(\d{0,4}).*$/,
+                                                        (m, a, b, c) =>
+                                                            c
+                                                                ? `${a}-${b}-${c}`
+                                                                : b
+                                                                  ? `${a}-${b}`
+                                                                  : `${a}`
+                                                    )}
                                                 onChange={(e) =>
                                                     handleContactInputChange(
                                                         "groom_mother_phone",
@@ -8047,10 +8287,20 @@ function AdminMainContent(props: any) {
                                         >
                                             <input
                                                 type="tel"
-                                                value={
+                                                value={(
                                                     selectedContact?.bride_phone ||
                                                     ""
-                                                }
+                                                )
+                                                    .replace(/\D/g, "")
+                                                    .replace(
+                                                        /^(\d{3})(\d{3,4})(\d{0,4}).*$/,
+                                                        (m, a, b, c) =>
+                                                            c
+                                                                ? `${a}-${b}-${c}`
+                                                                : b
+                                                                  ? `${a}-${b}`
+                                                                  : `${a}`
+                                                    )}
                                                 onChange={(e) =>
                                                     handleContactInputChange(
                                                         "bride_phone",
@@ -8145,10 +8395,20 @@ function AdminMainContent(props: any) {
                                         >
                                             <input
                                                 type="tel"
-                                                value={
+                                                value={(
                                                     selectedContact?.bride_father_phone ||
                                                     ""
-                                                }
+                                                )
+                                                    .replace(/\D/g, "")
+                                                    .replace(
+                                                        /^(\d{3})(\d{3,4})(\d{0,4}).*$/,
+                                                        (m, a, b, c) =>
+                                                            c
+                                                                ? `${a}-${b}-${c}`
+                                                                : b
+                                                                  ? `${a}-${b}`
+                                                                  : `${a}`
+                                                    )}
                                                 onChange={(e) =>
                                                     handleContactInputChange(
                                                         "bride_father_phone",
@@ -8245,10 +8505,20 @@ function AdminMainContent(props: any) {
                                         >
                                             <input
                                                 type="tel"
-                                                value={
+                                                value={(
                                                     selectedContact?.bride_mother_phone ||
                                                     ""
-                                                }
+                                                )
+                                                    .replace(/\D/g, "")
+                                                    .replace(
+                                                        /^(\d{3})(\d{3,4})(\d{0,4}).*$/,
+                                                        (m, a, b, c) =>
+                                                            c
+                                                                ? `${a}-${b}-${c}`
+                                                                : b
+                                                                  ? `${a}-${b}`
+                                                                  : `${a}`
+                                                    )}
                                                 onChange={(e) =>
                                                     handleContactInputChange(
                                                         "bride_mother_phone",
@@ -8815,6 +9085,8 @@ function AdminMainContent(props: any) {
                                 <TransportTab
                                     pageId={currentPageId}
                                     tokenGetter={getAuthToken}
+                                    setError={setError}
+                                    setSuccess={setSuccess}
                                 />
                             </div>
                         </div>
@@ -8849,6 +9121,8 @@ function AdminMainContent(props: any) {
                                 <InfoTab
                                     pageId={currentPageId}
                                     tokenGetter={getAuthToken}
+                                    setError={setError}
+                                    setSuccess={setSuccess}
                                 />
                             </div>
                         </div>
@@ -10644,6 +10918,18 @@ function AdminMainContent(props: any) {
                                     }}
                                 />
                             </FormField>
+
+                            <SaveBar
+                                onSave={() =>
+                                    savePageSettings({
+                                        kko_img: pageSettings.kko_img,
+                                        kko_title: pageSettings.kko_title,
+                                        kko_date: pageSettings.kko_date,
+                                    })
+                                }
+                                loading={settingsLoading}
+                                label="저장"
+                            />
                         </div>
                     </AccordionSection>
 
@@ -10651,6 +10937,24 @@ function AdminMainContent(props: any) {
                     <AdminFooter />
                 </div>
             )}
+
+            {/* Focal Point 모달 */}
+            <FocalPointModal
+                isOpen={focalPointModalOpen}
+                imageSrc={focalPointImageSrc}
+                currentFocalPoint={{
+                    x: (pageSettings.photo_section_focal_point?.x || 0.5) * 400,
+                    y: (pageSettings.photo_section_focal_point?.y || 0.5) * 300
+                }}
+                onFocalPointComplete={handleFocalPointComplete}
+                onClose={() => {
+                    setFocalPointModalOpen(false)
+                    if (focalPointImageSrc) {
+                        URL.revokeObjectURL(focalPointImageSrc)
+                        setFocalPointImageSrc("")
+                    }
+                }}
+            />
 
             {/* 갤러리 탭 */}
             {activeTab === "gallery" && (
@@ -11183,10 +11487,9 @@ function AdminMainContent(props: any) {
                                                             }}
                                                         >
                                                             <UiPhotoTile
-                                                                src={withCacheBuster(
-                                                                    image.public_url,
-                                                                    currentUserId
-                                                                )}
+                                                                src={
+                                                                    image.public_url
+                                                                }
                                                                 name={
                                                                     image.original_name
                                                                 }
@@ -11265,9 +11568,13 @@ function AdminMainContent(props: any) {
 function InfoTab({
     pageId,
     tokenGetter,
+    setError,
+    setSuccess,
 }: {
     pageId: string
     tokenGetter: () => string | null
+    setError: (error: string | null) => void
+    setSuccess: (success: string | null) => void
 }): JSX.Element {
     type InfoItem = {
         id?: string
@@ -11288,8 +11595,7 @@ function InfoTab({
     const [items, setItems] = React.useState<InfoItem[]>(DEFAULT_ITEMS)
     const [loading, setLoading] = React.useState(false)
     const [saving, setSaving] = React.useState(false)
-    const [errorMsg, setErrorMsg] = React.useState<string>("")
-    const [successMsg, setSuccessMsg] = React.useState<string>("")
+    // 공용 알림 사용을 위해 setError/setSuccess로 변경
 
     // 교통안내와 동일한 패턴으로 구현
     const addItem = () => {
@@ -11383,12 +11689,12 @@ function InfoTab({
 
     const save = async () => {
         if (!pageId) {
-            setErrorMsg("페이지 ID가 필요합니다")
+            setError("페이지 ID가 필요합니다")
             return
         }
         setSaving(true)
-        setErrorMsg("")
-        setSuccessMsg("")
+        setError(null)
+        setSuccess(null)
         try {
             const token = tokenGetter?.() || ""
             const getApiBases = () => {
@@ -11444,15 +11750,11 @@ function InfoTab({
                     result?.message || result?.error || text || "저장 실패"
                 )
             }
-            setSuccessMsg("안내 사항이 저장되었습니다.")
+            setSuccess("안내 사항이 저장되었습니다.")
         } catch (e: any) {
-            setErrorMsg(e?.message || "저장 중 오류가 발생했습니다")
+            setError(e?.message || "저장 중 오류가 발생했습니다")
         } finally {
             setSaving(false)
-            setTimeout(() => {
-                setErrorMsg("")
-                setSuccessMsg("")
-            }, 3000)
         }
     }
 
@@ -11489,7 +11791,7 @@ function InfoTab({
         async function load() {
             if (!pageId) return
             setLoading(true)
-            setErrorMsg("")
+            setError(null)
             try {
                 const res = await request(
                     `/api/page-settings?info&pageId=${encodeURIComponent(pageId)}`
@@ -11798,31 +12100,7 @@ function InfoTab({
                 {saving ? "저장 중..." : "저장"}
             </button>
 
-            {errorMsg && (
-                <div
-                    style={{
-                        marginTop: 8,
-                        color: "#dc2626",
-                        fontSize: 13,
-                        textAlign: "center",
-                    }}
-                >
-                    {errorMsg}
-                </div>
-            )}
-
-            {successMsg && (
-                <div
-                    style={{
-                        marginTop: 8,
-                        color: "#059669",
-                        fontSize: 13,
-                        textAlign: "center",
-                    }}
-                >
-                    {successMsg}
-                </div>
-            )}
+            {/* 공용 알림으로 이동 */}
         </div>
     )
 }
@@ -11831,9 +12109,13 @@ function InfoTab({
 function TransportTab({
     pageId,
     tokenGetter,
+    setError,
+    setSuccess,
 }: {
     pageId: string
     tokenGetter: () => string | null
+    setError: (error: string | null) => void
+    setSuccess: (success: string | null) => void
 }): JSX.Element {
     type TransportItem = {
         id?: string
@@ -11861,8 +12143,7 @@ function TransportTab({
     const [detailAddress, setDetailAddress] = React.useState<string>("")
     const [loading, setLoading] = React.useState(false)
     const [saving, setSaving] = React.useState(false)
-    const [errorMsg, setErrorMsg] = React.useState<string>("")
-    const [successMsg, setSuccessMsg] = React.useState<string>("")
+    // 공용 알림 사용을 위해 setError/setSuccess로 변경
 
     // 다음 Postcode API와 Google Maps API 타입 정의
     interface DaumPostcodeData {
@@ -12064,8 +12345,7 @@ function TransportTab({
 
             const element_layer = document.getElementById("addressLayer")
             if (!element_layer) {
-                setErrorMsg("주소 검색 레이어를 찾을 수 없습니다.")
-                setTimeout(() => setErrorMsg(""), 3000)
+                setError("주소 검색 레이어를 찾을 수 없습니다.")
                 return
             }
 
@@ -12089,23 +12369,20 @@ function TransportTab({
                             fullAddress
                         )
 
-                        setSuccessMsg(
+                        setSuccess(
                             `주소와 좌표가 모두 설정되었습니다: ${fullAddress}`
                         )
-                        setTimeout(() => setSuccessMsg(""), 3000)
                     } catch (error) {
                         // 좌표 변환 실패해도 주소는 저장
                         try {
                             await saveCoordinatesToServer(0, 0, fullAddress)
-                            setSuccessMsg(
+                            setSuccess(
                                 `주소가 설정되었습니다: ${fullAddress} (좌표 변환 실패)`
                             )
-                            setTimeout(() => setSuccessMsg(""), 3000)
                         } catch (saveError) {
-                            setErrorMsg(
+                            setError(
                                 "주소 설정에 실패했습니다. 다시 시도해주세요."
                             )
-                            setTimeout(() => setErrorMsg(""), 3000)
                         }
                     }
 
@@ -12148,17 +12425,14 @@ function TransportTab({
                 if (fallbackAddress && fallbackAddress.trim()) {
                     setVenue_address(fallbackAddress.trim())
                     await saveCoordinatesToServer(0, 0, fallbackAddress.trim())
-                    setSuccessMsg(
+                    setSuccess(
                         `주소가 설정되었습니다: ${fallbackAddress} (수동 입력)`
                     )
-                    setTimeout(() => setSuccessMsg(""), 3000)
                 } else {
-                    setErrorMsg("주소가 입력되지 않았습니다.")
-                    setTimeout(() => setErrorMsg(""), 3000)
+                    setError("주소가 입력되지 않았습니다.")
                 }
             } catch (fallbackError) {
-                setErrorMsg("주소 검색 및 입력에 실패했습니다.")
-                setTimeout(() => setErrorMsg(""), 3000)
+                setError("주소 검색 및 입력에 실패했습니다.")
             }
         }
     }
@@ -12238,7 +12512,7 @@ function TransportTab({
         async function load() {
             if (!pageId) return
             setLoading(true)
-            setErrorMsg("")
+            setError(null)
             try {
                 const res = await request(
                     `/api/page-settings?transport&pageId=${encodeURIComponent(pageId)}`
@@ -12379,12 +12653,12 @@ function TransportTab({
 
     const save = async () => {
         if (!pageId) {
-            setErrorMsg("페이지 ID가 필요합니다")
+            setError("페이지 ID가 필요합니다")
             return
         }
         setSaving(true)
-        setErrorMsg("")
-        setSuccessMsg("")
+        setError(null)
+        setSuccess(null)
         try {
             const token = tokenGetter?.() || ""
             const getApiBases = () => {
@@ -12446,15 +12720,11 @@ function TransportTab({
                     result?.message || result?.error || text || "저장 실패"
                 )
             }
-            setSuccessMsg("교통안내가 저장되었습니다.")
+            setSuccess("교통안내가 저장되었습니다.")
         } catch (e: any) {
-            setErrorMsg(e?.message || "저장 중 오류가 발생했습니다")
+            setError(e?.message || "저장 중 오류가 발생했습니다")
         } finally {
             setSaving(false)
-            setTimeout(() => {
-                setErrorMsg("")
-                setSuccessMsg("")
-            }, 3000)
         }
     }
 
@@ -12672,39 +12942,7 @@ function TransportTab({
                     도로명 주소 입력
                 </button>
 
-                {/* 성공/에러 메시지 */}
-                {successMsg && (
-                    <div
-                        style={{
-                            marginTop: 8,
-                            padding: "8px 12px",
-                            backgroundColor: "#d4edda",
-                            color: "#155724",
-                            border: "1px solid #c3e6cb",
-                            borderRadius: "4px",
-                            fontSize: "14px",
-                            fontFamily: theme.font.body,
-                        }}
-                    >
-                        {successMsg}
-                    </div>
-                )}
-                {errorMsg && (
-                    <div
-                        style={{
-                            marginTop: 8,
-                            padding: "8px 12px",
-                            backgroundColor: "#f8d7da",
-                            color: "#721c24",
-                            border: "1px solid #f5c6cb",
-                            borderRadius: "4px",
-                            fontSize: "14px",
-                            fontFamily: theme.font.body,
-                        }}
-                    >
-                        {errorMsg}
-                    </div>
-                )}
+                {/* 공용 알림으로 이동 */}
             </div>
 
             {loading ? (
@@ -12965,31 +13203,7 @@ function TransportTab({
                 {saving ? "저장 중..." : "저장"}
             </button>
 
-            {errorMsg && (
-                <div
-                    style={{
-                        marginTop: 8,
-                        color: "#dc2626",
-                        fontSize: 13,
-                        textAlign: "center",
-                    }}
-                >
-                    {errorMsg}
-                </div>
-            )}
-
-            {successMsg && (
-                <div
-                    style={{
-                        marginTop: 8,
-                        color: "#059669",
-                        fontSize: 13,
-                        textAlign: "center",
-                    }}
-                >
-                    {successMsg}
-                </div>
-            )}
+            {/* 공용 알림으로 이동 */}
 
             {/* 하단 고정 저장 액션바 - 갤러리 순서 변경 시 표시 */}
         </div>
@@ -13001,14 +13215,14 @@ export default function AdminNew(props: any) {
     const [hasChanges, setHasChanges] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
     const [saveFunction, setSaveFunction] = useState<
-        (() => void | Promise<void>) | null
+        (() => Promise<void>) | null
     >(null)
 
     // AdminMainContent에서 상태를 업데이트할 수 있도록 콜백 함수들 제공
     const updateSaveState = (
         hasUnsavedChanges: boolean,
         isSavingOrder: boolean,
-        saveImageOrderFn: () => void | Promise<void>
+        saveImageOrderFn: () => Promise<void>
     ) => {
         setHasChanges(hasUnsavedChanges)
         setIsSaving(isSavingOrder)
@@ -13159,24 +13373,9 @@ function SaveActionBar({
     isSaving,
 }: {
     hasUnsavedChanges: boolean
-    onSave: () => void | Promise<void>
+    onSave: () => void
     isSaving: boolean
 }) {
-    const handleClick = async () => {
-        if (isSaving) return
-        try {
-            const maybePromise = onSave()
-            if (
-                maybePromise &&
-                typeof (maybePromise as Promise<void>).then === "function"
-            ) {
-                await maybePromise
-            }
-        } catch (error) {
-            console.error("저장 작업 중 오류:", error)
-        }
-    }
-
     if (!hasUnsavedChanges) return null
 
     return (
@@ -13190,7 +13389,7 @@ function SaveActionBar({
             }}
         >
             <button
-                onClick={handleClick}
+                onClick={onSave}
                 disabled={isSaving}
                 style={{
                     width: "100%",
