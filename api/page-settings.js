@@ -152,14 +152,34 @@ async function handleGetSettings(req, res) {
 
     // 레코드가 없으면 기본값으로 생성
     if (!data) {
+      // 최초 로그인 시 admin_users에서 웨딩 정보 가져오기
+      let weddingInfo = {}
+      try {
+        const { data: adminUser, error: adminErr } = await supabase
+          .from('admin_users')
+          .select('wedding_date, groom_name_en, bride_name_en')
+          .eq('page_id', pageId)
+          .single()
+
+        if (!adminErr && adminUser) {
+          weddingInfo = {
+            wedding_date: adminUser.wedding_date || null,
+            groom_name_en: adminUser.groom_name_en || '',
+            bride_name_en: adminUser.bride_name_en || ''
+          }
+        }
+      } catch (err) {
+        console.log('Failed to fetch wedding info from admin_users:', err)
+      }
+
       const defaultSettings = {
         page_id: pageId,
         type: 'papillon',
         groom_name_kr: '',
-        groom_name_en: '',
+        groom_name_en: weddingInfo.groom_name_en || '',
         bride_name_kr: '',
-        bride_name_en: '',
-        wedding_date: null,
+        bride_name_en: weddingInfo.bride_name_en || '',
+        wedding_date: weddingInfo.wedding_date || null,
         wedding_hour: '14',
         wedding_minute: '00',
         venue_name: '',
@@ -581,110 +601,6 @@ async function handleUpdateInfo(req, res, validatedUser) {
       success: false,
       error: '안내 사항 저장 중 오류가 발생했습니다',
       message: error?.message || String(error)
-    })
-  }
-}
-
-// 승인 시 웨딩 정보 복사 함수
-async function handleApprovalUpdateSettings(req, res, validatedUser) {
-  const { settings } = req.body
-
-  if (!settings) {
-    return res.status(400).json({
-      success: false,
-      error: 'settings is required'
-    })
-  }
-
-  try {
-    // 승인 시에는 page_id를 직접 받아서 처리
-    const { pageId } = req.query
-
-    if (!pageId) {
-      return res.status(400).json({
-        success: false,
-        error: 'pageId is required for approval update'
-      })
-    }
-
-    // 승인 시에만 복사할 웨딩 정보 필드들
-    const weddingFields = ['wedding_date', 'groom_name_en', 'bride_name_en']
-    
-    let sanitized = Object.fromEntries(
-      Object.entries(settings || {}).filter(([key]) => weddingFields.includes(key))
-    )
-
-    // 빈 문자열 날짜는 NULL로 저장
-    if (Object.prototype.hasOwnProperty.call(sanitized, 'wedding_date')) {
-      if (sanitized.wedding_date === '') {
-        sanitized.wedding_date = null
-      }
-    }
-
-    console.log('Approval wedding info copy:', { pageId, sanitized })
-
-    // 기존 데이터 확인
-    const { data: existingData, error: selectError } = await supabase
-      .from('page_settings')
-      .select('wedding_date, groom_name_en, bride_name_en')
-      .eq('page_id', pageId)
-      .single()
-
-    if (selectError && selectError.code !== 'PGRST116') {
-      throw selectError
-    }
-
-    // 기존 데이터가 있으면 웨딩 정보는 덮어쓰지 않음
-    const finalSettings = { ...sanitized }
-    if (existingData) {
-      if (existingData.wedding_date && finalSettings.wedding_date) {
-        delete finalSettings.wedding_date
-      }
-      if (existingData.groom_name_en && finalSettings.groom_name_en) {
-        delete finalSettings.groom_name_en
-      }
-      if (existingData.bride_name_en && finalSettings.bride_name_en) {
-        delete finalSettings.bride_name_en
-      }
-    }
-
-    // 업데이트할 필드가 없으면 성공으로 처리
-    if (Object.keys(finalSettings).length === 0) {
-      return res.json({
-        success: true,
-        message: '웨딩 정보가 이미 존재하여 덮어쓰지 않았습니다',
-        data: existingData
-      })
-    }
-
-    const { data, error } = await supabase
-      .from('page_settings')
-      .upsert(
-        {
-          page_id: pageId,
-          ...finalSettings,
-          updated_at: new Date().toISOString()
-        },
-        { onConflict: 'page_id' }
-      )
-      .select()
-      .single()
-
-    console.log('Approval upsert result:', { data, error })
-
-    if (error) throw error
-
-    return res.json({
-      success: true,
-      message: '웨딩 정보가 성공적으로 복사되었습니다',
-      data
-    })
-  } catch (error) {
-    console.error('Approval update settings error:', error)
-    return res.status(500).json({
-      success: false,
-      error: '승인 시 웨딩 정보 복사 중 오류가 발생했습니다',
-      message: error && error.message ? error.message : String(error)
     })
   }
 }
