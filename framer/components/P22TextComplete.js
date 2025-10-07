@@ -6,7 +6,7 @@
 
 import { jsx } from "react/jsx-runtime";
 import { useEffect, useMemo } from "react";
-import typography from "https://cdn.roarc.kr/fonts/typography.js?v=6fdc95bcc8fd197d879c051a8c2d5a03";
+import typography from "https://cdn.roarc.kr/fonts/typography.js?v=27c65dba30928cbbce6839678016d9ac"
 
 // === reference.js 패턴: React 훅 직접 import로 Proxy 패턴 불필요 ===
 

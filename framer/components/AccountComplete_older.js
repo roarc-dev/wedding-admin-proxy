@@ -1,4 +1,3 @@
-// v0.0.4
 // AccountComplete.js — Accout.tsx 기능을 React.createElement 기반 JS로 변환
 // - 브라우저 ESM
 // - JSX/TS 미사용 (createElement)

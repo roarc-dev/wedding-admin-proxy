@@ -1,9 +1,15 @@
 import React, { useEffect, useState } from "react"
 import { addPropertyControls, ControlType } from "framer"
+// @ts-ignore
+import typography from "https://cdn.roarc.kr/fonts/typography.js?v=27c65dba30928cbbce6839678016d9ac"
 
 const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app"
 
-function renderBoldSegments(text: string, baseStyle?: React.CSSProperties): JSX.Element[] {
+function renderBoldSegments(
+    text: string,
+    baseStyle?: React.CSSProperties,
+    pretendardFontFamily?: string
+): JSX.Element[] {
     const out: JSX.Element[] = []
     let last = 0
     let key = 0
@@ -14,15 +20,22 @@ function renderBoldSegments(text: string, baseStyle?: React.CSSProperties): JSX.
         const end = start + m[0].length
         if (start > last) {
             const chunk = text.slice(last, start)
-            if (chunk) out.push(
-                <span key={`nb-${key++}`} style={baseStyle}>
-                    {chunk}
-                </span>
-            )
+            if (chunk)
+                out.push(
+                    <span key={`nb-${key++}`} style={baseStyle}>
+                        {chunk}
+                    </span>
+                )
         }
         const boldText = m[1]
         out.push(
-            <span key={`b-${key++}`} style={{ ...(baseStyle || {}), fontFamily: "Pretendard SemiBold" }}>
+            <span
+                key={`b-${key++}`}
+                style={{
+                    ...(baseStyle || {}),
+                    fontFamily: pretendardFontFamily || "Pretendard SemiBold",
+                }}
+            >
                 {boldText}
             </span>
         )
@@ -30,16 +43,17 @@ function renderBoldSegments(text: string, baseStyle?: React.CSSProperties): JSX.
     }
     if (last < text.length) {
         const rest = text.slice(last)
-        if (rest) out.push(
-            <span key={`nb-${key++}`} style={baseStyle}>
-                {rest}
-            </span>
-        )
+        if (rest)
+            out.push(
+                <span key={`nb-${key++}`} style={baseStyle}>
+                    {rest}
+                </span>
+            )
     }
     return out
 }
 
-function renderInvitationSegments(text: string): JSX.Element[] {
+function renderInvitationSegments(text: string, pretendardFontFamily?: string): JSX.Element[] {
     const lines = (text || "").split("\n")
     const rendered: JSX.Element[] = []
     for (let i = 0; i < lines.length; i++) {
@@ -54,22 +68,41 @@ function renderInvitationSegments(text: string): JSX.Element[] {
             const end = start + match[0].length
             if (start > lastIndex) {
                 const chunk = line.slice(lastIndex, start)
-                if (chunk) parts.push(
-                    <span key={`t-${i}-${keySeq++}`}>{renderBoldSegments(chunk)}</span>
-                )
+                if (chunk)
+                    parts.push(
+                        <span key={`t-${i}-${keySeq++}`}>
+                            {renderBoldSegments(chunk, undefined, pretendardFontFamily)}
+                        </span>
+                    )
             }
             const inner = match[1]
             if (inner)
                 parts.push(
-                    <span key={`q-${i}-${keySeq++}`} style={{ fontSize: 14, lineHeight: "1em", color: "#6e6e6e" }}>
-                        {renderBoldSegments(inner, { fontSize: 14, lineHeight: "1em", color: "#6e6e6e" })}
+                    <span
+                        key={`q-${i}-${keySeq++}`}
+                        style={{
+                            fontSize: 14,
+                            lineHeight: "1em",
+                            color: "#6e6e6e",
+                        }}
+                    >
+                        {renderBoldSegments(inner, {
+                            fontSize: 14,
+                            lineHeight: "1em",
+                            color: "#6e6e6e",
+                        }, pretendardFontFamily)}
                     </span>
                 )
             lastIndex = end
         }
         if (lastIndex < line.length) {
             const rest = line.slice(lastIndex)
-            if (rest) parts.push(<span key={`t-${i}-${keySeq++}`}>{renderBoldSegments(rest)}</span>)
+            if (rest)
+                parts.push(
+                    <span key={`t-${i}-${keySeq++}`}>
+                        {renderBoldSegments(rest, undefined, pretendardFontFamily)}
+                    </span>
+                )
         }
         rendered.push(
             <span key={`line-${i}`}>
@@ -129,7 +162,7 @@ interface InviteNameProps {
     style?: React.CSSProperties
 }
 
-export default function WeddingInvitation(props: InviteNameProps) {
+export default function InviteNameV2(props: InviteNameProps) {
     const { pageId = "default", style } = props
 
     const [weddingData, setWeddingData] = useState<WeddingData>({
@@ -150,6 +183,18 @@ export default function WeddingInvitation(props: InviteNameProps) {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
+    // Typography 폰트 로딩
+    useEffect(() => {
+        try {
+            if (typography && typeof typography.ensure === "function") {
+                typography.ensure()
+            }
+        } catch (error) {
+            console.warn("[InviteNameV2] Typography loading failed:", error)
+        }
+    }, [])
+
+    // Proxy에서 데이터 로드
     useEffect(() => {
         let mounted = true
         async function loadInvite() {
@@ -178,23 +223,17 @@ export default function WeddingInvitation(props: InviteNameProps) {
                         brideFatherName: d.bride_father_name || "",
                         brideMotherName: d.bride_mother_name || "",
                         brideName: d.bride_name || "",
-                        showGroomFatherChrysanthemum:
-                            !!d.show_groom_father_chrysanthemum,
-                        showGroomMotherChrysanthemum:
-                            !!d.show_groom_mother_chrysanthemum,
-                        showBrideFatherChrysanthemum:
-                            !!d.show_bride_father_chrysanthemum,
-                        showBrideMotherChrysanthemum:
-                            !!d.show_bride_mother_chrysanthemum,
+                        showGroomFatherChrysanthemum: !!d.show_groom_father_chrysanthemum,
+                        showGroomMotherChrysanthemum: !!d.show_groom_mother_chrysanthemum,
+                        showBrideFatherChrysanthemum: !!d.show_bride_father_chrysanthemum,
+                        showBrideMotherChrysanthemum: !!d.show_bride_mother_chrysanthemum,
                         sonLabel: d.son_label || "아들",
                         daughterLabel: d.daughter_label || "딸",
                     })
                 }
             } catch (e: any) {
                 if (mounted)
-                    setError(
-                        e?.message || "초대장 데이터를 불러오지 못했습니다"
-                    )
+                    setError(e?.message || "초대장 데이터를 불러오지 못했습니다")
             } finally {
                 if (mounted) setLoading(false)
             }
@@ -204,6 +243,15 @@ export default function WeddingInvitation(props: InviteNameProps) {
             mounted = false
         }
     }, [pageId])
+
+    // Pretendard 폰트 스택을 안전하게 가져오기
+    const pretendardFontFamily = React.useMemo(() => {
+        try {
+            return typography?.helpers?.stacks?.pretendardVariable || '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
+        } catch {
+            return '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
+        }
+    }, [])
 
     const dotNeeded = (a: string, b: string) => !!(a && b)
 
@@ -239,249 +287,256 @@ export default function WeddingInvitation(props: InviteNameProps) {
                         textAlign: "center",
                         color: "black",
                         fontSize: 16,
-                        fontFamily: "Pretendard Regular",
+                        fontFamily: pretendardFontFamily,
                         lineHeight: "32px",
                         wordWrap: "break-word",
                     }}
                 >
-                    {renderInvitationSegments(weddingData.invitationText)}
+                    {renderInvitationSegments(weddingData.invitationText, pretendardFontFamily)}
                 </div>
-
-                {/* 이름 영역 */}
+            {/* 이름 영역 */}
+            <div
+                style={{
+                    width: "fit-content",
+                    whiteSpace: "nowrap",
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "flex-start",
+                    gap: 20,
+                }}
+            >
+                {/* 좌측 부모/아들·딸 컬럼 */}
                 <div
                     style={{
-                        width: "fit-content",
-                        whiteSpace: "nowrap",
-                        display: "flex",
-                        justifyContent: "center",
+                        width: "100%",
+                        display: "inline-flex",
+                        flexDirection: "column",
+                        justifyContent: "flex-start",
                         alignItems: "flex-start",
-                        gap: 20,
                     }}
                 >
-                    {/* 좌측 부모/아들·딸 컬럼 */}
+                    {/* 신랑 부모 라인 */}
                     <div
                         style={{
-                            width: "100%",
                             display: "inline-flex",
-                            flexDirection: "column",
                             justifyContent: "flex-start",
-                            alignItems: "flex-start",
+                            alignItems: "center",
+                            gap: 4,
                         }}
                     >
-                        {/* 신랑 부모 라인 */}
                         <div
                             style={{
-                                display: "inline-flex",
                                 justifyContent: "flex-start",
                                 alignItems: "center",
                                 gap: 4,
+                                display: "flex",
+                                marginLeft:
+                                    weddingData.showGroomFatherChrysanthemum
+                                        ? -16
+                                        : 0,
                             }}
                         >
-                            <div
-                                style={{
-                                    justifyContent: "flex-start",
-                                    alignItems: "center",
-                                    gap: 4,
-                                    display: "flex",
-                                }}
-                            >
-                                {weddingData.showGroomFatherChrysanthemum && (
-                                    <ChrysanthemumIcon />
-                                )}
-                                <div
-                                    style={{
-                                        color: "black",
-                                        fontSize: 18,
-                                        fontFamily: "Pretendard Regular",
-                                        lineHeight: "32px",
-                                        wordWrap: "break-word",
-                                    }}
-                                >
-                                    {weddingData.groomFatherName || ""}
-                                </div>
-                                {dotNeeded(
-                                    weddingData.groomFatherName,
-                                    weddingData.groomMotherName
-                                ) && (
-                                    <div
-                                        style={{
-                                            color: "black",
-                                            fontSize: 18,
-                                            fontFamily: "Pretendard Regular",
-                                            lineHeight: "32px",
-                                            wordWrap: "break-word",
-                                        }}
-                                    >
-                                        ·
-                                    </div>
-                                )}
-                                {weddingData.showGroomMotherChrysanthemum && (
-                                    <ChrysanthemumIcon />
-                                )}
-                                <div
-                                    style={{
-                                        color: "black",
-                                        fontSize: 18,
-                                        fontFamily: "Pretendard Regular",
-                                        lineHeight: "32px",
-                                        wordWrap: "break-word",
-                                    }}
-                                >
-                                    {weddingData.groomMotherName || ""}
-                                </div>
-                            </div>
+                            {weddingData.showGroomFatherChrysanthemum && (
+                                <ChrysanthemumIcon />
+                            )}
                             <div
                                 style={{
                                     color: "black",
                                     fontSize: 18,
-                                    fontFamily: "Pretendard Regular",
+                                    fontFamily: pretendardFontFamily,
                                     lineHeight: "32px",
                                     wordWrap: "break-word",
                                 }}
                             >
-                                의
+                                {weddingData.groomFatherName || ""}
                             </div>
+                            {dotNeeded(
+                                weddingData.groomFatherName,
+                                weddingData.groomMotherName
+                            ) && (
+                                <div
+                                    style={{
+                                        color: "black",
+                                        fontSize: 18,
+                                        fontFamily: pretendardFontFamily,
+                                        lineHeight: "32px",
+                                        wordWrap: "break-word",
+                                    }}
+                                >
+                                    ·
+                                </div>
+                            )}
+                            {weddingData.showGroomMotherChrysanthemum && (
+                                <ChrysanthemumIcon />
+                            )}
                             <div
                                 style={{
                                     color: "black",
                                     fontSize: 18,
-                                    fontFamily: "Pretendard Regular",
+                                    fontFamily: pretendardFontFamily,
                                     lineHeight: "32px",
                                     wordWrap: "break-word",
                                 }}
                             >
-                                {weddingData.sonLabel || "아들"}
+                                {weddingData.groomMotherName || ""}
                             </div>
                         </div>
-                        {/* 신부 부모 라인 */}
                         <div
                             style={{
-                                display: "inline-flex",
-                                justifyContent: "flex-start",
-                                alignItems: "center",
-                                gap: 4,
+                                color: "black",
+                                fontSize: 18,
+                                fontFamily: "Pretendard Regular",
+                                lineHeight: "32px",
+                                wordWrap: "break-word",
                             }}
                         >
-                            <div
-                                style={{
-                                    justifyContent: "flex-start",
-                                    alignItems: "center",
-                                    gap: 4,
-                                    display: "flex",
-                                }}
-                            >
-                                {weddingData.showBrideFatherChrysanthemum && (
-                                    <ChrysanthemumIcon />
-                                )}
-                                <div
-                                    style={{
-                                        color: "black",
-                                        fontSize: 18,
-                                        fontFamily: "Pretendard Regular",
-                                        lineHeight: "32px",
-                                        wordWrap: "break-word",
-                                    }}
-                                >
-                                    {weddingData.brideFatherName || ""}
-                                </div>
-                                {dotNeeded(
-                                    weddingData.brideFatherName,
-                                    weddingData.brideMotherName
-                                ) && (
-                                    <div
-                                        style={{
-                                            color: "black",
-                                            fontSize: 18,
-                                            fontFamily: "Pretendard Regular",
-                                            lineHeight: "32px",
-                                            wordWrap: "break-word",
-                                        }}
-                                    >
-                                        ·
-                                    </div>
-                                )}
-                                {weddingData.showBrideMotherChrysanthemum && (
-                                    <ChrysanthemumIcon />
-                                )}
-                                <div
-                                    style={{
-                                        color: "black",
-                                        fontSize: 18,
-                                        fontFamily: "Pretendard Regular",
-                                        lineHeight: "32px",
-                                        wordWrap: "break-word",
-                                    }}
-                                >
-                                    {weddingData.brideMotherName || ""}
-                                </div>
-                            </div>
-                            <div
-                                style={{
-                                    color: "black",
-                                    fontSize: 18,
-                                    fontFamily: "Pretendard Regular",
-                                    lineHeight: "32px",
-                                    wordWrap: "break-word",
-                                }}
-                            >
-                                의
-                            </div>
-                            <div
-                                style={{
-                                    color: "black",
-                                    fontSize: 18,
-                                    fontFamily: "Pretendard Regular",
-                                    lineHeight: "32px",
-                                    wordWrap: "break-word",
-                                }}
-                            >
-                                {weddingData.daughterLabel || "딸"}
-                            </div>
+                            의
+                        </div>
+                        <div
+                            style={{
+                                color: "black",
+                                fontSize: 18,
+                                fontFamily: "Pretendard Regular",
+                                lineHeight: "32px",
+                                wordWrap: "break-word",
+                            }}
+                        >
+                            {weddingData.sonLabel || "아들"}
                         </div>
                     </div>
+                    {/* 신부 부모 라인 */}
+                    <div
+                        style={{
+                            display: "inline-flex",
+                            justifyContent: "flex-start",
+                            alignItems: "center",
+                            gap: 4,
+                        }}
+                    >
+                        <div
+                            style={{
+                                justifyContent: "flex-start",
+                                alignItems: "center",
+                                gap: 4,
+                                display: "flex",
+                                marginLeft:
+                                    weddingData.showBrideFatherChrysanthemum
+                                        ? -16
+                                        : 0,
+                            }}
+                        >
+                            {weddingData.showBrideFatherChrysanthemum && (
+                                <ChrysanthemumIcon />
+                            )}
+                            <div
+                                style={{
+                                    color: "black",
+                                    fontSize: 18,
+                                    fontFamily: pretendardFontFamily,
+                                    lineHeight: "32px",
+                                    wordWrap: "break-word",
+                                }}
+                            >
+                                {weddingData.brideFatherName || ""}
+                            </div>
+                            {dotNeeded(
+                                weddingData.brideFatherName,
+                                weddingData.brideMotherName
+                            ) && (
+                                <div
+                                    style={{
+                                        color: "black",
+                                        fontSize: 18,
+                                        fontFamily: pretendardFontFamily,
+                                        lineHeight: "32px",
+                                        wordWrap: "break-word",
+                                    }}
+                                >
+                                    ·
+                                </div>
+                            )}
+                            {weddingData.showBrideMotherChrysanthemum && (
+                                <ChrysanthemumIcon />
+                            )}
+                            <div
+                                style={{
+                                    color: "black",
+                                    fontSize: 18,
+                                    fontFamily: pretendardFontFamily,
+                                    lineHeight: "32px",
+                                    wordWrap: "break-word",
+                                }}
+                            >
+                                {weddingData.brideMotherName || ""}
+                            </div>
+                        </div>
+                        <div
+                            style={{
+                                color: "black",
+                                fontSize: 18,
+                                fontFamily: "Pretendard Regular",
+                                lineHeight: "32px",
+                                wordWrap: "break-word",
+                            }}
+                        >
+                            의
+                        </div>
+                        <div
+                            style={{
+                                color: "black",
+                                fontSize: 18,
+                                fontFamily: "Pretendard Regular",
+                                lineHeight: "32px",
+                                wordWrap: "break-word",
+                            }}
+                        >
+                            {weddingData.daughterLabel || "딸"}
+                        </div>
+                    </div>
+                </div>
 
-                    {/* 우측 이름 컬럼 */}
+                {/* 우측 이름 컬럼 */}
+                <div
+                    style={{
+                        width: "100%",
+                        flexDirection: "column",
+                        justifyContent: "flex-start",
+                        alignItems: "flex-start",
+                        display: "inline-flex",
+                    }}
+                >
                     <div
                         style={{
-                            width: "100%",
-                            flexDirection: "column",
-                            justifyContent: "flex-start",
-                            alignItems: "flex-start",
-                            display: "inline-flex",
+                            alignSelf: "stretch",
+                            color: "black",
+                            fontSize: 18,
+                            fontFamily: pretendardFontFamily,
+                            lineHeight: "32px",
+                            wordWrap: "break-word",
                         }}
                     >
-                        <div
-                            style={{
-                                alignSelf: "stretch",
-                                color: "black",
-                                fontSize: 18,
-                                fontFamily: "Pretendard SemiBold",
-                                lineHeight: "32px",
-                                wordWrap: "break-word",
-                            }}
-                        >
-                            {weddingData.groomName || ""}
-                        </div>
-                        <div
-                            style={{
-                                alignSelf: "stretch",
-                                color: "black",
-                                fontSize: 18,
-                                fontFamily: "Pretendard SemiBold",
-                                lineHeight: "32px",
-                                wordWrap: "break-word",
-                            }}
-                        >
-                            {weddingData.brideName || ""}
-                        </div>
+                        {weddingData.groomName || ""}
                     </div>
+                    <div
+                        style={{
+                            alignSelf: "stretch",
+                            color: "black",
+                            fontSize: 18,
+                            fontFamily: pretendardFontFamily,
+                            lineHeight: "32px",
+                            wordWrap: "break-word",
+                        }}
+                    >
+                        {weddingData.brideName || ""}
+                    </div>
+                </div>
                 </div>
             </div>
         </div>
     )
 }
 
-addPropertyControls(WeddingInvitation, {
+addPropertyControls(InviteNameV2, {
     pageId: {
         type: ControlType.String,
         title: "page_id",

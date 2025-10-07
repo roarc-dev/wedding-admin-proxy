@@ -1,6 +1,8 @@
 import { addPropertyControls, ControlType } from "framer"
 import { motion } from "framer-motion"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
+// @ts-ignore
+import typography from "https://cdn.roarc.kr/fonts/typography.js?v=27c65dba30928cbbce6839678016d9ac"
 
 // 프록시 서버 URL (고정된 Production URL)
 const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app"
@@ -33,9 +35,6 @@ interface CalendarEvent {
 
 interface CalendarComponentProxyProps {
     pageId: string
-    highlightColor: string
-    useTestData: boolean
-    testDates: string
 }
 
 // 프록시를 통한 안전한 페이지 설정 가져오기
@@ -49,11 +48,13 @@ async function getPageSettings(pageId: string): Promise<PageSettings | null> {
                 headers: {
                     "Content-Type": "application/json",
                 },
-            })
+            }),
         ])
 
         if (!pageResult.ok) {
-            throw new Error(`HTTP ${pageResult.status}: ${pageResult.statusText}`)
+            throw new Error(
+                `HTTP ${pageResult.status}: ${pageResult.statusText}`
+            )
         }
 
         const result = await pageResult.json()
@@ -63,8 +64,16 @@ async function getPageSettings(pageId: string): Promise<PageSettings | null> {
             const data = result.data
 
             // invite_cards 데이터를 우선적으로 사용
-            const groom_name = inviteResult?.groom_name || data.groom_name_kr || data.groom_name || ""
-            const bride_name = inviteResult?.bride_name || data.bride_name_kr || data.bride_name || ""
+            const groom_name =
+                inviteResult?.groom_name ||
+                data.groom_name_kr ||
+                data.groom_name ||
+                ""
+            const bride_name =
+                inviteResult?.bride_name ||
+                data.bride_name_kr ||
+                data.bride_name ||
+                ""
 
             return {
                 id: data.id,
@@ -92,7 +101,9 @@ async function getPageSettings(pageId: string): Promise<PageSettings | null> {
 }
 
 // 프록시를 통한 invite_cards 데이터 가져오기
-async function getInviteData(pageId: string): Promise<{ groom_name?: string; bride_name?: string } | null> {
+async function getInviteData(
+    pageId: string
+): Promise<{ groom_name?: string; bride_name?: string } | null> {
     try {
         const response = await fetch(
             `${PROXY_BASE_URL}/api/invite?pageId=${pageId}`,
@@ -195,9 +206,6 @@ const HeartShape: React.FC<{ color: string; size?: number }> = ({
 
 export default function CalendarComponentProxy({
     pageId = "default",
-    highlightColor = "#e0e0e0",
-    useTestData = false,
-    testDates = "2024-12-18,2024-12-25,2024-12-31",
 }: CalendarComponentProxyProps) {
     const [calendarData, setCalendarData] = useState<CalendarEvent[]>([])
     const [pageSettings, setPageSettings] = useState<PageSettings | null>(null)
@@ -208,6 +216,35 @@ export default function CalendarComponentProxy({
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
 
+    // Typography 폰트 로딩
+    useEffect(() => {
+        try {
+            if (typography && typeof typography.ensure === "function") {
+                typography.ensure()
+            }
+        } catch (error) {
+            console.warn("[CalendarProxy] Typography loading failed:", error)
+        }
+    }, [])
+
+    // Pretendard 폰트 스택을 안전하게 가져오기
+    const pretendardFontFamily = useMemo(() => {
+        try {
+            return typography?.helpers?.stacks?.pretendardVariable || '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
+        } catch {
+            return '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
+        }
+    }, [])
+
+    // P22 폰트 스택을 안전하게 가져오기
+    const p22FontFamily = useMemo(() => {
+        try {
+            return typography?.helpers?.stacks?.p22 || '"P22 Late November", "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
+        } catch {
+            return '"P22 Late November", "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
+        }
+    }, [])
+
     // 데이터 로드
     const loadData = async () => {
         try {
@@ -217,50 +254,21 @@ export default function CalendarComponentProxy({
             // 페이지 설정과 캘린더 데이터를 병렬로 로드
             const [settings, calendar] = await Promise.all([
                 getPageSettings(pageId),
-                useTestData ? Promise.resolve([]) : getCalendarData(pageId),
+                getCalendarData(pageId),
             ])
 
             setPageSettings(settings)
+            setCalendarData(calendar)
 
-            if (useTestData && testDates) {
-                // 테스트 데이터 생성
-                const dates = testDates
-                    .split(",")
-                    .map((date: string) => date.trim())
-                    .filter((date: string) => date)
-                const testCalendarData = dates.map(
-                    (date: string, index: number) => ({
-                        id: `test_${index}`,
-                        page_id: pageId,
-                        date: date,
-                        title: `Test Event ${index + 1}`,
-                        created_at: new Date().toISOString(),
-                    })
-                )
-                setCalendarData(testCalendarData)
-
-                if (testCalendarData.length > 0) {
-                    const firstDate = new Date(testCalendarData[0].date)
-                    setCurrentMonth((firstDate.getMonth() + 1).toString())
-                    setCurrentYear(firstDate.getFullYear())
-
-                    // console.log('테스트 데이터 로드 완료:', { testCalendarData, currentMonth, currentYear })
-                }
-            } else {
-                setCalendarData(calendar)
-
-                if (calendar.length > 0) {
-                    const firstDate = new Date(calendar[0].date)
-                    setCurrentMonth((firstDate.getMonth() + 1).toString())
-                    setCurrentYear(firstDate.getFullYear())
-                } else if (settings && settings.wedding_date) {
-                    // 캘린더 데이터가 없으면 웨딩 날짜를 기준으로 월 설정
-                    const weddingDate = new Date(settings.wedding_date)
-                    setCurrentMonth((weddingDate.getMonth() + 1).toString())
-                    setCurrentYear(weddingDate.getFullYear())
-
-                    // console.log('웨딩 날짜 기준 월 설정:', { weddingDate: settings.wedding_date })
-                }
+            if (calendar.length > 0) {
+                const firstDate = new Date(calendar[0].date)
+                setCurrentMonth((firstDate.getMonth() + 1).toString())
+                setCurrentYear(firstDate.getFullYear())
+            } else if (settings && settings.wedding_date) {
+                // 캘린더 데이터가 없으면 웨딩 날짜를 기준으로 월 설정
+                const weddingDate = new Date(settings.wedding_date)
+                setCurrentMonth((weddingDate.getMonth() + 1).toString())
+                setCurrentYear(weddingDate.getFullYear())
             }
         } catch (error) {
             setError(
@@ -275,7 +283,7 @@ export default function CalendarComponentProxy({
 
     useEffect(() => {
         loadData()
-    }, [pageId, useTestData, testDates])
+    }, [pageId])
 
     // D-day 계산 함수
     const calculateDday = () => {
@@ -473,7 +481,8 @@ export default function CalendarComponentProxy({
                 <div
                     style={{
                         fontSize: "16px",
-                        fontFamily: "Pretendard Regular",
+                        fontFamily: pretendardFontFamily,
+                        fontWeight: 400,
                         textAlign: "center",
                     }}
                 >
@@ -499,7 +508,8 @@ export default function CalendarComponentProxy({
                 <div
                     style={{
                         fontSize: "16px",
-                        fontFamily: "Pretendard Regular",
+                        fontFamily: pretendardFontFamily,
+                        fontWeight: 400,
                         textAlign: "center",
                         color: "#888",
                     }}
@@ -521,33 +531,44 @@ export default function CalendarComponentProxy({
             }}
         >
             {/* 날짜와 시간 표시 */}
-            <div
+            <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, ease: "easeOut", delay: 0 }}
                 style={{
                     fontSize: "16px",
                     lineHeight: "1.8em",
-                    fontFamily: "Pretendard Regular",
+                    fontFamily: pretendardFontFamily,
+                    fontWeight: 400,
                     textAlign: "center",
                     marginBottom: "20px",
                 }}
             >
                 {formatDateTime()}
-            </div>
+            </motion.div>
 
             {/* 월 표시 */}
-            <div
+            <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, ease: "easeOut", delay: 0 }}
                 style={{
                     fontSize: "50px",
                     lineHeight: "1.8em",
-                    fontFamily: "P22LateNovemberW01-Regular Regular",
+                    fontFamily: p22FontFamily,
+                    fontWeight: 400,
                     textAlign: "center",
                     marginBottom: "20px",
                 }}
             >
                 {currentMonth}
-            </div>
+            </motion.div>
 
             {/* 달력 */}
-            <div
+            <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, ease: "easeOut", delay: 0 }}
                 style={{
                     display: "flex",
                     flexDirection: "row",
@@ -572,7 +593,8 @@ export default function CalendarComponentProxy({
                             style={{
                                 fontSize: "15px",
                                 lineHeight: "2.6em",
-                                fontFamily: "Pretendard SemiBold",
+                                fontFamily: pretendardFontFamily,
+                                fontWeight: 600,
                                 marginBottom: "5px",
                             }}
                         >
@@ -621,7 +643,7 @@ export default function CalendarComponentProxy({
                                                         <HeartShape
                                                             color={
                                                                 pageSettings?.highlight_color ||
-                                                                highlightColor
+                                                                "#e0e0e0"
                                                             }
                                                             size={28}
                                                         />
@@ -636,7 +658,7 @@ export default function CalendarComponentProxy({
                                                             borderRadius: "50%",
                                                             backgroundColor:
                                                                 pageSettings?.highlight_color ||
-                                                                highlightColor,
+                                                                "#e0e0e0",
                                                             zIndex: 0,
                                                         }}
                                                         animate={{
@@ -660,9 +682,8 @@ export default function CalendarComponentProxy({
                                             style={{
                                                 fontSize: "15px",
                                                 lineHeight: "2.6em",
-                                                fontFamily: isHighlighted(day)
-                                                    ? "Pretendard SemiBold"
-                                                    : "Pretendard Regular",
+                                                fontFamily: pretendardFontFamily,
+                                                fontWeight: isHighlighted(day) ? 600 : 400,
                                                 color: isHighlighted(day)
                                                     ? pageSettings?.highlight_text_color ||
                                                       "black"
@@ -687,10 +708,13 @@ export default function CalendarComponentProxy({
                         ))}
                     </div>
                 ))}
-            </div>
+            </motion.div>
 
             {/* 하단 신랑신부 이름과 D-day */}
-            <div
+            <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, ease: "easeOut", delay: 0 }}
                 style={{
                     display: "flex",
                     flexDirection: "column",
@@ -703,7 +727,8 @@ export default function CalendarComponentProxy({
                     style={{
                         fontSize: "17px",
                         lineHeight: "1em",
-                        fontFamily: "Pretendard Regular",
+                        fontFamily: pretendardFontFamily,
+                        fontWeight: 400,
                         textAlign: "center",
                         marginBottom: "10px",
                     }}
@@ -717,13 +742,14 @@ export default function CalendarComponentProxy({
                     style={{
                         fontSize: "17px",
                         lineHeight: "1em",
-                        fontFamily: "Pretendard SemiBold",
+                        fontFamily: pretendardFontFamily,
+                        fontWeight: 600,
                         textAlign: "center",
                     }}
                 >
                     {calculateDday()}
                 </div>
-            </div>
+            </motion.div>
         </div>
     )
 }
@@ -734,21 +760,5 @@ addPropertyControls(CalendarComponentProxy, {
         title: "Page ID",
         defaultValue: "default",
         placeholder: "Enter page ID",
-    },
-    highlightColor: {
-        type: ControlType.Color,
-        title: "Highlight Color",
-        defaultValue: "#e0e0e0",
-    },
-    testDates: {
-        type: ControlType.String,
-        title: "Test Dates",
-        defaultValue: "2024-12-18,2024-12-25,2024-12-31",
-        placeholder: "Enter dates (YYYY-MM-DD) separated by commas",
-    },
-    useTestData: {
-        type: ControlType.Boolean,
-        title: "Use Test Data",
-        defaultValue: false,
     },
 })

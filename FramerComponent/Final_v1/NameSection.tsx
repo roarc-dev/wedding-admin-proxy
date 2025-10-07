@@ -1,15 +1,68 @@
 import React, { useEffect, useRef, useState } from "react"
 import { motion, useInView } from "framer-motion"
 import { addPropertyControls, ControlType } from "framer"
+// @ts-ignore
+import typography from "https://cdn.roarc.kr/fonts/typography.js?v=27c65dba30928cbbce6839678016d9ac"
+
+// 프록시 서버 URL (고정된 Production URL)
+const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app"
+
+// API 호출 함수들
+async function getInviteNamesByPageId(pageId: string) {
+    if (!pageId) return { groom_name: "", bride_name: "" }
+    try {
+        const response = await fetch(
+            `${PROXY_BASE_URL}/api/invite?pageId=${encodeURIComponent(pageId)}`,
+            { method: "GET", headers: { "Content-Type": "application/json" } }
+        )
+        if (!response.ok) {
+            return { groom_name: "", bride_name: "" }
+        }
+        const result = await response.json()
+        if (result && result.success && result.data) {
+            return {
+                groom_name: result.data.groom_name || "",
+                bride_name: result.data.bride_name || "",
+            }
+        }
+        return { groom_name: "", bride_name: "" }
+    } catch {
+        return { groom_name: "", bride_name: "" }
+    }
+}
+
+async function getPageSettingsNames(pageId: string) {
+    if (!pageId) return { groom_name_en: "", bride_name_en: "" }
+    try {
+        const res = await fetch(
+            `${PROXY_BASE_URL}/api/page-settings?pageId=${encodeURIComponent(pageId)}`,
+            { method: 'GET', headers: { 'Content-Type': 'application/json' } }
+        )
+        if (!res.ok) return { groom_name_en: "", bride_name_en: "" }
+        const json = await res.json()
+        const data = json && json.data ? json.data : {}
+        return {
+            groom_name_en: data.groom_name_en || "",
+            bride_name_en: data.bride_name_en || "",
+        }
+    } catch {
+        return { groom_name_en: "", bride_name_en: "" }
+    }
+}
 
 interface NameSectionProps {
     groomName: string
     brideName: string
+    pageId?: string
     style?: React.CSSProperties
 }
 
 export default function NameSection(props: NameSectionProps) {
-    const { groomName, brideName, style } = props
+    const { groomName, brideName, pageId, style } = props
+
+    // 이름 상태 (props 우선, 없으면 페이지에서 로드)
+    const [resolvedGroomName, setResolvedGroomName] = useState(groomName)
+    const [resolvedBrideName, setResolvedBrideName] = useState(brideName)
 
     // 'and' SVG 컴포넌트
     const AndSvg = () => (
@@ -40,9 +93,55 @@ export default function NameSection(props: NameSectionProps) {
     const [nameFontSize, setNameFontSize] = useState(48)
     const [andSvgScale, setAndSvgScale] = useState(1)
     const [marginSize, setMarginSize] = useState(14)
+    // 순차 애니메이션 제어: 0=대기, 1=신랑 완료, 2=SVG 완료
+    const [sequence, setSequence] = useState(0)
 
     // 애니메이션 트리거를 위한 useInView
     const isInView = useInView(nameContainerRef, { once: true, amount: 0.3 })
+
+    // Typography 폰트 로딩
+    useEffect(() => {
+        try {
+            if (typography && typeof typography.ensure === "function") {
+                typography.ensure()
+            }
+        } catch (error) {
+            console.warn("[NameSection] Typography loading failed:", error)
+        }
+    }, [])
+
+    // 페이지에서 신랑/신부 이름 로드 (props 값이 비어있을 때만)
+    useEffect(() => {
+        let mounted = true
+        ;(async () => {
+            const hasCustomGroom = !!(groomName && groomName.trim() && groomName !== "GROOM")
+            const hasCustomBride = !!(brideName && brideName.trim() && brideName !== "BRIDE")
+            if (hasCustomGroom || hasCustomBride) {
+                return // 사용자가 이름을 명시한 경우 API 호출 생략
+            }
+            
+            // 1) page_settings에서 EN 이름 우선 사용
+            const settingsNames = await getPageSettingsNames(pageId || "")
+            if (!mounted) return
+            let updated = false
+            if (settingsNames.groom_name_en) {
+                setResolvedGroomName(settingsNames.groom_name_en)
+                updated = true
+            }
+            if (settingsNames.bride_name_en) {
+                setResolvedBrideName(settingsNames.bride_name_en)
+                updated = true
+            }
+            if (updated) return
+
+            // 2) 폴백: invite에서 이름 사용
+            const names = await getInviteNamesByPageId(pageId || "")
+            if (!mounted) return
+            if (names.groom_name && !groomName) setResolvedGroomName(names.groom_name)
+            if (names.bride_name && !brideName) setResolvedBrideName(names.bride_name)
+        })()
+        return () => { mounted = false }
+    }, [pageId, groomName, brideName])
 
     // 폰트 크기 자동 조정
     const adjustTextSize = (): void => {
@@ -51,82 +150,99 @@ export default function NameSection(props: NameSectionProps) {
 
         const containerWidth = (nameContainerRef.current as HTMLDivElement)
             .clientWidth
-        
+
         // 모바일 브라우저 최적화: 최대 너비 430px
         const baseWidth = 390
         const minWidth = 280
         const maxWidth = 430
-        
+
         // 현재 너비를 모바일 범위로 제한
-        const clampedWidth = Math.max(minWidth, Math.min(maxWidth, containerWidth))
-        
+        const clampedWidth = Math.max(
+            minWidth,
+            Math.min(maxWidth, containerWidth)
+        )
+
         // 비례 계수 계산 (0.7 ~ 1.1 범위로 제한하여 모바일에서 극단적 변화 방지)
         const scale = Math.max(0.7, Math.min(1.1, clampedWidth / baseWidth))
-        
+
         // 기본 크기들
         const baseFontSize = 48
         const baseMargin = 14
         const baseSvgHeight = 42
-        
+
         // 스케일에 따른 크기 계산
         const targetFontSize = Math.round(baseFontSize * scale)
         const targetMargin = Math.round(baseMargin * scale)
         const targetSvgHeight = Math.round(baseSvgHeight * scale)
-        
+
         // 모바일 최적화된 폰트 크기 제한
         const minFontSize = Math.max(20, Math.round(baseFontSize * 0.7))
         const maxFontSize = Math.min(56, Math.round(baseFontSize * 1.1))
-        
+
         // SVG 스케일 계산 (높이 기준)
         const svgScale = targetSvgHeight / baseSvgHeight
-        
+
         // 사용 가능한 너비 계산 (SVG와 여백 고려)
-        const availableWidth = Math.max(0, containerWidth - (targetMargin * 2) - 20)
-        
+        const availableWidth = Math.max(
+            0,
+            containerWidth - targetMargin * 2 - 20
+        )
+
         // 폰트 크기 테스트 및 조정
         const testFontSize = (size: number): boolean => {
             if (!groomRef.current || !brideRef.current) return false
-            
+
             groomRef.current.style.fontSize = `${size}px`
             const groomOverflows = groomRef.current.scrollWidth > availableWidth
-            
+
             brideRef.current.style.fontSize = `${size}px`
             const brideOverflows = brideRef.current.scrollWidth > availableWidth
-            
+
             return groomOverflows || brideOverflows
         }
-        
+
         // 최종 폰트 크기 결정
         let finalFontSize = Math.min(targetFontSize, maxFontSize)
-        
+
         // 오버플로우 체크하면서 크기 조정
         while (testFontSize(finalFontSize) && finalFontSize > minFontSize) {
             finalFontSize -= 1
         }
-        
+
         // 상태 업데이트
         setNameFontSize(finalFontSize)
         setMarginSize(targetMargin)
         setAndSvgScale(svgScale)
-        
+
         // 디버깅용 로그 (개발 시 확인용)
-        console.log(`Container: ${containerWidth}px, Scale: ${scale.toFixed(2)}, Font: ${finalFontSize}px, Margin: ${targetMargin}px`)
+        console.log(
+            `Container: ${containerWidth}px, Scale: ${scale.toFixed(2)}, Font: ${finalFontSize}px, Margin: ${targetMargin}px`
+        )
     }
+    // P22 폰트 스택을 안전하게 가져오기
+    const p22FontFamily = React.useMemo(() => {
+        try {
+            return typography?.helpers?.stacks?.p22 || '"P22 Late November", "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
+        } catch {
+            return '"P22 Late November", "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
+        }
+    }, [])
+
     useEffect(() => {
         // 초기 로드 시 즉시 실행
         adjustTextSize()
-        
+
         // 리사이즈 이벤트 핸들러 개선
         const handleResize = () => {
             // 디바운싱 없이 즉시 실행하여 반응성 향상
             adjustTextSize()
         }
-        
+
         window.addEventListener("resize", handleResize)
-        
+
         // 컴포넌트 언마운트 시 정리
         return () => window.removeEventListener("resize", handleResize)
-    }, [groomName, brideName])
+    }, [resolvedGroomName, resolvedBrideName])
 
     return (
         <div
@@ -150,15 +266,20 @@ export default function NameSection(props: NameSectionProps) {
             <motion.div
                 ref={groomRef}
                 initial={{ opacity: 0 }}
-                animate={isInView ? { opacity: 1 } : { opacity: 0 }}
+                animate={isInView && !!(resolvedGroomName && resolvedGroomName.trim()) ? { opacity: 1 } : { opacity: 0 }}
                 transition={{
                     type: "spring",
-                    duration: 1,
+                    duration: 0.8,
                     bounce: 0,
-                    delay: 0,
+                }}
+                onAnimationComplete={() => {
+                    // 신랑 이름이 표시 완료되었을 때만 다음 단계로 진행
+                    if (isInView && sequence < 1 && !!(resolvedGroomName && resolvedGroomName.trim())) {
+                        setSequence(1)
+                    }
                 }}
                 style={{
-                    fontFamily: "P22LateNovemberW01-Regular Regular",
+                    fontFamily: p22FontFamily,
                     fontSize: `${nameFontSize}px`,
                     textAlign: "center",
                     lineHeight: "1.2",
@@ -166,17 +287,21 @@ export default function NameSection(props: NameSectionProps) {
                     overflow: "hidden",
                 }}
             >
-                {groomName.toUpperCase()}
+                {resolvedGroomName.toUpperCase()}
             </motion.div>
             {/* and SVG */}
             <motion.div
                 initial={{ opacity: 0 }}
-                animate={isInView ? { opacity: 1 } : { opacity: 0 }}
+                animate={isInView && sequence >= 1 ? { opacity: 1 } : { opacity: 0 }}
                 transition={{
                     type: "spring",
-                    duration: 1,
+                    duration: 0.8,
                     bounce: 0,
-                    delay: 0.5,
+                }}
+                onAnimationComplete={() => {
+                    if (isInView && sequence === 1) {
+                        setSequence(2)
+                    }
                 }}
                 style={{
                     display: "flex",
@@ -194,15 +319,14 @@ export default function NameSection(props: NameSectionProps) {
             <motion.div
                 ref={brideRef}
                 initial={{ opacity: 0 }}
-                animate={isInView ? { opacity: 1 } : { opacity: 0 }}
+                animate={isInView && sequence >= 2 ? { opacity: 1 } : { opacity: 0 }}
                 transition={{
                     type: "spring",
-                    duration: 1,
+                    duration: 0.8,
                     bounce: 0,
-                    delay: 1,
                 }}
                 style={{
-                    fontFamily: "P22LateNovemberW01-Regular Regular",
+                    fontFamily: p22FontFamily,
                     fontSize: `${nameFontSize}px`,
                     textAlign: "center",
                     lineHeight: "1.2",
@@ -210,7 +334,7 @@ export default function NameSection(props: NameSectionProps) {
                     overflow: "hidden",
                 }}
             >
-                {brideName.toUpperCase()}
+                {resolvedBrideName.toUpperCase()}
             </motion.div>
         </div>
     )
@@ -233,5 +357,11 @@ addPropertyControls(NameSection, {
         title: "신부 이름",
         defaultValue: "BRIDE",
         placeholder: "신부 이름을 입력하세요 (자동 대문자 변환)",
+    },
+    pageId: {
+        type: ControlType.String,
+        title: "페이지 ID",
+        defaultValue: "",
+        placeholder: "페이지 ID를 입력하세요 (API에서 이름을 가져옵니다)",
     },
 })

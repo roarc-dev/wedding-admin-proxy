@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { addPropertyControls, ControlType } from "framer"
 
 // P22 폰트 로딩을 위한 typography import
+// @ts-ignore
 import typography from "https://cdn.roarc.kr/fonts/typography.js?v=6fdc95bcc8fd197d879c051a8c2d5a03"
 
 const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app"
@@ -14,118 +15,145 @@ interface InfoItem {
     display_order: number
 }
 
-// 텍스트 포맷팅 유틸리티 함수들 (Admin.tsx에서 가져옴)
-function renderBoldSegments(
+// 텍스트 포맷팅 유틸리티
+function processBoldAndBreak(
     text: string,
-    baseStyle?: React.CSSProperties
+    isSmall: boolean,
+    keyPrefix: string
 ): JSX.Element[] {
-    const out: JSX.Element[] = []
-    let last = 0
-    let key = 0
-    const re = /\*\*([^*]+)\*\*/g
-    let m: RegExpExecArray | null
-    while ((m = re.exec(text)) !== null) {
-        const start = m.index
-        const end = start + m[0].length
-        if (start > last) {
-            const chunk = text.slice(last, start)
-            if (chunk)
-                out.push(
-                    <span key={`nb-${key++}`} style={baseStyle}>
-                        {chunk}
-                    </span>
-                )
-        }
-        const boldText = m[1]
-        out.push(
-            <span
-                key={`b-${key++}`}
-                style={{
-                    ...(baseStyle || {}),
-                    fontFamily: "Pretendard SemiBold",
-                }}
-            >
-                {boldText}
-            </span>
-        )
-        last = end
-    }
-    if (last < text.length) {
-        const rest = text.slice(last)
-        if (rest)
-            out.push(
-                <span key={`nb-${key++}`} style={baseStyle}>
-                    {rest}
+    const segments: JSX.Element[] = []
+    const src = (text || "").replace(/\r\n?/g, "\n")
+    let index = 0
+    const regex = /(\*\*([^*]+)\*\*)|(\n\n)|(\n)/g
+    let match: RegExpExecArray | null
+
+    while ((match = regex.exec(src)) !== null) {
+        const start = match.index
+        const end = start + match[0].length
+
+        if (start > index) {
+            const normal = src.slice(index, start)
+            segments.push(
+                <span
+                    key={`${keyPrefix}-t-${index}`}
+                    style={{
+                        fontFamily:
+                            typography.helpers.stacks.pretendardVariable,
+                        fontWeight: 400,
+                        lineHeight: isSmall ? "1.8em" : "1.8em",
+                    }}
+                >
+                    {normal}
                 </span>
             )
-    }
-    return out
-}
+        }
 
-function renderSmallSegments(
-    text: string,
-    baseStyle?: React.CSSProperties
-): JSX.Element[] {
-    const lines = (text || "").split("\n")
-    const rendered: JSX.Element[] = []
-    for (let i = 0; i < lines.length; i++) {
-        const line = lines[i]
-        const parts: JSX.Element[] = []
-        let lastIndex = 0
-        let keySeq = 0
-        const regex = /\{([^}]*)\}/g
-        let match: RegExpExecArray | null
-        while ((match = regex.exec(line)) !== null) {
-            const start = match.index
-            const end = start + match[0].length
-            if (start > lastIndex) {
-                const chunk = line.slice(lastIndex, start)
-                if (chunk)
-                    parts.push(
-                        <span key={`t-${i}-${keySeq++}`}>
-                            {renderBoldSegments(chunk, baseStyle)}
-                        </span>
-                    )
-            }
-            const inner = match[1]
-            if (inner)
-                parts.push(
-                    <span
-                        key={`s-${i}-${keySeq++}`}
-                        style={{
-                            fontSize: 13,
-                            lineHeight: "1.8em",
-                            color: "#757575",
-                            fontFamily: "Pretendard Regular",
-                        }}
-                    >
-                        {renderBoldSegments(inner, {
-                            fontSize: 13,
-                            lineHeight: "1.8em",
-                            color: "#757575",
-                            fontFamily: "Pretendard Regular",
-                        })}
-                    </span>
-                )
-            lastIndex = end
+        if (match[1]) {
+            const inner = match[2] || ""
+            segments.push(
+                <span
+                    key={`${keyPrefix}-b-${start}`}
+                    style={{
+                        fontFamily:
+                            typography.helpers.stacks.pretendardVariable,
+                        fontWeight: 600,
+                        lineHeight: isSmall ? "1.8em" : "1.8em",
+                    }}
+                >
+                    {inner}
+                </span>
+            )
+        } else if (match[3]) {
+            segments.push(
+                <div
+                    key={`${keyPrefix}-dbl-${start}`}
+                    style={{ height: "0.6em" }}
+                />
+            )
+        } else if (match[4]) {
+            segments.push(<br key={`${keyPrefix}-br-${start}`} />)
         }
-        if (lastIndex < line.length) {
-            const rest = line.slice(lastIndex)
-            if (rest)
-                parts.push(
-                    <span key={`t-${i}-${keySeq++}`}>
-                        {renderBoldSegments(rest, baseStyle)}
-                    </span>
-                )
-        }
-        rendered.push(
-            <span key={`line-${i}`}>
-                {parts}
-                {i !== lines.length - 1 && <br />}
+
+        index = end
+    }
+
+    if (index < src.length) {
+        const tail = src.slice(index)
+        segments.push(
+            <span
+                key={`${keyPrefix}-t-${index}`}
+                style={{
+                    fontFamily: typography.helpers.stacks.pretendardVariable,
+                    fontWeight: 400,
+                    lineHeight: isSmall ? "1.8em" : "1.8em",
+                }}
+            >
+                {tail}
             </span>
         )
     }
-    return rendered
+
+    return segments
+}
+
+function renderInfoStyledText(text: string): JSX.Element[] {
+    const src = (text || "").replace(/\r\n?/g, "\n")
+    const segments: JSX.Element[] = []
+    let index = 0
+    const regex = /(\{([^}]*)\})|(\n\n)|(\n)/g
+    let match: RegExpExecArray | null
+
+    while ((match = regex.exec(src)) !== null) {
+        const start = match.index
+        const end = start + match[0].length
+
+        if (start > index) {
+            const before = src.slice(index, start)
+            segments.push(
+                <span key={`pre-${index}`}>
+                    {processBoldAndBreak(before, false, `pre-${start}`)}
+                </span>
+            )
+        }
+
+        if (match[1]) {
+            const inner = match[2] || ""
+            segments.push(
+                <span
+                    key={`small-${start}`}
+                    style={{
+                        fontSize: 13,
+                        lineHeight: "1.8em",
+                        color: "#757575",
+                        fontFamily:
+                            typography.helpers.stacks.pretendardVariable,
+                        fontWeight: 400,
+                    }}
+                >
+                    {processBoldAndBreak(inner, true, `small-${start}`)}
+                </span>
+            )
+        } else if (match[3]) {
+            segments.push(
+                <div key={`dbl-${start}`} style={{ height: "0.6em" }} />
+            )
+        } else if (match[4]) {
+            segments.push(<br key={`br-${start}`} />)
+        }
+
+        index = end
+    }
+
+    if (index < src.length) {
+        const tail = src.slice(index)
+        segments.push(
+            <span key={`tail-${index}`}>
+                {processBoldAndBreak(tail, false, `tail-${index}`)}
+            </span>
+        )
+    }
+
+    return segments
 }
 
 // Info 컴포넌트
@@ -138,6 +166,7 @@ function Info({
 }) {
     const [infoItems, setInfoItems] = useState<InfoItem[]>([])
     const [loading, setLoading] = useState(false)
+
     // 데이터 로딩
     useEffect(() => {
         let mounted = true
@@ -184,16 +213,18 @@ function Info({
         } catch (_) {}
     }, [])
 
-    // P22 폰트 스택
     const p22Stack = typography.helpers.stacks.p22
 
     // 슬라이드 상태 관리
     const [currentIndex, setCurrentIndex] = useState(0)
     const [isAutoPlaying, setIsAutoPlaying] = useState(true)
+    const [slideDir, setSlideDir] = useState(0)
 
-    // infoItems 정렬 (display_order 기준)
+    // infoItems 정렬
     const sortedInfoItems = useMemo(() => {
-        return [...infoItems].sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
+        return [...infoItems].sort(
+            (a, b) => (a.display_order ?? 0) - (b.display_order ?? 0)
+        )
     }, [infoItems])
 
     // 자동 슬라이드 타이머
@@ -201,87 +232,38 @@ function Info({
         if (!isAutoPlaying || sortedInfoItems.length <= 1) return
 
         const timer = setInterval(() => {
+            setSlideDir(1)
             setCurrentIndex((prev) => (prev + 1) % sortedInfoItems.length)
         }, 5000)
 
         return () => clearInterval(timer)
     }, [isAutoPlaying, sortedInfoItems.length])
 
-    // 드래그 상태
-    const [isDragging, setIsDragging] = useState(false)
-    const [dragOffset, setDragOffset] = useState(0)
-    const [startX, setStartX] = useState(0)
-
-    // 카드 높이 계산 (가장 긴 내용 기준)
+    // 카드 높이 계산
     const maxCardHeight = useMemo(() => {
         const heights: number[] = []
 
         sortedInfoItems.forEach((item) => {
-            // 제목 높이 계산 (예상)
-            const titleHeight = 32 // 18px * 1.8em ≈ 32px
-            // 본문 높이 계산 (예상)
+            const titleHeight = 32
             const descriptionLines = (item.description || "").split("\n").length
-            const descriptionHeight = descriptionLines * 27 // 15px * 1.8em ≈ 27px
-
-            // 여백 포함
-            const totalHeight = titleHeight + descriptionHeight + 80 // padding + margin
+            const descriptionHeight = descriptionLines * 27
+            const totalHeight = titleHeight + descriptionHeight + 80
             heights.push(totalHeight)
         })
 
-        return Math.max(...heights, 280) // 최소 높이 280px
+        return Math.max(...heights, 280)
     }, [sortedInfoItems])
 
-    // 드래그 핸들러
-    const handleDragStart = useCallback(
-        (e: React.MouseEvent | React.TouchEvent) => {
-            setIsDragging(true)
-            setIsAutoPlaying(false)
-            const clientX = "touches" in e ? e.touches[0].clientX : e.clientX
-            setStartX(clientX)
-        },
-        []
-    )
-
-    const handleDragMove = useCallback(
-        (e: React.MouseEvent | React.TouchEvent) => {
-            if (!isDragging) return
-
-            const clientX = "touches" in e ? e.touches[0].clientX : e.clientX
-            const deltaX = clientX - startX
-            setDragOffset(deltaX)
-        },
-        [isDragging, startX]
-    )
-
-    const handleDragEnd = useCallback(() => {
-        if (!isDragging) return
-
-        setIsDragging(false)
-        setDragOffset(0)
-
-        const threshold = 50
-        if (Math.abs(dragOffset) > threshold) {
-            if (dragOffset > 0) {
-                // 오른쪽으로 드래그 (이전)
-                setCurrentIndex(
-                    (prev) => (prev - 1 + sortedInfoItems.length) % sortedInfoItems.length
-                )
-            } else {
-                // 왼쪽으로 드래그 (다음)
-                setCurrentIndex((prev) => (prev + 1) % sortedInfoItems.length)
-            }
-        }
-
-        // 5초 후 자동 재생 재개
-        setTimeout(() => setIsAutoPlaying(true), 5000)
-    }, [isDragging, dragOffset, sortedInfoItems.length])
-
     // 페이지네이션 클릭
-    const handlePaginationClick = useCallback((index: number) => {
-        setCurrentIndex(index)
-        setIsAutoPlaying(false)
-        setTimeout(() => setIsAutoPlaying(true), 5000)
-    }, [])
+    const handlePaginationClick = useCallback(
+        (index: number) => {
+            setSlideDir(index > currentIndex ? 1 : -1)
+            setCurrentIndex(index)
+            setIsAutoPlaying(false)
+            setTimeout(() => setIsAutoPlaying(true), 5000)
+        },
+        [currentIndex]
+    )
 
     // 슬라이드 애니메이션 variants
     const slideVariants = {
@@ -294,17 +276,10 @@ function Info({
             opacity: 1,
         },
         exit: (direction: number) => ({
-            x: direction < 0 ? 300 : -300,
+            x: direction > 0 ? -300 : 300,
             opacity: 0,
         }),
     }
-
-    // 현재 슬라이드 방향 계산
-    const slideDirection = useMemo(() => {
-        if (dragOffset > 0) return -1 // 이전
-        if (dragOffset < 0) return 1 // 다음
-        return 0
-    }, [dragOffset])
 
     if (!sortedInfoItems || sortedInfoItems.length === 0) {
         return null
@@ -316,6 +291,7 @@ function Info({
                 backgroundColor: "#ebebeb",
                 overflow: "hidden",
                 width: "100%",
+                minWidth: 360,
                 height: "fit-content",
                 padding: "80px 0px",
                 display: "flex",
@@ -325,7 +301,11 @@ function Info({
             }}
         >
             {/* 제목 */}
-            <div
+            <motion.div
+                initial={{ opacity: 0, y: 40 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, ease: "easeOut", delay: 0 }}
+                viewport={{ once: true, amount: 0.3 }}
                 style={{
                     width: "100%",
                     height: "fit-content",
@@ -344,7 +324,7 @@ function Info({
                 }}
             >
                 INFORMATION
-            </div>
+            </motion.div>
 
             {/* 슬라이드 카드 영역 */}
             <div
@@ -355,39 +335,27 @@ function Info({
                     alignItems: "center",
                 }}
             >
-                <div
+                <motion.div
+                    initial={{ opacity: 0, y: 40, scale: 0.8 }}
+                    whileInView={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ duration: 0.5, ease: "easeOut", delay: 0 }}
+                    viewport={{ once: true, amount: 0.3 }}
                     style={{
                         width: "88%",
                         height: maxCardHeight,
                         backgroundColor: "white",
                         position: "relative",
                         overflow: "hidden",
-                        cursor: sortedInfoItems.length > 1 ? "grab" : "default",
                     }}
-                    onMouseDown={
-                        sortedInfoItems.length > 1 ? handleDragStart : undefined
-                    }
-                    onMouseMove={
-                        sortedInfoItems.length > 1 ? handleDragMove : undefined
-                    }
-                    onMouseUp={sortedInfoItems.length > 1 ? handleDragEnd : undefined}
-                    onMouseLeave={
-                        sortedInfoItems.length > 1 ? handleDragEnd : undefined
-                    }
-                    onTouchStart={
-                        sortedInfoItems.length > 1 ? handleDragStart : undefined
-                    }
-                    onTouchMove={
-                        sortedInfoItems.length > 1 ? handleDragMove : undefined
-                    }
-                    onTouchEnd={
-                        sortedInfoItems.length > 1 ? handleDragEnd : undefined
-                    }
                 >
-                    <AnimatePresence initial={false} custom={slideDirection}>
+                    <AnimatePresence
+                        initial={false}
+                        custom={slideDir}
+                        mode="popLayout"
+                    >
                         <motion.div
                             key={currentIndex}
-                            custom={slideDirection}
+                            custom={slideDir}
                             variants={slideVariants}
                             initial="enter"
                             animate="center"
@@ -404,26 +372,32 @@ function Info({
                             dragConstraints={{ left: 0, right: 0 }}
                             dragElastic={0.2}
                             onDragStart={() => {
-                                setIsDragging(true)
                                 setIsAutoPlaying(false)
                             }}
-                            onDragEnd={(event, { offset, velocity }) => {
-                                setIsDragging(false)
-                                setDragOffset(0)
-
+                            onDragEnd={(e, { offset, velocity }) => {
                                 const swipe = Math.abs(offset.x) * velocity.x
-                                if (swipe < -500) {
-                                    setCurrentIndex(
-                                        (prev) => (prev + 1) % sortedInfoItems.length
-                                    )
-                                } else if (swipe > 500) {
+
+                                // 스와이프 임계값: 50px 이상 드래그 또는 빠른 스와이프
+                                if (offset.x < -50 || swipe < -500) {
+                                    // 다음 슬라이드
+                                    setSlideDir(1)
                                     setCurrentIndex(
                                         (prev) =>
-                                            (prev - 1 + sortedInfoItems.length) %
+                                            (prev + 1) % sortedInfoItems.length
+                                    )
+                                } else if (offset.x > 50 || swipe > 500) {
+                                    // 이전 슬라이드
+                                    setSlideDir(-1)
+                                    setCurrentIndex(
+                                        (prev) =>
+                                            (prev -
+                                                1 +
+                                                sortedInfoItems.length) %
                                             sortedInfoItems.length
                                     )
                                 }
 
+                                // 5초 후 자동 재생 재개
                                 setTimeout(() => setIsAutoPlaying(true), 5000)
                             }}
                             style={{
@@ -436,13 +410,16 @@ function Info({
                                 justifyContent: "center",
                                 padding: 40,
                                 boxSizing: "border-box",
-                                transform: isDragging
-                                    ? `translateX(${dragOffset}px)`
-                                    : "translateX(0)",
-                                transition: isDragging
-                                    ? "none"
-                                    : "transform 0.1s ease-out",
+                                cursor:
+                                    sortedInfoItems.length > 1
+                                        ? "grab"
+                                        : "default",
                             }}
+                            whileTap={
+                                sortedInfoItems.length > 1
+                                    ? { cursor: "grabbing" }
+                                    : {}
+                            }
                         >
                             {/* 제목 */}
                             <div
@@ -452,7 +429,10 @@ function Info({
                                     textAlign: "center",
                                     color: "#000",
                                     fontSize: 18,
-                                    fontFamily: "Pretendard SemiBold",
+                                    fontFamily:
+                                        typography.helpers.stacks
+                                            .pretendardVariable,
+                                    fontWeight: 600,
                                     lineHeight: "1.8em",
                                     marginBottom: 20,
                                 }}
@@ -465,23 +445,32 @@ function Info({
                                 style={{
                                     width: "100%",
                                     height: "100%",
-                                    textAlign: "center",
                                     color: "#000",
                                     fontSize: 15,
-                                    fontFamily: "Pretendard Regular",
+                                    fontFamily:
+                                        typography.helpers.stacks
+                                            .pretendardVariable,
                                     lineHeight: "1.8em",
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "center",
                                 }}
                             >
-                                {renderSmallSegments(
-                                    sortedInfoItems[currentIndex]?.description || ""
-                                )}
+                                <div
+                                    style={{
+                                        display: "inline-block",
+                                        textAlign: "center",
+                                    }}
+                                >
+                                    {renderInfoStyledText(
+                                        sortedInfoItems[currentIndex]
+                                            ?.description || ""
+                                    )}
+                                </div>
                             </div>
                         </motion.div>
                     </AnimatePresence>
-                </div>
+                </motion.div>
             </div>
 
             {/* 페이지네이션 */}
@@ -491,6 +480,7 @@ function Info({
                         display: "flex",
                         justifyContent: "center",
                         alignItems: "center",
+                        marginTop: "-30px",
                         gap: 8,
                     }}
                 >
@@ -501,10 +491,11 @@ function Info({
                             style={{
                                 width: 8,
                                 height: 8,
-                                borderRadius: "50%",
+                                padding: 0,
+                                borderRadius: "100%",
                                 backgroundColor:
                                     index === currentIndex
-                                        ? "#000000"
+                                        ? "rgba(0, 0, 0, 0.5)"
                                         : "rgba(0, 0, 0, 0.25)",
                                 border: "none",
                                 cursor: "pointer",
@@ -523,7 +514,7 @@ addPropertyControls(Info, {
     pageId: {
         type: ControlType.String,
         title: "page_id",
-        defaultValue: "default",
+        defaultValue: "aeyong",
         placeholder: "예: aeyong",
     },
 })

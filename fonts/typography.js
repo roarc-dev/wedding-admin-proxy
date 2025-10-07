@@ -22,10 +22,10 @@ const DEFAULT_FONT_PATHS = {
     // Many P22 Late November distributions are single-weight display fonts.
     normal: 'fonts/P22-LateNovember/P22-LateNovemberW01-Regular.woff2',
   },
-  goldenbook: {
-    // Additional display font (demo)
-    normal: 'fonts/P22-LateNovember/Fontspring-DEMO-goldenbook-regular.woff2',
-  },
+  // goldenbook: {
+  //   // Now loaded via Typekit instead of self-hosted
+  //   // normal: 'fonts/P22-LateNovember/Fontspring-DEMO-goldenbook-regular.woff2',
+  // },
 }
 
 function joinUrl(base, path) {
@@ -47,6 +47,17 @@ function injectLinkOnce(id, href) {
   document.head.appendChild(link)
 }
 
+function injectTypekitOnce(id, href) {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return
+  if (!href) return
+  if (document.getElementById(id)) return
+  const link = document.createElement('link')
+  link.id = id
+  link.rel = 'stylesheet'
+  link.href = href
+  document.head.appendChild(link)
+}
+
 function buildFontFaceCss(cdnBase, fontPaths) {
   const paths = fontPaths || DEFAULT_FONT_PATHS
   const base = cdnBase || DEFAULT_CDN_BASE
@@ -58,10 +69,7 @@ function buildFontFaceCss(cdnBase, fontPaths) {
     css.push(`@font-face{font-family:"P22 Late November";font-style:normal;font-weight:400;font-display:swap;src:url("${joinUrl(base, paths.p22.normal)}") format("woff2");}`)
   }
 
-  // Goldenbook (display)
-  if (paths.goldenbook && paths.goldenbook.normal) {
-    css.push(`@font-face{font-family:"Goldenbook";font-style:normal;font-weight:400;font-display:swap;src:url("${joinUrl(base, paths.goldenbook.normal)}") format("woff2");}`)
-  }
+  // Goldenbook is now loaded via Typekit, no @font-face needed
 
   return css.join('')
 }
@@ -84,13 +92,22 @@ function getStacks() {
     pretendardVariable: `"Pretendard Variable", Pretendard, ${systemSans}`,
     pretendard: `Pretendard, ${systemSans}`,
     p22: `"P22 Late November", "Pretendard", ${systemSans}`,
-    goldenbook: `"Goldenbook", ${systemSans}`,
+    goldenbook: `"goldenbook", ${systemSans}`,
   }
 }
 
 function makeFontStyle({ family, weight, size, lineHeight }) {
   const stacks = getStacks()
-  const familyName = family === 'p22' ? stacks.p22 : (family === 'pretendardVariable' ? stacks.pretendardVariable : stacks.pretendard)
+  let familyName
+  if (family === 'p22') {
+    familyName = stacks.p22
+  } else if (family === 'pretendardVariable') {
+    familyName = stacks.pretendardVariable
+  } else if (family === 'goldenbook') {
+    familyName = stacks.goldenbook
+  } else {
+    familyName = stacks.pretendard
+  }
   const style = {
     fontFamily: familyName,
     fontWeight: weight != null ? weight : 400,
@@ -144,6 +161,8 @@ function createTypography(options) {
       injectLinkOnce('pretendard-upstream-css', override?.pretendardHref || pretendardHref)
       // 2) P22 self-hosted @font-face
       injectFontFacesOnce({ cdnBase: override?.cdnBase || cdnBase, fontPaths: override?.fontPaths || fontPaths })
+      // 3) Goldenbook via Typekit
+      injectTypekitOnce('goldenbook-typekit', 'https://use.typekit.net/szb6mar.css')
     },
     buildFontFaceCss: (override) => buildFontFaceCss(override?.cdnBase || cdnBase, override?.fontPaths || fontPaths),
     styles,

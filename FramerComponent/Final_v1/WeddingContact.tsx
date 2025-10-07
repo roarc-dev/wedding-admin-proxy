@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { addPropertyControls, ControlType } from "framer"
+// @ts-ignore
+import typography from "https://cdn.roarc.kr/fonts/typography.js?v=27c65dba30928cbbce6839678016d9ac"
 
 /**
  * @framerDisableUnlink
@@ -10,6 +12,12 @@ import { addPropertyControls, ControlType } from "framer"
 
 // 프록시 서버 URL (고정된 Production URL)
 const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app"
+
+// 기본 아이콘 URL
+const DEFAULT_CALL_ICON_URL =
+    "https://cdn.roarc.kr/framer/ContactIcon/phone.png"
+const DEFAULT_SMS_ICON_URL =
+    "https://cdn.roarc.kr/framer/ContactIcon/sms.png.webp"
 
 // 글로벌 캐시 및 프리로딩 시스템
 const contactCache = new Map()
@@ -29,8 +37,6 @@ const preloadContactInfo = async (pageId: string) => {
     }
 
     try {
-        console.log(`🚀 Preloading contact data for pageId: ${pageId}`)
-
         const controller = new AbortController()
         const timeoutId = setTimeout(() => controller.abort(), 5000) // 5초 타임아웃
 
@@ -55,48 +61,16 @@ const preloadContactInfo = async (pageId: string) => {
                     data: result.data[0],
                     timestamp: Date.now(),
                 })
-                console.log(`✅ Preloaded contact data for pageId: ${pageId}`)
             }
         }
     } catch (error) {
         // 프리로딩 실패는 조용히 처리 (사용자에게 노출하지 않음)
-        console.log(`⚠️ Preload failed for pageId: ${pageId}`, error)
     }
 }
 
 // 글로벌 프리로딩 스케줄러
 const schedulePreload = (pageId: string) => {
     setTimeout(() => preloadContactInfo(pageId), PRELOAD_DELAY)
-}
-
-// 전화번호 형식 변환 함수 (어떤 형식이든 010-1234-5678 형식으로 변환)
-const formatPhoneNumber = (phone: string): string => {
-    if (!phone) return ""
-    
-    // 모든 구분자 제거 (하이픈, 점, 공백 등)
-    const cleaned = phone.replace(/[\s.\-()]/g, "")
-    
-    // 11자리 전화번호 (대부분의 휴대폰 번호)
-    if (cleaned.length === 11 && cleaned.startsWith("010")) {
-        return `${cleaned.substring(0, 3)}-${cleaned.substring(3, 7)}-${cleaned.substring(7)}`
-    }
-    
-    // 10자리 전화번호 (일부 지역번호 또는 특수번호)
-    if (cleaned.length === 10) {
-        if (cleaned.startsWith("02")) { // 서울 지역번호
-            return `${cleaned.substring(0, 2)}-${cleaned.substring(2, 6)}-${cleaned.substring(6)}`
-        } else { // 기타 지역번호나 특수번호
-            return `${cleaned.substring(0, 3)}-${cleaned.substring(3, 6)}-${cleaned.substring(6)}`
-        }
-    }
-    
-    // 8자리 전화번호 (일부 지역번호)
-    if (cleaned.length === 8) {
-        return `${cleaned.substring(0, 4)}-${cleaned.substring(4)}`
-    }
-    
-    // 그 외의 경우 원래 형식 유지 (잘못된 형식일 수 있음)
-    return phone
 }
 
 interface ContactInfo {
@@ -120,20 +94,41 @@ interface ContactInfo {
 
 interface WeddingContactProps {
     pageId: string
-    callIcon?: string
-    smsIcon?: string
     style?: React.CSSProperties
 }
 
 type ViewState = "closed" | "selection" | "groom" | "bride"
 
 export default function WeddingContact(props: WeddingContactProps) {
-    const { pageId = "demo", callIcon = "", smsIcon = "", style = {} } = props
+    const { pageId = "demo", style = {} } = props
 
     const [viewState, setViewState] = useState<ViewState>("selection")
     const [contactInfo, setContactInfo] = useState<ContactInfo | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [isLoading, setIsLoading] = useState(true)
+
+    // Typography 폰트 로딩
+    useEffect(() => {
+        try {
+            if (typography && typeof typography.ensure === "function") {
+                typography.ensure()
+            }
+        } catch (error) {
+            console.warn("[WeddingContact] Typography loading failed:", error)
+        }
+    }, [])
+
+    // Pretendard 폰트 스택을 안전하게 가져오기
+    const pretendardFontFamily = React.useMemo(() => {
+        try {
+            return (
+                typography?.helpers?.stacks?.pretendardVariable ||
+                '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
+            )
+        } catch {
+            return '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
+        }
+    }, [])
 
     // 즉시 캐시 확인 및 프리로딩 스케줄링
     useEffect(() => {
@@ -147,7 +142,6 @@ export default function WeddingContact(props: WeddingContactProps) {
         const cached = contactCache.get(cacheKey)
 
         if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-            console.log(`💾 Using cached data for pageId: ${pageId}`)
             setContactInfo(cached.data)
             setError(null)
             setIsLoading(false)
@@ -223,8 +217,6 @@ export default function WeddingContact(props: WeddingContactProps) {
                 )
             }
         } catch (err) {
-            console.error("연락처 정보 조회 실패:", err)
-
             if (err instanceof Error) {
                 if (err.name === "AbortError") {
                     setError(
@@ -250,34 +242,34 @@ export default function WeddingContact(props: WeddingContactProps) {
                 {
                     label: "신랑",
                     name: contactInfo.groom_name,
-                    phone: formatPhoneNumber(contactInfo.groom_phone),
+                    phone: contactInfo.groom_phone,
                 },
                 {
                     label: "혼주",
                     name: contactInfo.groom_father_name,
-                    phone: formatPhoneNumber(contactInfo.groom_father_phone),
+                    phone: contactInfo.groom_father_phone,
                 },
                 {
                     label: "혼주",
                     name: contactInfo.groom_mother_name,
-                    phone: formatPhoneNumber(contactInfo.groom_mother_phone),
+                    phone: contactInfo.groom_mother_phone,
                 },
             ].filter((contact) => contact.name && contact.phone),
             bride: [
                 {
                     label: "신부",
                     name: contactInfo.bride_name,
-                    phone: formatPhoneNumber(contactInfo.bride_phone),
+                    phone: contactInfo.bride_phone,
                 },
                 {
                     label: "혼주",
                     name: contactInfo.bride_father_name,
-                    phone: formatPhoneNumber(contactInfo.bride_father_phone),
+                    phone: contactInfo.bride_father_phone,
                 },
                 {
                     label: "혼주",
                     name: contactInfo.bride_mother_name,
-                    phone: formatPhoneNumber(contactInfo.bride_mother_phone),
+                    phone: contactInfo.bride_mother_phone,
                 },
             ].filter((contact) => contact.name && contact.phone),
         }
@@ -366,7 +358,8 @@ export default function WeddingContact(props: WeddingContactProps) {
                             <h2
                                 style={{
                                     fontSize: "14px",
-                                    fontFamily: "Pretendard SemiBold",
+                                    fontFamily: pretendardFontFamily,
+                                    fontWeight: 600,
                                     color: "#FFFFFF",
                                     margin: 0,
                                     flex: 1,
@@ -462,7 +455,8 @@ export default function WeddingContact(props: WeddingContactProps) {
                                                 borderRadius: "50%",
                                                 fontSize: "16px",
                                                 fontFamily:
-                                                    "Pretendard SemiBold",
+                                                    pretendardFontFamily,
+                                                fontWeight: 600,
                                                 color: "#1F2937",
                                                 cursor: "pointer",
                                                 display: "flex",
@@ -488,7 +482,8 @@ export default function WeddingContact(props: WeddingContactProps) {
                                                 borderRadius: "50%",
                                                 fontSize: "16px",
                                                 fontFamily:
-                                                    "Pretendard SemiBold",
+                                                    pretendardFontFamily,
+                                                fontWeight: 600,
                                                 color: "#1F2937",
                                                 cursor: "pointer",
                                                 display: "flex",
@@ -525,8 +520,9 @@ export default function WeddingContact(props: WeddingContactProps) {
                                                 }
                                                 onCall={makeCall}
                                                 onSMS={sendSMS}
-                                                callIcon={callIcon}
-                                                smsIcon={smsIcon}
+                                                pretendardFontFamily={
+                                                    pretendardFontFamily
+                                                }
                                             />
                                         </div>
 
@@ -546,7 +542,8 @@ export default function WeddingContact(props: WeddingContactProps) {
                                             <span
                                                 style={{
                                                     fontFamily:
-                                                        "Pretendard Regular",
+                                                        pretendardFontFamily,
+                                                    fontWeight: 400,
                                                     fontSize: "14px",
                                                     color: "#8c8c8c",
                                                 }}
@@ -577,8 +574,9 @@ export default function WeddingContact(props: WeddingContactProps) {
                                                 }
                                                 onCall={makeCall}
                                                 onSMS={sendSMS}
-                                                callIcon={callIcon}
-                                                smsIcon={smsIcon}
+                                                pretendardFontFamily={
+                                                    pretendardFontFamily
+                                                }
                                             />
                                         </div>
 
@@ -597,7 +595,8 @@ export default function WeddingContact(props: WeddingContactProps) {
                                             <span
                                                 style={{
                                                     fontFamily:
-                                                        "Pretendard Regular",
+                                                        pretendardFontFamily,
+                                                    fontWeight: 400,
                                                     lineHeight: 1.4,
                                                     fontSize: "14px",
                                                     color: "#8c8c8c",
@@ -628,16 +627,14 @@ interface ContactListProps {
     contacts: Contact[]
     onCall: (phone: string) => void
     onSMS: (phone: string) => void
-    callIcon?: string
-    smsIcon?: string
+    pretendardFontFamily: string
 }
 
 const ContactList = React.memo(function ContactList({
     contacts,
     onCall,
     onSMS,
-    callIcon,
-    smsIcon,
+    pretendardFontFamily,
 }: ContactListProps) {
     return (
         <div
@@ -657,13 +654,60 @@ const ContactList = React.memo(function ContactList({
                     onCall={onCall}
                     onSMS={onSMS}
                     showBorder={index < contacts.length - 1}
-                    callIcon={callIcon}
-                    smsIcon={smsIcon}
+                    pretendardFontFamily={pretendardFontFamily}
                 />
             ))}
         </div>
     )
 })
+
+// 전화번호 정규화 함수
+function normalizePhoneNumber(input: string): string {
+    if (!input) return ""
+
+    // 모든 숫자만 추출
+    const digits = String(input).replace(/\D/g, "")
+
+    // 휴대폰 번호 (11자리) - 010, 011, 016, 017, 018, 019
+    if (digits.length === 11) {
+        const prefix = digits.slice(0, 3)
+        if (["010", "011", "016", "017", "018", "019"].includes(prefix)) {
+            return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`
+        }
+    }
+
+    // 서울 지역번호 (10자리)
+    if (digits.length === 10 && digits.startsWith("02")) {
+        return `${digits.slice(0, 2)}-${digits.slice(2, 6)}-${digits.slice(6)}`
+    }
+
+    // 일반 시내 전화번호 (10자리) - 지역번호 3자리 + 국번 3-4자리
+    if (digits.length === 10) {
+        return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`
+    }
+
+    // 서울 지역번호 (9자리)
+    if (digits.length === 9 && digits.startsWith("02")) {
+        return `${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5)}`
+    }
+
+    // 일반 시내 전화번호 (9자리) - 지역번호 3자리 + 국번 3자리
+    if (digits.length === 9) {
+        return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`
+    }
+
+    // 그 외의 경우 (기본 폴백) - 끝에서 4자리를 기준으로 분리
+    if (digits.length > 7) {
+        const lastFourIndex = Math.max(0, digits.length - 4)
+        const middleIndex = Math.max(0, lastFourIndex - 3)
+        if (middleIndex > 0) {
+            return `${digits.slice(0, middleIndex)}-${digits.slice(middleIndex, lastFourIndex)}-${digits.slice(lastFourIndex)}`
+        }
+    }
+
+    // 원본 반환 (숫자가 너무 적은 경우나 처리할 수 없는 경우)
+    return input
+}
 
 // 연락처 아이템 컴포넌트 (최적화)
 interface ContactItemProps {
@@ -673,8 +717,7 @@ interface ContactItemProps {
     onCall: (phone: string) => void
     onSMS: (phone: string) => void
     showBorder?: boolean
-    callIcon?: string
-    smsIcon?: string
+    pretendardFontFamily: string
 }
 
 const ContactItem = React.memo(function ContactItem({
@@ -684,8 +727,7 @@ const ContactItem = React.memo(function ContactItem({
     onCall,
     onSMS,
     showBorder = true,
-    callIcon,
-    smsIcon,
+    pretendardFontFamily,
 }: ContactItemProps) {
     if (!name || !phone) return null
 
@@ -719,7 +761,8 @@ const ContactItem = React.memo(function ContactItem({
                 <div
                     style={{
                         fontSize: "14px",
-                        fontFamily: "Pretendard SemiBold",
+                        fontFamily: pretendardFontFamily,
+                        fontWeight: 600,
                         color: "#707070",
                         marginBottom: 0,
                         lineHeight: 1.4,
@@ -738,7 +781,8 @@ const ContactItem = React.memo(function ContactItem({
                     <div
                         style={{
                             fontSize: "16px",
-                            fontFamily: "Pretendard SemiBold",
+                            fontFamily: pretendardFontFamily,
+                            fontWeight: 600,
                             color: "#1F2937",
                             lineHeight: 1.4,
                         }}
@@ -748,12 +792,13 @@ const ContactItem = React.memo(function ContactItem({
                     <div
                         style={{
                             fontSize: "16px",
-                            fontFamily: "Pretendard Regular",
+                            fontFamily: pretendardFontFamily,
+                            fontWeight: 400,
                             color: "#000000",
                             lineHeight: 1,
                         }}
                     >
-                        {phone}
+                        {normalizePhoneNumber(phone)}
                     </div>
                 </div>
             </div>
@@ -785,19 +830,15 @@ const ContactItem = React.memo(function ContactItem({
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
                 >
-                    {callIcon ? (
-                        <img
-                            src={callIcon}
-                            alt="통화"
-                            style={{
-                                width: "18px",
-                                height: "18px",
-                                objectFit: "contain",
-                            }}
-                        />
-                    ) : (
-                        <span style={{ fontSize: "16px" }}>📞</span>
-                    )}
+                    <img
+                        src={DEFAULT_CALL_ICON_URL}
+                        alt="통화"
+                        style={{
+                            width: "18px",
+                            height: "18px",
+                            objectFit: "contain",
+                        }}
+                    />
                 </motion.button>
                 <motion.button
                     onClick={handleSMS}
@@ -815,19 +856,15 @@ const ContactItem = React.memo(function ContactItem({
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
                 >
-                    {smsIcon ? (
-                        <img
-                            src={smsIcon}
-                            alt="문자"
-                            style={{
-                                width: "18px",
-                                height: "18px",
-                                objectFit: "contain",
-                            }}
-                        />
-                    ) : (
-                        <span style={{ fontSize: "16px" }}>💬</span>
-                    )}
+                    <img
+                        src={DEFAULT_SMS_ICON_URL}
+                        alt="문자"
+                        style={{
+                            width: "18px",
+                            height: "18px",
+                            objectFit: "contain",
+                        }}
+                    />
                 </motion.button>
             </div>
         </div>
@@ -841,17 +878,5 @@ addPropertyControls(WeddingContact, {
         title: "페이지 ID",
         defaultValue: "demo",
         description: "각 결혼식 페이지를 구분하는 고유 ID",
-    },
-    callIcon: {
-        type: ControlType.File,
-        title: "통화 아이콘",
-        allowedFileTypes: ["image/*"],
-        description: "통화 버튼에 사용할 아이콘 이미지",
-    },
-    smsIcon: {
-        type: ControlType.File,
-        title: "문자 아이콘",
-        allowedFileTypes: ["image/*"],
-        description: "문자 버튼에 사용할 아이콘 이미지",
     },
 })

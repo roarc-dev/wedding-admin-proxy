@@ -161,7 +161,7 @@ async function handleGetRequest(req, res) {
 
   const { data: users, error } = await supabase
     .from('admin_users')
-    .select('id, username, name, is_active, created_at, last_login, updated_at, role, approval_status, page_id')
+    .select('id, username, name, is_active, created_at, last_login, updated_at, role, approval_status, page_id, expiry_date')
     .order('created_at', { ascending: false })
 
   if (error) {
@@ -188,7 +188,7 @@ async function handlePutRequest(req, res) {
     })
   }
 
-  const { id, username: newUsername, name: newName, is_active, newPassword, page_id: newPageId } = req.body
+  const { id, username: newUsername, name: newName, is_active, newPassword, page_id: newPageId, expiry_date } = req.body
 
   if (!id) {
     return res.status(400).json({
@@ -202,6 +202,7 @@ async function handlePutRequest(req, res) {
   if (newName) updateData.name = newName
   if (typeof is_active === 'boolean') updateData.is_active = is_active
   if (newPageId !== undefined) updateData.page_id = newPageId
+  if (expiry_date !== undefined) updateData.expiry_date = expiry_date || null
   if (newPassword) {
     updateData.password = await bcrypt.hash(newPassword, 10)
   }
@@ -211,7 +212,7 @@ async function handlePutRequest(req, res) {
     .from('admin_users')
     .update(updateData)
     .eq('id', id)
-    .select('id, username, name, is_active, updated_at, page_id, approval_status')
+    .select('id, username, name, is_active, updated_at, page_id, approval_status, expiry_date')
     .single()
 
   if (error) {

@@ -5,9 +5,12 @@ import * as React from "react"
 import { addPropertyControls, ControlType } from "framer"
 
 // @ts-ignore
-import AccountComplete from "./AccountComplete.js"
+import AccountComplete from "https://cdn.roarc.kr/framer/components/AccountComplete_older.js?dev=1"
 
-function AccountCompleteCdn(props: { pageId?: string; style?: React.CSSProperties }) {
+function AccountCompleteCdn(props: {
+    pageId?: string
+    style?: React.CSSProperties
+}) {
     const { pageId = "default", style } = props
     return <AccountComplete pageId={pageId} style={style} />
 }
@@ -24,5 +27,3 @@ addPropertyControls(AccountCompleteCdn, {
 })
 
 export default AccountCompleteCdn as React.ComponentType
-
-

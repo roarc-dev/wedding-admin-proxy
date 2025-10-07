@@ -1,14 +1,14 @@
-// v0.0.4
-// AccountComplete.js — Accout.tsx 기능을 React.createElement 기반 JS로 변환
+// v0.0.6
+// AccountComplete.js – Account.tsx 기능을 React.createElement 기반 JS로 변환
 // - 브라우저 ESM
 // - JSX/TS 미사용 (createElement)
 // - Framer/React 전역 런타임에서 동작
 // - typography.js를 통해 폰트 로딩 보장
+// - 브라우저에서 CSS transition 폴백으로 애니메이션 구현
 
 import { jsx, jsxs, Fragment } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
 import typography from "https://cdn.roarc.kr/fonts/typography.js?v=73ec350103c71ae8190673accafe44f1";
-import { motion } from "framer-motion";
 
 // 프록시 서버 URL (고정된 Production URL)
 const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app";
@@ -35,23 +35,50 @@ function AccountComplete(props) {
   const g = (typeof globalThis !== "undefined" && globalThis) || (typeof window !== "undefined" ? window : {});
   const ReactLocal = (g && (g.React || (g.Framer && g.Framer.React))) || null;
   if (!ReactLocal) {
-    // Framer의 사전 최적화/분석 단계에서는 React 글로벌이 없을 수 있음. 런타임이 아니면 렌더를 생략.
     return null;
   }
   const React = ReactLocal;
-  const { useState, useEffect } = ReactLocal;
+  const { useState, useEffect, useRef } = ReactLocal;
 
-  // framer-motion 환경 감지 (없으면 폴백 제공)
+  // framer-motion 환경 감지
   const framerNS = (g && g.Framer) || {};
-  const motionEnv = (framerNS && framerNS.motion) || g.motion || null;
-  let motion = motionEnv;
-  if (!motion || !motion.div || !motion.button) {
-    const factory = (tag) => (props) => React.createElement(tag, props, props && props.children);
-    motion = { div: factory("div"), button: factory("button"), svg: factory("svg") };
-  }
-  const AnimatePresence = (framerNS && framerNS.AnimatePresence) || ((props) => React.createElement(React.Fragment, null, props.children));
+  let motion = null;
+  let AnimatePresence = null;
 
-  const [groomViewState, setGroomViewState] = useState("closed"); // "closed" | "open"
+  if (framerNS && framerNS.motion) {
+    motion = framerNS.motion;
+    AnimatePresence = framerNS.AnimatePresence;
+  } else if (g.motion) {
+    motion = g.motion;
+    AnimatePresence = g.AnimatePresence;
+  }
+
+  // motion이 없으면 CSS transition을 사용하는 폴백 컴포넌트 생성
+  const useMotionFallback = !motion || !motion.div;
+
+  if (useMotionFallback) {
+    // CSS transition을 사용하는 폴백
+    const factory = (tag) => React.forwardRef((props, ref) => {
+      const { animate, initial, exit, transition, whileInView, viewport, ...cleanProps } = props || {};
+      
+      // 인라인 스타일에 transition 추가
+      const enhancedStyle = {
+        ...cleanProps.style,
+        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      };
+
+      return React.createElement(tag, { ...cleanProps, ref, style: enhancedStyle }, props && props.children);
+    });
+
+    motion = { 
+      div: factory("div"), 
+      button: factory("button"), 
+      svg: factory("svg") 
+    };
+    AnimatePresence = (props) => React.createElement(React.Fragment, null, props.children);
+  }
+
+  const [groomViewState, setGroomViewState] = useState("closed");
   const [brideViewState, setBrideViewState] = useState("closed");
   const [accountInfo, setAccountInfo] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -59,10 +86,49 @@ function AccountComplete(props) {
   const [copyMessage, setCopyMessage] = useState("");
   const [showCopyMessage, setShowCopyMessage] = useState(false);
 
+  // 스크롤 애니메이션을 위한 visibility 상태
+  const [titleVisible, setTitleVisible] = useState(false);
+  const [accountsVisible, setAccountsVisible] = useState(false);
+  const [brideVisible, setBrideVisible] = useState(false);
+
+  const titleRef = useRef(null);
+  const accountsRef = useRef(null);
+  const brideRef = useRef(null);
+
   // 폰트 로딩 보장
   useEffect(() => {
     try { typography && typeof typography.ensure === "function" && typography.ensure(); } catch (_) {}
   }, []);
+
+  // IntersectionObserver를 사용한 스크롤 애니메이션 (폴백용)
+  useEffect(() => {
+    if (!useMotionFallback) return;
+
+    const observerOptions = {
+      threshold: 0.3,
+      rootMargin: '0px'
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          if (entry.target === titleRef.current) {
+            setTimeout(() => setTitleVisible(true), 0);
+          } else if (entry.target === accountsRef.current) {
+            setTimeout(() => setAccountsVisible(true), 150);
+          } else if (entry.target === brideRef.current) {
+            setTimeout(() => setBrideVisible(true), 300);
+          }
+        }
+      });
+    }, observerOptions);
+
+    if (titleRef.current) observer.observe(titleRef.current);
+    if (accountsRef.current) observer.observe(accountsRef.current);
+    if (brideRef.current) observer.observe(brideRef.current);
+
+    return () => observer.disconnect();
+  }, [useMotionFallback, accountInfo]);
 
   // 계좌 정보 로드
   const loadAccountInfo = async () => {
@@ -168,27 +234,123 @@ function AccountComplete(props) {
 
   const ExpandSection = ({ title, accounts }) => {
     const isOpen = accounts.open === true;
+    const [rotation, setRotation] = useState(0);
+    const [contentHeight, setContentHeight] = useState(0);
+    const [currentHeight, setCurrentHeight] = useState(54);
+    const contentRef = useRef(null);
+
+    useEffect(() => {
+      setRotation(isOpen ? 180 : 0);
+    }, [isOpen]);
+
+    // 컨텐츠 높이 측정 (초기 마운트 시)
+    useEffect(() => {
+      if (contentRef.current) {
+        const measured = contentRef.current.scrollHeight;
+        setContentHeight(measured);
+      }
+    }, [accountInfo]);
+
+    // 높이 애니메이션을 위한 상태 업데이트
+    useEffect(() => {
+      if (isOpen) {
+        // 열릴 때: 현재 높이를 54로 설정 후, 다음 프레임에 전체 높이로 변경
+        setCurrentHeight(54);
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            setCurrentHeight(54 + contentHeight);
+          });
+        });
+      } else {
+        // 닫힐 때: 현재 높이를 전체 높이로 설정 후, 다음 프레임에 54로 변경
+        setCurrentHeight(54 + contentHeight);
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            setCurrentHeight(54);
+          });
+        });
+      }
+    }, [isOpen, contentHeight]);
+
     const header = React.createElement("div", {
-      style: { alignSelf: "stretch", height: 54, minHeight: 54, maxHeight: 54, background: "#EBEBEB", justifyContent: "center", alignItems: "center", gap: 10, display: "inline-flex", cursor: "pointer", flexShrink: 0 },
+      style: { 
+        alignSelf: "stretch", 
+        height: 54, 
+        minHeight: 54, 
+        maxHeight: 54, 
+        background: "#EBEBEB", 
+        justifyContent: "center", 
+        alignItems: "center", 
+        gap: 10, 
+        display: "inline-flex", 
+        cursor: "pointer", 
+        flexShrink: 0 
+      },
       onClick: accounts.onToggle
     },
-      React.createElement("div", { style: { color: "black", fontSize: 14, fontFamily: "Pretendard SemiBold", wordWrap: "break-word" } }, title),
-      React.createElement(motion.svg, { width: 15, height: 8, viewBox: "0 0 15 8", fill: "none", xmlns: "http://www.w3.org/2000/svg", animate: { rotate: isOpen ? 180 : 0 }, transition: { duration: 0, ease: "easeInOut" } },
+      React.createElement("div", { 
+        style: { 
+          color: "black", 
+          fontSize: 14, 
+          fontFamily: "Pretendard SemiBold", 
+          wordWrap: "break-word" 
+        } 
+      }, title),
+      React.createElement("svg", { 
+        width: 15, 
+        height: 8, 
+        viewBox: "0 0 15 8", 
+        fill: "none", 
+        xmlns: "http://www.w3.org/2000/svg",
+        style: {
+          transform: `rotate(${rotation}deg)`,
+          transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+          transformOrigin: "center"
+        }
+      },
         React.createElement("g", { id: "Group 2117912660" },
-          React.createElement("path", { id: "Vector 1121", d: "M1.5 1L7.5 6.5L13.5 1", stroke: "black", strokeWidth: 1.5 })
+          React.createElement("path", { 
+            id: "Vector 1121", 
+            d: "M1.5 1L7.5 6.5L13.5 1", 
+            stroke: "black", 
+            strokeWidth: 1.5 
+          })
         )
       )
     );
 
-    const list = isOpen ? React.createElement(motion.div, {
-      style: { alignSelf: "stretch", padding: "15px 15px 0px 15px", flexDirection: "column", justifyContent: "flex-start", alignItems: "flex-start", gap: 10, display: "flex", boxSizing: "border-box" },
-      initial: { opacity: 0, y: -10 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -10 }, transition: { duration: 0.2, ease: "easeOut" }
-    }, accounts.items()) : null;
+    const list = React.createElement("div", {
+      ref: contentRef,
+      style: { 
+        alignSelf: "stretch", 
+        padding: "15px 15px 0px 15px", 
+        flexDirection: "column", 
+        justifyContent: "flex-start", 
+        alignItems: "flex-start", 
+        gap: 10, 
+        display: "flex", 
+        boxSizing: "border-box",
+        opacity: isOpen ? 1 : 0,
+        transform: isOpen ? 'translateY(0)' : 'translateY(-10px)',
+        transition: 'opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+      }
+    }, accounts.items());
 
-    return React.createElement(motion.div, {
-      style: { width: "100%", maxWidth: 378, background: "white", overflow: "hidden", flexDirection: "column", justifyContent: "flex-start", alignItems: "center", display: "inline-flex", boxSizing: "border-box" },
-      initial: false, animate: { height: isOpen ? "auto" : 54 }, transition: { duration: 0.3, ease: "easeInOut" }
-    }, header, React.createElement(AnimatePresence, null, list));
+    return React.createElement("div", {
+      style: { 
+        width: "100%", 
+        maxWidth: 378, 
+        background: "white", 
+        overflow: "hidden", 
+        flexDirection: "column", 
+        justifyContent: "flex-start", 
+        alignItems: "center", 
+        display: "inline-flex", 
+        boxSizing: "border-box",
+        height: currentHeight,
+        transition: 'height 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+      }
+    }, header, list);
   };
 
   const groomSection = React.createElement(ExpandSection, {
@@ -234,22 +396,95 @@ function AccountComplete(props) {
   });
 
   // 복사 토스트
-  const toast = React.createElement(AnimatePresence, null,
-    showCopyMessage ? React.createElement(motion.div, {
-      style: { position: "absolute", top: "50%", left: "25%", transform: "translate(-50%, -50%)", width: "80%", maxWidth: 200, height: 40, background: "#FFFFFF", borderRadius: 5, display: "flex", justifyContent: "center", alignItems: "center", boxShadow: "0px 0px 10px rgba(0, 0, 0, 0.1)", zIndex: 1000, pointerEvents: "none" },
-      initial: { opacity: 0, scale: 0.8 }, animate: { opacity: 1, scale: 1 }, exit: { opacity: 0, scale: 0.8 }, transition: { duration: 0.2 }
-    }, React.createElement("div", { style: { color: "#000000", fontSize: 14, fontFamily: "Pretendard Regular", textAlign: "center" } }, copyMessage)) : null
-  );
+  const toast = showCopyMessage ? React.createElement("div", {
+    style: { 
+      position: "absolute", 
+      top: "50%", 
+      left: "25%", 
+      transform: "translate(-50%, -50%)", 
+      width: "80%", 
+      maxWidth: 200, 
+      height: 40, 
+      background: "#FFFFFF", 
+      borderRadius: 5, 
+      display: "flex", 
+      justifyContent: "center", 
+      alignItems: "center", 
+      boxShadow: "0px 0px 10px rgba(0, 0, 0, 0.1)", 
+      zIndex: 1000, 
+      pointerEvents: "none",
+      opacity: showCopyMessage ? 1 : 0,
+      scale: showCopyMessage ? 1 : 0.8,
+      transition: 'opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+    }
+  }, React.createElement("div", { 
+    style: { 
+      color: "#000000", 
+      fontSize: 14, 
+      fontFamily: "Pretendard Regular", 
+      textAlign: "center" 
+    } 
+  }, copyMessage)) : null;
+
+  // 스크롤 애니메이션용 스타일 (폴백용)
+  const getScrollAnimStyle = (isVisible) => useMotionFallback ? {
+    opacity: isVisible ? 1 : 0,
+    transform: isVisible ? 'translateY(0)' : 'translateY(16px)',
+    transition: 'opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1), transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+  } : {};
 
   return React.createElement("div", { style: { marginTop: 80, marginBottom: 80, display: "flex", justifyContent: "center" } },
     React.createElement("div", { style: { width: "100%", display: "flex", flexDirection: "column", gap: 10, ...(style || {}) } },
-      // 안내 텍스트 박스 (애니메이션 래핑)
-      React.createElement(motion.div, { style: { width: "100%", paddingBottom: 30, display: "flex", flexDirection: "column", gap: 20, boxSizing: "border-box", alignItems: "center" }, initial: { opacity: 0, y: 16 }, whileInView: { opacity: 1, y: 0 }, transition: { duration: 0.5, ease: "easeOut", delay: 0 }, viewport: { once: true, amount: 0.3 } }, titleText, subText),
+      // 안내 텍스트 박스
+      React.createElement(useMotionFallback ? "div" : motion.div, { 
+        ref: titleRef,
+        style: { 
+          width: "100%", 
+          paddingBottom: 30, 
+          display: "flex", 
+          flexDirection: "column", 
+          gap: 20, 
+          boxSizing: "border-box", 
+          alignItems: "center",
+          ...getScrollAnimStyle(titleVisible)
+        }, 
+        ...(useMotionFallback ? {} : {
+          initial: { opacity: 0, y: 16 },
+          whileInView: { opacity: 1, y: 0 },
+          transition: { duration: 0.5, ease: [0.4, 0, 0.2, 1], delay: 0 },
+          viewport: { once: true, amount: 0.3 }
+        })
+      }, titleText, subText),
 
       // 계좌 버튼 컨테이너 88%
-      React.createElement(motion.div, { style: { width: "88%", display: "flex", flexDirection: "column", gap: 10, alignSelf: "center" }, initial: { opacity: 0, y: 16 }, whileInView: { opacity: 1, y: 0 }, transition: { duration: 0.5, ease: "easeOut", delay: 0.15 }, viewport: { once: true, amount: 0.3 } },
+      React.createElement(useMotionFallback ? "div" : motion.div, { 
+        ref: accountsRef,
+        style: { 
+          width: "88%", 
+          display: "flex", 
+          flexDirection: "column", 
+          gap: 10, 
+          alignSelf: "center",
+          ...getScrollAnimStyle(accountsVisible)
+        }, 
+        ...(useMotionFallback ? {} : {
+          initial: { opacity: 0, y: 16 },
+          whileInView: { opacity: 1, y: 0 },
+          transition: { duration: 0.5, ease: [0.4, 0, 0.2, 1], delay: 0.15 },
+          viewport: { once: true, amount: 0.3 }
+        })
+      },
         groomSection,
-        React.createElement(motion.div, { initial: { opacity: 0, y: 16 }, whileInView: { opacity: 1, y: 0 }, transition: { duration: 0.5, ease: "easeOut", delay: 0.3 }, viewport: { once: true, amount: 0.3 } }, brideSection)
+        React.createElement(useMotionFallback ? "div" : motion.div, {
+          ref: brideRef,
+          style: getScrollAnimStyle(brideVisible),
+          ...(useMotionFallback ? {} : {
+            initial: { opacity: 0, y: 16 },
+            whileInView: { opacity: 1, y: 0 },
+            transition: { duration: 0.5, ease: [0.4, 0, 0.2, 1], delay: 0.3 },
+            viewport: { once: true, amount: 0.3 }
+          })
+        }, brideSection)
       ),
 
       toast
@@ -259,4 +494,3 @@ function AccountComplete(props) {
 
 AccountComplete.displayName = "AccountComplete";
 export default AccountComplete;
-

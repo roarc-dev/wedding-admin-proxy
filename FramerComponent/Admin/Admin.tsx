@@ -8,6 +8,8 @@ import React, {
 import ReactDOM from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { addPropertyControls, ControlType } from "framer"
+// @ts-ignore
+import typography from "https://cdn.roarc.kr/fonts/typography.js?v=27c65dba30928cbbce6839678016d9ac"
 
 // ======= Gallery Minis (single-file, inline styles) =======
 // Key generation utilities for R2
@@ -144,7 +146,7 @@ function UiRadioGroup({
                             />
                             <div
                                 style={{
-                                    fontFamily: theme.font.bodyBold,
+                                    ...theme.typography.label,
                                     fontSize: theme.text.sm,
                                     color: theme.color.text,
                                 }}
@@ -191,7 +193,7 @@ function UiIndexPill({ index }: { index: number }) {
                 border: `1px solid ${theme.color.border}`,
                 display: "grid",
                 placeItems: "center",
-                fontFamily: theme.font.bodyBold,
+                ...theme.typography.label,
                 fontSize: theme.text.sm,
             }}
         >
@@ -421,7 +423,7 @@ function UiPhotoTile({
                             style={{
                                 color: "black",
                                 fontSize: 14,
-                                fontFamily: "Pretendard SemiBold",
+                                ...theme.typography.label,
                                 wordWrap: "break-word",
                             }}
                         >
@@ -498,7 +500,7 @@ function UiPhotoTile({
                         style={{
                             color: "#757575",
                             fontSize: 12,
-                            fontFamily: "Pretendard SemiBold",
+                            ...theme.typography.label,
                             wordWrap: "break-word",
                         }}
                     >
@@ -599,7 +601,7 @@ function EmptyState({
         <div style={{ textAlign: "center", padding: theme.space(2) }}>
             <div
                 style={{
-                    fontFamily: theme.font.bodyBold,
+                    ...theme.font.bodyBold,
                     fontSize: theme.text.sm,
                     color: theme.color.text,
                     marginBottom: theme.space(2),
@@ -651,9 +653,20 @@ const theme: any = {
         },
     },
     font: {
-        body: "Pretendard Regular",
-        bodyBold: "Pretendard SemiBold",
-        display: "P22LateNovemberW01-Regular Regular, serif",
+        // Info.tsx와 동일하게 pretendardVariable 스택을 사용
+        body:
+            typography?.helpers?.stacks?.pretendardVariable ||
+            '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"',
+        // bodyBold는 pretendardVariable 스택 + weight:600 사용을 전제로 함
+        bodyBold: {
+            fontFamily:
+                typography?.helpers?.stacks?.pretendardVariable ||
+                '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"',
+            fontWeight: 600,
+        },
+        display:
+            typography?.helpers?.stacks?.p22 ||
+            "P22LateNovemberW01-Regular Regular, serif",
     },
     radius: { xs: 0, sm: 2, md: 0, lg: 0, xl: 24, pill: 999 },
     shadow: {
@@ -679,19 +692,28 @@ const theme: any = {
         xl: 20,
         xxl: 24,
     },
-    // 공통 타이포그래피 스타일
+    // 공통 타이포그래피 스타일 (Info.tsx와 동일: pretendardVariable + weight)
     typography: {
         label: {
-            fontFamily: "Pretendard SemiBold",
+            fontFamily:
+                typography?.helpers?.stacks?.pretendardVariable ||
+                '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"',
+            fontWeight: 600,
             fontSize: 14,
             color: "black",
         },
         body: {
-            fontFamily: "Pretendard Regular",
+            fontFamily:
+                typography?.helpers?.stacks?.pretendardVariable ||
+                '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"',
+            fontWeight: 400,
             fontSize: 14,
         },
         sectionHeader: {
-            fontFamily: "Pretendard Regular",
+            fontFamily:
+                typography?.helpers?.stacks?.pretendardVariable ||
+                '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"',
+            fontWeight: 400,
             fontSize: 14,
             color: "#757575",
         },
@@ -722,7 +744,7 @@ function mergeStyles(
 type FormFieldProps = {
     label: string
     htmlFor?: string
-    helpText?: string
+    helpText?: React.ReactNode
     required?: boolean
     gap?: number // 묶음 간격 override
     labelGap?: number // 라벨-입력 간격 override
@@ -755,9 +777,9 @@ function FormField({
             <label
                 htmlFor={htmlFor}
                 style={{
+                    ...theme.typography.label,
                     color: theme.color.text,
                     fontSize: 14,
-                    fontFamily: "Pretendard SemiBold",
                     ...labelStyle,
                 }}
             >
@@ -810,7 +832,7 @@ const InputBase = React.forwardRef<HTMLInputElement, InputBaseProps>(
                     outline: "none",
                     background: theme.color.surface,
                     color: theme.color.text,
-                    fontFamily: "Pretendard Regular",
+                    fontFamily: theme.font.body,
                     fontSize: 14,
                     ...style,
                 }}
@@ -846,7 +868,7 @@ const ButtonBase: React.FC<ButtonBaseProps> = ({
                 background: isPrimary ? theme.color.primary : theme.color.bg,
                 color: isPrimary ? theme.color.primaryText : theme.color.text,
                 cursor: "pointer",
-                fontFamily: "Pretendard Regular",
+                fontFamily: theme.font.body,
                 fontSize: 14,
                 ...style,
             }}
@@ -879,7 +901,7 @@ function Button({
         border: 0,
         cursor: disabled ? "not-allowed" : "pointer",
         borderRadius: theme.radius.lg,
-        fontFamily: theme.font.bodyBold,
+        ...theme.font.bodyBold,
         transition: "transform .05s ease, opacity .2s ease",
         width: fullWidth ? "100%" : undefined,
         whiteSpace: "nowrap",
@@ -1025,7 +1047,7 @@ function AdminFooter() {
                 style={{
                     color: "#BABABA",
                     fontSize: 12,
-                    fontFamily: "Pretendard Regular",
+                    fontFamily: theme.font.body,
                     wordWrap: "break-word",
                 }}
             >
@@ -1126,7 +1148,7 @@ function Section({
                         style={{
                             color: theme.color.roarc.grey600,
                             fontSize: "16px",
-                            fontFamily: "Pretendard Regular",
+                            fontFamily: theme.font.body,
                             wordWrap: "break-word",
                         }}
                     >
@@ -1267,7 +1289,10 @@ function SaveBar({
                 onClick={onSave}
                 disabled={!!loading}
                 fullWidth
-                style={{ fontFamily: "Pretendard SemiBold", fontSize: 14 }}
+                style={{
+                    ...theme.font.bodyBold,
+                    fontSize: 14,
+                }}
             >
                 {loading ? "저장 중..." : (label ?? "저장")}
             </Button>
@@ -1313,9 +1338,10 @@ function Field({
                 >
                     <div
                         style={{
-                            fontFamily: theme.font.bodyBold,
-                            fontSize: theme.text.sm,
+                            ...theme.typography.label,
+                            // 기존 UX 유지: 색상과 크기는 현행 유지
                             color: theme.color.sub,
+                            fontSize: theme.text.sm,
                         }}
                     >
                         {label}
@@ -1526,22 +1552,18 @@ function FieldRow({
 function AccordionSection({
     title,
     sectionKey,
-    openMap,
+    isOpen,
     onToggle,
     children,
 }: {
     title: string
     sectionKey: string
-    openMap: Record<string, boolean>
-    onToggle: (key: string) => void
+    isOpen: boolean
+    onToggle: () => void
     children: React.ReactNode
 }) {
     return (
-        <Section
-            title={title}
-            isOpen={!!openMap[sectionKey]}
-            onToggle={() => onToggle(sectionKey)}
-        >
+        <Section title={title} isOpen={isOpen} onToggle={onToggle}>
             {children}
         </Section>
     )
@@ -1588,7 +1610,7 @@ function NameDisplay({
                 display: "flex",
                 alignItems: "center",
                 fontSize: 14,
-                fontFamily: "Pretendard Regular",
+                fontFamily: theme.font.body,
                 color: name ? "black" : "#ADADAD",
             }}
         >
@@ -1644,7 +1666,7 @@ function InlineNameSection({
         >
             <div
                 style={{
-                    fontFamily: "P22LateNovemberW01-Regular Regular",
+                    fontFamily: theme.font.display,
                     fontSize: responsiveFontSize,
                     textAlign: "center",
                     lineHeight: 1.2,
@@ -1685,7 +1707,7 @@ function InlineNameSection({
             </div>
             <div
                 style={{
-                    fontFamily: "P22LateNovemberW01-Regular Regular",
+                    fontFamily: theme.font.display,
                     fontSize: responsiveFontSize,
                     textAlign: "center",
                     lineHeight: 1.2,
@@ -1916,7 +1938,7 @@ function InlineCalendarPreview({
                 style={{
                     fontSize: 16,
                     lineHeight: "1.8em",
-                    fontFamily: "Pretendard Regular",
+                    fontFamily: theme.font.body,
                     textAlign: "center",
                     marginBottom: 20,
                 }}
@@ -1958,7 +1980,7 @@ function InlineCalendarPreview({
                             style={{
                                 fontSize: theme.text.md,
                                 lineHeight: "2.6em",
-                                fontFamily: theme.font.bodyBold,
+                                ...theme.font.bodyBold,
                                 marginBottom: theme.space(1.25),
                             }}
                         >
@@ -2042,8 +2064,8 @@ function InlineCalendarPreview({
                                                     ? textColorCss
                                                     : undefined,
                                                 fontFamily: isHighlighted(d)
-                                                    ? "Pretendard SemiBold"
-                                                    : "Pretendard Regular",
+                                                    ? theme.font.bodyBold
+                                                    : theme.font.body,
                                                 zIndex: 1,
                                                 position: "relative",
                                             }}
@@ -2071,7 +2093,7 @@ function InlineCalendarPreview({
                     style={{
                         fontSize: 17,
                         lineHeight: "1em",
-                        fontFamily: "Pretendard Regular",
+                        fontFamily: theme.font.body,
                         textAlign: "center",
                         marginBottom: 10,
                     }}
@@ -2082,7 +2104,7 @@ function InlineCalendarPreview({
                     style={{
                         fontSize: 17,
                         lineHeight: "1em",
-                        fontFamily: "Pretendard SemiBold",
+                        ...theme.font.bodyBold,
                         textAlign: "center",
                     }}
                 >
@@ -2855,6 +2877,63 @@ function AdminMainContent(props: any) {
     let currentSaveImageOrder: (() => Promise<void>) | null = null
     let currentIsSavingOrder = false
 
+    // Typography 폰트 로딩
+    useEffect(() => {
+        try {
+            if (typography && typeof typography.ensure === "function") {
+                typography.ensure()
+            }
+        } catch (error) {
+            console.warn("[Admin] Typography loading failed:", error)
+        }
+    }, [])
+
+    // Pretendard 폰트 스택을 안전하게 가져오기
+    const pretendardFontFamily = React.useMemo(() => {
+        try {
+            return (
+                typography?.helpers?.stacks?.pretendardVariable ||
+                '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
+            )
+        } catch {
+            return '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
+        }
+    }, [])
+
+    // Pretendard Regular 스타일 (weight: 400)
+    const pretendardRegularStyle: React.CSSProperties = React.useMemo(() => {
+        try {
+            return (
+                typography?.helpers?.fontPretendard?.(400) || {
+                    fontFamily: pretendardFontFamily,
+                    fontWeight: 400,
+                }
+            )
+        } catch {
+            return {
+                fontFamily: pretendardFontFamily,
+                fontWeight: 400,
+            }
+        }
+    }, [pretendardFontFamily])
+
+    // Pretendard SemiBold 스타일 (weight: 600)
+    const pretendardSemiBoldStyle: React.CSSProperties = React.useMemo(() => {
+        try {
+            return (
+                typography?.helpers?.fontPretendard?.(600) || {
+                    fontFamily: pretendardFontFamily,
+                    fontWeight: 600,
+                }
+            )
+        } catch {
+            return {
+                fontFamily: pretendardFontFamily,
+                fontWeight: 600,
+            }
+        }
+    }, [pretendardFontFamily])
+
     // 공통 상태
     const [isAuthenticated, setIsAuthenticated] = useState(false)
     const [currentUser, setCurrentUser] = useState<any>(null)
@@ -2864,20 +2943,10 @@ function AdminMainContent(props: any) {
     // 탭 상태 관리
     const [activeTab, setActiveTab] = useState<"basic" | "gallery">("basic")
 
-    // 아코디언 상태 관리
-    const [openSections, setOpenSections] = useState({
-        name: true, // "성함" 섹션은 기본적으로 열림
-        photo: false,
-        invite: false,
-        rsvp: false, // RSVP 섹션
-        transport: false,
-        calendar: false,
-        images: false,
-        contacts: false,
-        account: false,
-        kakaoShare: false,
-        bgm: false,
-    })
+    // 아코디언 상태 관리 (한 번에 하나의 섹션만 열림)
+    const [currentOpenSection, setCurrentOpenSection] = useState<string | null>(
+        "name"
+    ) // "성함" 섹션은 기본적으로 열림
     const [currentPageId, setCurrentPageId] = useState("")
     // 페이지 선택/리스트 관련 로직 제거 (사전 부여된 page_id만 사용)
     const [assignedPageId, setAssignedPageId] = useState<string | null>(null)
@@ -3069,6 +3138,7 @@ function AdminMainContent(props: any) {
         highlight_text_color: "black",
         gallery_type: "thumbnail",
         rsvp: "off", // RSVP 활성화 상태
+        comments: "off", // 방명록 활성화 상태
         kko_img: "", // 카카오톡 공유 이미지
         kko_title: "", // 카카오톡 공유 제목
         kko_date: "", // 카카오톡 공유 날짜
@@ -3077,6 +3147,7 @@ function AdminMainContent(props: any) {
         bgm_autoplay: false,
     })
     const [settingsLoading, setSettingsLoading] = useState(false)
+    const [hasLoadedSettings, setHasLoadedSettings] = useState(false)
     const [compressProgress, setCompressProgress] = useState<number | null>(
         null
     )
@@ -3104,6 +3175,7 @@ function AdminMainContent(props: any) {
 
     useEffect(() => {
         setKkoDefaultsApplied(false)
+        setHasLoadedSettings(false)
     }, [currentPageId])
     // 미리보기용 포맷터 및 프롭 빌더
     const formatPhotoDisplayDateTime = (): string => {
@@ -3189,10 +3261,7 @@ function AdminMainContent(props: any) {
         return {
             imageUrl: getPhotoSectionDisplayUrl(),
             displayDateTime: formatPhotoDisplayDateTime(),
-            location:
-                pageSettings.photo_section_location ||
-                pageSettings.venue_name ||
-                undefined,
+            location: pageSettings.venue_name || undefined,
             overlayPosition:
                 (pageSettings.photo_section_overlay_position as
                     | "top"
@@ -3275,6 +3344,7 @@ function AdminMainContent(props: any) {
 
         if (Object.keys(defaults).length > 0) {
             setPageSettings((prev) => ({ ...prev, ...defaults }))
+            // 초기 로딩 이전에는 기본값만 부분 저장하여 공백 병합을 방지
             void savePageSettings(defaults)
             const nextTitle = defaults.kko_title ?? pageSettings.kko_title
             const nextDate = defaults.kko_date ?? pageSettings.kko_date
@@ -3340,7 +3410,8 @@ function AdminMainContent(props: any) {
     // 초대글 미리보기: InviteName.tsx 렌더링 로직과 동일한 스타일 구현
     const renderBoldSegmentsPreview = (
         text: string,
-        baseStyle?: React.CSSProperties
+        baseStyle?: React.CSSProperties,
+        pretendardSemiBoldStyle?: React.CSSProperties
     ): JSX.Element[] => {
         const out: JSX.Element[] = []
         let last = 0
@@ -3365,7 +3436,7 @@ function AdminMainContent(props: any) {
                     key={`b-${key++}`}
                     style={{
                         ...(baseStyle || {}),
-                        fontFamily: "Pretendard SemiBold",
+                        ...(pretendardSemiBoldStyle || {}),
                     }}
                 >
                     {boldText}
@@ -3385,65 +3456,71 @@ function AdminMainContent(props: any) {
         return out
     }
 
-    const renderInvitationSegmentsPreview = (text: string): JSX.Element[] => {
-        const lines = (text || "").split("\n")
-        const rendered: JSX.Element[] = []
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i]
+    const renderInvitationSegmentsPreview = (
+        text: string,
+        pretendardSemiBoldStyle?: React.CSSProperties
+    ): JSX.Element[] => {
+        const out: JSX.Element[] = []
+        let last = 0
+        let key = 0
+
+        // 보라색 인용: 줄바꿈 포함 허용
+        const quoteRe = /\{([\s\S]*?)\}/g
+        let m: RegExpExecArray | null
+
+        // 공통: 줄바꿈 보존하면서 굵기 처리
+        const renderWithLineBreaks = (
+            value: string,
+            baseStyle?: React.CSSProperties
+        ): JSX.Element[] => {
+            const lines = value.split("\n")
             const parts: JSX.Element[] = []
-            let lastIndex = 0
-            let keySeq = 0
-            const regex = /\{([^}]*)\}/g
-            let match: RegExpExecArray | null
-            while ((match = regex.exec(line)) !== null) {
-                const start = match.index
-                const end = start + match[0].length
-                if (start > lastIndex) {
-                    const chunk = line.slice(lastIndex, start)
-                    if (chunk)
-                        parts.push(
-                            <span key={`t-${i}-${keySeq++}`}>
-                                {renderBoldSegmentsPreview(chunk)}
-                            </span>
-                        )
-                }
-                const inner = match[1]
-                if (inner)
-                    parts.push(
-                        <span
-                            key={`q-${i}-${keySeq++}`}
-                            style={{
-                                fontSize: 14,
-                                lineHeight: "1em",
-                                color: "#6e6e6e",
-                            }}
-                        >
-                            {renderBoldSegmentsPreview(inner, {
-                                fontSize: 14,
-                                lineHeight: "1em",
-                                color: "#6e6e6e",
-                            })}
-                        </span>
-                    )
-                lastIndex = end
+            for (let i = 0; i < lines.length; i++) {
+                parts.push(
+                    <span key={`lw-${key++}`}>
+                        {renderBoldSegmentsPreview(
+                            lines[i],
+                            baseStyle,
+                            pretendardSemiBoldStyle
+                        )}
+                    </span>
+                )
+                if (i !== lines.length - 1)
+                    parts.push(<br key={`br-${key++}`} />)
             }
-            if (lastIndex < line.length) {
-                const rest = line.slice(lastIndex)
-                if (rest)
-                    parts.push(
-                        <span key={`t-${i}-${keySeq++}`}>
-                            {renderBoldSegmentsPreview(rest)}
-                        </span>
-                    )
-            }
-            rendered.push(
-                <span key={`line-${i}`}>
-                    {parts}
-                    {i !== lines.length - 1 && <br />}
-                </span>
-            )
+            return parts
         }
-        return rendered
+
+        while ((m = quoteRe.exec(text)) !== null) {
+            const start = m.index
+            const end = start + m[0].length
+            if (start > last) {
+                const chunk = text.slice(last, start)
+                if (chunk) out.push(...renderWithLineBreaks(chunk))
+            }
+            const inner = m[1]
+            if (inner) {
+                const muted: React.CSSProperties = {
+                    fontSize: 14,
+                    lineHeight: "1.8em",
+                    color: "#6e6e6e",
+                    display: "inline-block",
+                }
+                out.push(
+                    <span key={`q-${key++}`} style={muted}>
+                        {renderWithLineBreaks(inner, muted)}
+                    </span>
+                )
+            }
+            last = end
+        }
+
+        if (last < (text || "").length) {
+            const rest = text.slice(last)
+            if (rest) out.push(...renderWithLineBreaks(rest))
+        }
+
+        return out
     }
 
     function InlineChrysanthemumIcon() {
@@ -3475,12 +3552,119 @@ function AdminMainContent(props: any) {
 
     const dotNeededLocal = (a?: string, b?: string) => !!(a && b)
 
-    // 아코디언 토글 함수
-    const toggleSection = (sectionName: keyof typeof openSections) => {
-        setOpenSections((prev) => ({
-            ...prev,
-            [sectionName]: !prev[sectionName],
-        }))
+    // 아코디언 토글 함수 (한 번에 하나의 섹션만 열림)
+    const toggleSection = async (sectionName: string) => {
+        // 현재 열려있는 섹션이 있다면 데이터를 저장
+        if (currentOpenSection && currentOpenSection !== sectionName) {
+            try {
+                // 각 섹션별 저장 로직
+                switch (currentOpenSection) {
+                    case "name":
+                        // 성함 섹션 저장 (페이지 설정 저장)
+                        await savePageSettings({
+                            groomName: pageSettings.groomName,
+                            groom_name_en: pageSettings.groom_name_en,
+                            brideName: pageSettings.brideName,
+                            bride_name_en: pageSettings.bride_name_en,
+                        })
+                        break
+                    case "photo":
+                        // 메인 사진 섹션 저장 (페이지 설정 저장)
+                        await savePageSettings({
+                            photo_section_image_path:
+                                pageSettings.photo_section_image_path,
+                            photo_section_image_url:
+                                pageSettings.photo_section_image_url,
+                            wedding_date: pageSettings.wedding_date,
+                            wedding_hour: pageSettings.wedding_hour,
+                            wedding_minute: pageSettings.wedding_minute,
+                            venue_name: pageSettings.venue_name,
+                            venue_address: pageSettings.venue_address,
+                            photo_section_overlay_position:
+                                pageSettings.photo_section_overlay_position,
+                            photo_section_overlay_color:
+                                pageSettings.photo_section_overlay_color,
+                            photo_section_locale:
+                                pageSettings.photo_section_locale,
+                            highlight_shape: pageSettings.highlight_shape,
+                            highlight_color: pageSettings.highlight_color,
+                            highlight_text_color:
+                                pageSettings.highlight_text_color,
+                        })
+                        break
+                    case "invite":
+                        // 초대글 섹션 저장
+                        await saveInviteData()
+                        break
+                    case "transport":
+                        // 교통안내 섹션 저장 (페이지 설정 저장)
+                        await savePageSettings({
+                            venue_name: pageSettings.venue_name,
+                            venue_address: pageSettings.venue_address,
+                        })
+                        break
+                    case "calendar":
+                        // 캘린더 섹션 저장 (페이지 설정 저장)
+                        await savePageSettings({
+                            wedding_date: pageSettings.wedding_date,
+                            wedding_hour: pageSettings.wedding_hour,
+                            wedding_minute: pageSettings.wedding_minute,
+                            highlight_shape: pageSettings.highlight_shape,
+                            highlight_color: pageSettings.highlight_color,
+                            highlight_text_color:
+                                pageSettings.highlight_text_color,
+                        })
+                        break
+                    case "contacts":
+                        // 연락처 섹션 저장
+                        await handleSaveContactInline()
+                        break
+                    case "account":
+                        // 계좌안내 섹션 저장
+                        await handleSaveContactInline()
+                        break
+                    case "bgm":
+                        // 배경음악 섹션 저장
+                        await savePageSettings({
+                            bgm_url: pageSettings.bgm_url,
+                            bgm_type: pageSettings.bgm_type,
+                            bgm_autoplay: pageSettings.bgm_autoplay,
+                        })
+                        break
+                    case "rsvp":
+                        // RSVP 섹션 저장
+                        await savePageSettings({
+                            rsvp: pageSettings.rsvp,
+                        })
+                        break
+                    case "comments":
+                        // 방명록 섹션 저장
+                        await savePageSettings({
+                            comments: pageSettings.comments,
+                        })
+                        break
+                    case "kakaoShare":
+                        // 카카오톡 공유 섹션 저장
+                        await savePageSettings({
+                            kko_img: pageSettings.kko_img,
+                            kko_title: pageSettings.kko_title,
+                            kko_date: pageSettings.kko_date,
+                        })
+                        break
+                }
+            } catch (error) {
+                console.error(`섹션 ${currentOpenSection} 저장 실패:`, error)
+                // 저장 실패 시에도 섹션을 변경 (사용자에게 알림)
+                alert(
+                    `이전 섹션(${currentOpenSection}) 저장에 실패했습니다. 계속 진행하시겠습니까?`
+                )
+            }
+        }
+
+        // 새 섹션으로 전환
+        setCurrentOpenSection(
+            currentOpenSection === sectionName ? null : sectionName
+        )
     }
 
     const initialContactData = {
@@ -3829,7 +4013,7 @@ function AdminMainContent(props: any) {
                         border: "none",
                         borderRadius: "8px",
                         fontSize: "16px",
-                        fontFamily: "Pretendard SemiBold",
+                        ...theme.font.bodyBold,
                         cursor: isCurrentlySaving ? "not-allowed" : "pointer",
                         display: "flex",
                         justifyContent: "center",
@@ -4168,6 +4352,7 @@ function AdminMainContent(props: any) {
             const result = await response.json()
             if (result.success) {
                 setPageSettings(result.data)
+                setHasLoadedSettings(true)
             }
         } catch (err) {
             console.error("페이지 설정 로드 실패:", err)
@@ -4196,6 +4381,7 @@ function AdminMainContent(props: any) {
         "highlight_color",
         "highlight_text_color",
         "rsvp",
+        "comments",
         "kko_img",
         "kko_title",
         "kko_date",
@@ -4229,10 +4415,14 @@ function AdminMainContent(props: any) {
 
         setSettingsLoading(true)
         try {
-            const merged = overrideSettings
-                ? { ...pageSettings, ...overrideSettings }
-                : pageSettings
-            const settingsToSave = sanitizeSettingsForSave(merged)
+            // 초기 로드 전에는 부분 저장 시 해당 키만 저장하여 공백 병합 방지
+            const shouldPartialOnly = !!overrideSettings && !hasLoadedSettings
+            const base = shouldPartialOnly
+                ? overrideSettings
+                : overrideSettings
+                  ? { ...pageSettings, ...overrideSettings }
+                  : pageSettings
+            const settingsToSave = sanitizeSettingsForSave(base)
             console.log("Saving page settings:", {
                 currentPageId,
                 settings: settingsToSave,
@@ -5442,7 +5632,7 @@ function AdminMainContent(props: any) {
                         color: "white",
                         border: "none",
                         fontSize: "10px",
-                        fontFamily: "Pretendard Regular",
+                        fontFamily: theme.font.body,
                         cursor: "pointer",
                     }}
                 >
@@ -5451,9 +5641,9 @@ function AdminMainContent(props: any) {
 
                 <span
                     style={{
+                        ...theme.typography.label,
                         color: "black",
                         fontSize: "16px",
-                        fontFamily: "Pretendard SemiBold",
                     }}
                 >
                     {inviteData.groomName || "신랑"} ♥{" "}
@@ -5467,7 +5657,7 @@ function AdminMainContent(props: any) {
                         color: "#7F7F7F",
                         border: `1px solid ${theme.color.border}`,
                         fontSize: "10px",
-                        fontFamily: "Pretendard Regular",
+                        fontFamily: theme.font.body,
                         cursor: "pointer",
                     }}
                 >
@@ -5502,7 +5692,7 @@ function AdminMainContent(props: any) {
                                 : "2px solid transparent",
                         color: activeTab === "basic" ? "#000000" : "#666666",
                         fontSize: "14px",
-                        fontFamily: "Pretendard Regular",
+                        fontFamily: theme.font.body,
                         cursor: "pointer",
                         transition: "all 0.2s ease",
                     }}
@@ -5523,7 +5713,7 @@ function AdminMainContent(props: any) {
                                 : "2px solid transparent",
                         color: activeTab === "gallery" ? "#000000" : "#666666",
                         fontSize: "14px",
-                        fontFamily: "Pretendard Regular",
+                        fontFamily: theme.font.body,
                         cursor: "pointer",
                         transition: "all 0.2s ease",
                     }}
@@ -5545,8 +5735,8 @@ function AdminMainContent(props: any) {
                     <AccordionSection
                         title="성함"
                         sectionKey="name"
-                        openMap={openSections}
-                        onToggle={(key) => toggleSection(key as any)}
+                        isOpen={currentOpenSection === "name"}
+                        onToggle={() => toggleSection("name")}
                     >
                         <div
                             style={{
@@ -5653,8 +5843,8 @@ function AdminMainContent(props: any) {
                     <AccordionSection
                         title="메인 사진"
                         sectionKey="photo"
-                        openMap={openSections}
-                        onToggle={(key) => toggleSection(key as any)}
+                        isOpen={currentOpenSection === "photo"}
+                        onToggle={() => toggleSection("photo")}
                     >
                         <div
                             style={{
@@ -5699,7 +5889,7 @@ function AdminMainContent(props: any) {
                                 <div
                                     style={{
                                         fontSize: 12,
-                                        fontFamily: "Pretendard Regular",
+                                        fontFamily: theme.font.body,
                                         color: "#7F7F7F",
                                         textAlign: "center",
                                     }}
@@ -5773,8 +5963,7 @@ function AdminMainContent(props: any) {
                                                 style={{
                                                     color: "var(--Black, black)",
                                                     fontSize: 14,
-                                                    fontFamily:
-                                                        "Pretendard Regular",
+                                                    fontFamily: theme.font.body,
                                                     wordWrap: "break-word",
                                                 }}
                                             >
@@ -5824,8 +6013,7 @@ function AdminMainContent(props: any) {
                                                 outlineOffset: -0.25,
                                                 borderRadius: 0,
                                                 fontSize: 16,
-                                                fontFamily:
-                                                    "Pretendard Regular",
+                                                fontFamily: theme.font.body,
                                                 color: "#000",
                                                 cursor: "pointer",
                                                 appearance: "none",
@@ -6047,7 +6235,7 @@ function AdminMainContent(props: any) {
                                                         borderRadius: 0,
                                                         fontSize: 12,
                                                         fontFamily:
-                                                            "Pretendard Regular",
+                                                            theme.font.body,
                                                         color: "#000",
                                                         cursor: "pointer",
                                                         appearance: "none",
@@ -6136,7 +6324,7 @@ function AdminMainContent(props: any) {
                                                         borderRadius: 0,
                                                         fontSize: 12,
                                                         fontFamily:
-                                                            "Pretendard Regular",
+                                                            theme.font.body,
                                                         color: "#000",
                                                         cursor: "pointer",
                                                         appearance: "none",
@@ -6206,15 +6394,16 @@ function AdminMainContent(props: any) {
                                 >
                                     <InputBase
                                         type="text"
-                                        value={
-                                            pageSettings.photo_section_location ||
-                                            ""
-                                        }
+                                        value={pageSettings.venue_name || ""}
                                         onChange={(e) =>
                                             setPageSettings({
                                                 ...pageSettings,
-                                                photo_section_location:
-                                                    e.target.value,
+                                                venue_name: e.target.value,
+                                            })
+                                        }
+                                        onBlur={(e) =>
+                                            void savePageSettings({
+                                                venue_name: e.target.value,
                                             })
                                         }
                                         placeholder="식장 이름을 입력하세요"
@@ -6343,8 +6532,8 @@ function AdminMainContent(props: any) {
                     <AccordionSection
                         title="초대글"
                         sectionKey="invite"
-                        openMap={openSections}
-                        onToggle={(key) => toggleSection(key as any)}
+                        isOpen={currentOpenSection === "invite"}
+                        onToggle={() => toggleSection("invite")}
                     >
                         <div
                             style={{
@@ -6380,13 +6569,14 @@ function AdminMainContent(props: any) {
                                             textAlign: "center",
                                             color: "black",
                                             fontSize: 16,
-                                            fontFamily: "Pretendard Regular",
+                                            fontFamily: theme.font.body,
                                             lineHeight: "32px",
                                             wordWrap: "break-word",
                                         }}
                                     >
                                         {renderInvitationSegmentsPreview(
-                                            inviteData.invitationText
+                                            inviteData.invitationText,
+                                            { ...theme.font.bodyBold }
                                         )}
                                     </div>
 
@@ -6431,6 +6621,10 @@ function AdminMainContent(props: any) {
                                                         alignItems: "center",
                                                         gap: 4,
                                                         display: "flex",
+                                                        marginLeft:
+                                                            inviteData.showGroomFatherChrysanthemum
+                                                                ? -16
+                                                                : 0,
                                                     }}
                                                 >
                                                     {inviteData.showGroomFatherChrysanthemum && (
@@ -6441,7 +6635,7 @@ function AdminMainContent(props: any) {
                                                             color: "black",
                                                             fontSize: 18,
                                                             fontFamily:
-                                                                "Pretendard Regular",
+                                                                theme.font.body,
                                                             lineHeight: "32px",
                                                             wordWrap:
                                                                 "break-word",
@@ -6459,7 +6653,8 @@ function AdminMainContent(props: any) {
                                                                 color: "black",
                                                                 fontSize: 18,
                                                                 fontFamily:
-                                                                    "Pretendard Regular",
+                                                                    theme.font
+                                                                        .body,
                                                                 lineHeight:
                                                                     "32px",
                                                                 wordWrap:
@@ -6477,7 +6672,7 @@ function AdminMainContent(props: any) {
                                                             color: "black",
                                                             fontSize: 18,
                                                             fontFamily:
-                                                                "Pretendard Regular",
+                                                                theme.font.body,
                                                             lineHeight: "32px",
                                                             wordWrap:
                                                                 "break-word",
@@ -6492,7 +6687,7 @@ function AdminMainContent(props: any) {
                                                         color: "black",
                                                         fontSize: 18,
                                                         fontFamily:
-                                                            "Pretendard Regular",
+                                                            theme.font.body,
                                                         lineHeight: "32px",
                                                         wordWrap: "break-word",
                                                     }}
@@ -6504,7 +6699,7 @@ function AdminMainContent(props: any) {
                                                         color: "black",
                                                         fontSize: 18,
                                                         fontFamily:
-                                                            "Pretendard Regular",
+                                                            theme.font.body,
                                                         lineHeight: "32px",
                                                         wordWrap: "break-word",
                                                     }}
@@ -6530,6 +6725,10 @@ function AdminMainContent(props: any) {
                                                         alignItems: "center",
                                                         gap: 4,
                                                         display: "flex",
+                                                        marginLeft:
+                                                            inviteData.showBrideFatherChrysanthemum
+                                                                ? -16
+                                                                : 0,
                                                     }}
                                                 >
                                                     {inviteData.showBrideFatherChrysanthemum && (
@@ -6540,7 +6739,7 @@ function AdminMainContent(props: any) {
                                                             color: "black",
                                                             fontSize: 18,
                                                             fontFamily:
-                                                                "Pretendard Regular",
+                                                                theme.font.body,
                                                             lineHeight: "32px",
                                                             wordWrap:
                                                                 "break-word",
@@ -6558,7 +6757,8 @@ function AdminMainContent(props: any) {
                                                                 color: "black",
                                                                 fontSize: 18,
                                                                 fontFamily:
-                                                                    "Pretendard Regular",
+                                                                    theme.font
+                                                                        .body,
                                                                 lineHeight:
                                                                     "32px",
                                                                 wordWrap:
@@ -6576,7 +6776,7 @@ function AdminMainContent(props: any) {
                                                             color: "black",
                                                             fontSize: 18,
                                                             fontFamily:
-                                                                "Pretendard Regular",
+                                                                theme.font.body,
                                                             lineHeight: "32px",
                                                             wordWrap:
                                                                 "break-word",
@@ -6591,7 +6791,7 @@ function AdminMainContent(props: any) {
                                                         color: "black",
                                                         fontSize: 18,
                                                         fontFamily:
-                                                            "Pretendard Regular",
+                                                            theme.font.body,
                                                         lineHeight: "32px",
                                                         wordWrap: "break-word",
                                                     }}
@@ -6603,7 +6803,7 @@ function AdminMainContent(props: any) {
                                                         color: "black",
                                                         fontSize: 18,
                                                         fontFamily:
-                                                            "Pretendard Regular",
+                                                            theme.font.body,
                                                         lineHeight: "32px",
                                                         wordWrap: "break-word",
                                                     }}
@@ -6628,8 +6828,7 @@ function AdminMainContent(props: any) {
                                                     alignSelf: "stretch",
                                                     color: "black",
                                                     fontSize: 18,
-                                                    fontFamily:
-                                                        "Pretendard SemiBold",
+                                                    ...theme.font.bodyBold,
                                                     lineHeight: "32px",
                                                     wordWrap: "break-word",
                                                 }}
@@ -6638,11 +6837,10 @@ function AdminMainContent(props: any) {
                                             </div>
                                             <div
                                                 style={{
+                                                    ...theme.font.bodyBold,
                                                     alignSelf: "stretch",
                                                     color: "black",
                                                     fontSize: 18,
-                                                    fontFamily:
-                                                        "Pretendard SemiBold",
                                                     lineHeight: "32px",
                                                     wordWrap: "break-word",
                                                 }}
@@ -6720,8 +6918,7 @@ function AdminMainContent(props: any) {
                                                 padding: "4px 8px",
                                                 background: "white",
                                                 border: `1px solid ${theme.color.border}`,
-                                                fontFamily:
-                                                    "Pretendard SemiBold",
+                                                ...theme.font.bodyBold,
                                                 fontSize: 12,
                                                 cursor: "pointer",
                                             }}
@@ -6738,8 +6935,7 @@ function AdminMainContent(props: any) {
                                                 background: "white",
                                                 color: "#7f7f7f",
                                                 border: `1px solid ${theme.color.border}`,
-                                                fontFamily:
-                                                    "Pretendard Regular",
+                                                fontFamily: theme.font.body,
                                                 fontSize: 12,
                                                 cursor: "pointer",
                                             }}
@@ -6755,6 +6951,7 @@ function AdminMainContent(props: any) {
                                         display: "flex",
                                         flexDirection: "column",
                                         gap: 14, // 특수 간격 유지
+                                        marginTop: 12,
                                     }}
                                 >
                                     <span style={theme.typography.label}>
@@ -7074,6 +7271,7 @@ function AdminMainContent(props: any) {
                                             display: "inline-flex",
                                             alignItems: "center",
                                             gap: 10,
+                                            marginBottom: 12,
                                         }}
                                     >
                                         <input
@@ -7109,8 +7307,8 @@ function AdminMainContent(props: any) {
                     <AccordionSection
                         title="연락처"
                         sectionKey="contacts"
-                        openMap={openSections}
-                        onToggle={(key) => toggleSection(key as any)}
+                        isOpen={currentOpenSection === "contacts"}
+                        onToggle={() => toggleSection("contacts")}
                     >
                         <div
                             style={{
@@ -7190,7 +7388,7 @@ function AdminMainContent(props: any) {
                                                 border: `1px solid ${theme.color.border}`,
                                                 borderRadius: theme.radius.sm,
                                                 fontSize: theme.text.sm,
-                                                fontFamily: theme.font.bodyBold,
+                                                ...theme.font.bodyBold,
                                                 cursor: "pointer",
                                                 display: "flex",
                                                 alignItems: "center",
@@ -7253,8 +7451,7 @@ function AdminMainContent(props: any) {
                                                     border: "none",
                                                     outline: "none",
                                                     fontSize: 14,
-                                                    fontFamily:
-                                                        "Pretendard Regular",
+                                                    fontFamily: theme.font.body,
                                                     color: selectedContact?.groom_name
                                                         ? "black"
                                                         : "#ADADAD",
@@ -7292,8 +7489,7 @@ function AdminMainContent(props: any) {
                                                     border: "none",
                                                     outline: "none",
                                                     fontSize: 14,
-                                                    fontFamily:
-                                                        "Pretendard Regular",
+                                                    fontFamily: theme.font.body,
                                                     color: selectedContact?.groom_phone
                                                         ? "black"
                                                         : "#ADADAD",
@@ -7354,8 +7550,7 @@ function AdminMainContent(props: any) {
                                                     border: "none",
                                                     outline: "none",
                                                     fontSize: 14,
-                                                    fontFamily:
-                                                        "Pretendard Regular",
+                                                    fontFamily: theme.font.body,
                                                     color: selectedContact?.groom_father_name
                                                         ? "black"
                                                         : "#ADADAD",
@@ -7393,8 +7588,7 @@ function AdminMainContent(props: any) {
                                                     border: "none",
                                                     outline: "none",
                                                     fontSize: 14,
-                                                    fontFamily:
-                                                        "Pretendard Regular",
+                                                    fontFamily: theme.font.body,
                                                     color: selectedContact?.groom_father_phone
                                                         ? "black"
                                                         : "#ADADAD",
@@ -7455,8 +7649,7 @@ function AdminMainContent(props: any) {
                                                     border: "none",
                                                     outline: "none",
                                                     fontSize: 14,
-                                                    fontFamily:
-                                                        "Pretendard Regular",
+                                                    fontFamily: theme.font.body,
                                                     color: selectedContact?.groom_mother_name
                                                         ? "black"
                                                         : "#ADADAD",
@@ -7494,8 +7687,7 @@ function AdminMainContent(props: any) {
                                                     border: "none",
                                                     outline: "none",
                                                     fontSize: 14,
-                                                    fontFamily:
-                                                        "Pretendard Regular",
+                                                    fontFamily: theme.font.body,
                                                     color: selectedContact?.groom_mother_phone
                                                         ? "black"
                                                         : "#ADADAD",
@@ -7556,8 +7748,7 @@ function AdminMainContent(props: any) {
                                                     border: "none",
                                                     outline: "none",
                                                     fontSize: 14,
-                                                    fontFamily:
-                                                        "Pretendard Regular",
+                                                    fontFamily: theme.font.body,
                                                     color: selectedContact?.bride_name
                                                         ? "black"
                                                         : "#ADADAD",
@@ -7595,8 +7786,7 @@ function AdminMainContent(props: any) {
                                                     border: "none",
                                                     outline: "none",
                                                     fontSize: 14,
-                                                    fontFamily:
-                                                        "Pretendard Regular",
+                                                    fontFamily: theme.font.body,
                                                     color: selectedContact?.bride_phone
                                                         ? "black"
                                                         : "#ADADAD",
@@ -7656,8 +7846,7 @@ function AdminMainContent(props: any) {
                                                     border: "none",
                                                     outline: "none",
                                                     fontSize: 14,
-                                                    fontFamily:
-                                                        "Pretendard Regular",
+                                                    fontFamily: theme.font.body,
                                                     color: selectedContact?.bride_father_name
                                                         ? "black"
                                                         : "#ADADAD",
@@ -7695,8 +7884,7 @@ function AdminMainContent(props: any) {
                                                     border: "none",
                                                     outline: "none",
                                                     fontSize: 14,
-                                                    fontFamily:
-                                                        "Pretendard Regular",
+                                                    fontFamily: theme.font.body,
                                                     color: selectedContact?.bride_father_phone
                                                         ? "black"
                                                         : "#ADADAD",
@@ -7758,8 +7946,7 @@ function AdminMainContent(props: any) {
                                                     border: "none",
                                                     outline: "none",
                                                     fontSize: 14,
-                                                    fontFamily:
-                                                        "Pretendard Regular",
+                                                    fontFamily: theme.font.body,
                                                     color: selectedContact?.bride_mother_name
                                                         ? "black"
                                                         : "#ADADAD",
@@ -7797,8 +7984,7 @@ function AdminMainContent(props: any) {
                                                     border: "none",
                                                     outline: "none",
                                                     fontSize: 14,
-                                                    fontFamily:
-                                                        "Pretendard Regular",
+                                                    fontFamily: theme.font.body,
                                                     color: selectedContact?.bride_mother_phone
                                                         ? "black"
                                                         : "#ADADAD",
@@ -7820,8 +8006,8 @@ function AdminMainContent(props: any) {
                     <AccordionSection
                         title="캘린더"
                         sectionKey="calendar"
-                        openMap={openSections}
-                        onToggle={(key) => toggleSection(key as any)}
+                        isOpen={currentOpenSection === "calendar"}
+                        onToggle={() => toggleSection("calendar")}
                     >
                         <div
                             style={{
@@ -7855,12 +8041,12 @@ function AdminMainContent(props: any) {
                                     <div
                                         style={{
                                             width: "100%",
-                                            height: 480,
+                                            height: 520,
                                             background: "#FAFAFA",
                                             border: `1px solid ${theme.color.border}`,
                                             outlineOffset: -0.25,
                                             display: "flex",
-                                            alignItems: "flex-start",
+                                            alignItems: "center",
                                             justifyContent: "center",
                                         }}
                                     >
@@ -7895,7 +8081,7 @@ function AdminMainContent(props: any) {
                                             textAlign: "center",
                                             color: "#7F7F7F",
                                             fontSize: 14,
-                                            fontFamily: "Pretendard Regular",
+                                            fontFamily: theme.font.body,
                                         }}
                                     >
                                         미리보기
@@ -7910,6 +8096,7 @@ function AdminMainContent(props: any) {
                                         flexDirection: "column",
                                         gap: 16,
                                         alignItems: "stretch",
+                                        marginTop: 12,
                                     }}
                                 >
                                     {/* 예식일 표시 모양 */}
@@ -7925,10 +8112,7 @@ function AdminMainContent(props: any) {
                                         <div
                                             style={{
                                                 textAlign: "center",
-                                                color: "black",
-                                                fontSize: 14,
-                                                fontFamily:
-                                                    "Pretendard SemiBold",
+                                                ...theme.typography.label,
                                             }}
                                         >
                                             예식일 표시 모양
@@ -7938,6 +8122,7 @@ function AdminMainContent(props: any) {
                                                 display: "flex",
                                                 gap: 36,
                                                 alignItems: "center",
+                                                marginTop: 6,
                                             }}
                                         >
                                             {/* 원형 라디오 버튼 */}
@@ -7988,7 +8173,7 @@ function AdminMainContent(props: any) {
                                                         color: "#757575",
                                                         fontSize: 14,
                                                         fontFamily:
-                                                            "Pretendard Regular",
+                                                            theme.font.body,
                                                     }}
                                                 >
                                                     원형
@@ -8042,7 +8227,7 @@ function AdminMainContent(props: any) {
                                                         color: "#757575",
                                                         fontSize: 14,
                                                         fontFamily:
-                                                            "Pretendard Regular",
+                                                            theme.font.body,
                                                     }}
                                                 >
                                                     하트
@@ -8064,10 +8249,8 @@ function AdminMainContent(props: any) {
                                         <div
                                             style={{
                                                 textAlign: "center",
-                                                color: "black",
-                                                fontSize: 14,
-                                                fontFamily:
-                                                    "Pretendard SemiBold",
+                                                ...theme.typography.label,
+                                                marginTop: 12,
                                             }}
                                         >
                                             모양 색상
@@ -8189,10 +8372,8 @@ function AdminMainContent(props: any) {
                                         <div
                                             style={{
                                                 textAlign: "center",
-                                                color: "black",
-                                                fontSize: 14,
-                                                fontFamily:
-                                                    "Pretendard SemiBold",
+                                                ...theme.typography.label,
+                                                marginTop: 12,
                                             }}
                                         >
                                             텍스트 색상
@@ -8202,6 +8383,8 @@ function AdminMainContent(props: any) {
                                                 display: "flex",
                                                 gap: 32,
                                                 alignItems: "center",
+                                                marginTop: 6,
+                                                marginBottom: 12,
                                             }}
                                         >
                                             {/* 검정 라디오 버튼 */}
@@ -8252,7 +8435,7 @@ function AdminMainContent(props: any) {
                                                         color: "#757575",
                                                         fontSize: 14,
                                                         fontFamily:
-                                                            "Pretendard Regular",
+                                                            theme.font.body,
                                                     }}
                                                 >
                                                     검정
@@ -8306,7 +8489,7 @@ function AdminMainContent(props: any) {
                                                         color: "#757575",
                                                         fontSize: 14,
                                                         fontFamily:
-                                                            "Pretendard Regular",
+                                                            theme.font.body,
                                                     }}
                                                 >
                                                     흰색
@@ -8330,8 +8513,8 @@ function AdminMainContent(props: any) {
                     <AccordionSection
                         title="교통 안내"
                         sectionKey="transport"
-                        openMap={openSections}
-                        onToggle={(key) => toggleSection(key as any)}
+                        isOpen={currentOpenSection === "transport"}
+                        onToggle={() => toggleSection("transport")}
                     >
                         <div
                             style={{
@@ -8364,8 +8547,8 @@ function AdminMainContent(props: any) {
                     <AccordionSection
                         title="안내 사항"
                         sectionKey="info"
-                        openMap={openSections}
-                        onToggle={(key) => toggleSection(key as any)}
+                        isOpen={currentOpenSection === "info"}
+                        onToggle={() => toggleSection("info")}
                     >
                         <div
                             style={{
@@ -8398,8 +8581,8 @@ function AdminMainContent(props: any) {
                     <AccordionSection
                         title="계좌 안내"
                         sectionKey="account"
-                        openMap={openSections}
-                        onToggle={(key) => toggleSection(key as any)}
+                        isOpen={currentOpenSection === "account"}
+                        onToggle={() => toggleSection("account")}
                     >
                         <div
                             style={{
@@ -8479,7 +8662,7 @@ function AdminMainContent(props: any) {
                                                 border: `1px solid ${theme.color.border}`,
                                                 borderRadius: theme.radius.sm,
                                                 fontSize: theme.text.sm,
-                                                fontFamily: theme.font.bodyBold,
+                                                ...theme.font.bodyBold,
                                                 cursor: "pointer",
                                                 display: "flex",
                                                 alignItems: "center",
@@ -8542,8 +8725,7 @@ function AdminMainContent(props: any) {
                                                     border: "none",
                                                     outline: "none",
                                                     fontSize: 14,
-                                                    fontFamily:
-                                                        "Pretendard Regular",
+                                                    fontFamily: theme.font.body,
                                                     color: selectedContact?.groom_name
                                                         ? "black"
                                                         : "#ADADAD",
@@ -8588,7 +8770,7 @@ function AdminMainContent(props: any) {
                                                         outline: "none",
                                                         fontSize: 14,
                                                         fontFamily:
-                                                            "Pretendard Regular",
+                                                            theme.font.body,
                                                         color: selectedContact?.groom_bank
                                                             ? "black"
                                                             : "#ADADAD",
@@ -8626,7 +8808,7 @@ function AdminMainContent(props: any) {
                                                         outline: "none",
                                                         fontSize: 14,
                                                         fontFamily:
-                                                            "Pretendard Regular",
+                                                            theme.font.body,
                                                         color: selectedContact?.groom_account
                                                             ? "black"
                                                             : "#ADADAD",
@@ -8679,8 +8861,7 @@ function AdminMainContent(props: any) {
                                                     border: "none",
                                                     outline: "none",
                                                     fontSize: 14,
-                                                    fontFamily:
-                                                        "Pretendard Regular",
+                                                    fontFamily: theme.font.body,
                                                     color: selectedContact?.groom_father_name
                                                         ? "black"
                                                         : "#ADADAD",
@@ -8725,7 +8906,7 @@ function AdminMainContent(props: any) {
                                                         outline: "none",
                                                         fontSize: 14,
                                                         fontFamily:
-                                                            "Pretendard Regular",
+                                                            theme.font.body,
                                                         color: selectedContact?.groom_father_bank
                                                             ? "black"
                                                             : "#ADADAD",
@@ -8763,7 +8944,7 @@ function AdminMainContent(props: any) {
                                                         outline: "none",
                                                         fontSize: 14,
                                                         fontFamily:
-                                                            "Pretendard Regular",
+                                                            theme.font.body,
                                                         color: selectedContact?.groom_father_account
                                                             ? "black"
                                                             : "#ADADAD",
@@ -8816,8 +8997,7 @@ function AdminMainContent(props: any) {
                                                     border: "none",
                                                     outline: "none",
                                                     fontSize: 14,
-                                                    fontFamily:
-                                                        "Pretendard Regular",
+                                                    fontFamily: theme.font.body,
                                                     color: selectedContact?.groom_mother_name
                                                         ? "black"
                                                         : "#ADADAD",
@@ -8862,7 +9042,7 @@ function AdminMainContent(props: any) {
                                                         outline: "none",
                                                         fontSize: 14,
                                                         fontFamily:
-                                                            "Pretendard Regular",
+                                                            theme.font.body,
                                                         color: selectedContact?.groom_mother_bank
                                                             ? "black"
                                                             : "#ADADAD",
@@ -8900,7 +9080,7 @@ function AdminMainContent(props: any) {
                                                         outline: "none",
                                                         fontSize: 14,
                                                         fontFamily:
-                                                            "Pretendard Regular",
+                                                            theme.font.body,
                                                         color: selectedContact?.groom_mother_account
                                                             ? "black"
                                                             : "#ADADAD",
@@ -8962,8 +9142,7 @@ function AdminMainContent(props: any) {
                                                     border: "none",
                                                     outline: "none",
                                                     fontSize: 14,
-                                                    fontFamily:
-                                                        "Pretendard Regular",
+                                                    fontFamily: theme.font.body,
                                                     color: selectedContact?.bride_name
                                                         ? "black"
                                                         : "#ADADAD",
@@ -9008,7 +9187,7 @@ function AdminMainContent(props: any) {
                                                         outline: "none",
                                                         fontSize: 14,
                                                         fontFamily:
-                                                            "Pretendard Regular",
+                                                            theme.font.body,
                                                         color: selectedContact?.bride_bank
                                                             ? "black"
                                                             : "#ADADAD",
@@ -9046,7 +9225,7 @@ function AdminMainContent(props: any) {
                                                         outline: "none",
                                                         fontSize: 14,
                                                         fontFamily:
-                                                            "Pretendard Regular",
+                                                            theme.font.body,
                                                         color: selectedContact?.bride_account
                                                             ? "black"
                                                             : "#ADADAD",
@@ -9099,8 +9278,7 @@ function AdminMainContent(props: any) {
                                                     border: "none",
                                                     outline: "none",
                                                     fontSize: 14,
-                                                    fontFamily:
-                                                        "Pretendard Regular",
+                                                    fontFamily: theme.font.body,
                                                     color: selectedContact?.bride_father_name
                                                         ? "black"
                                                         : "#ADADAD",
@@ -9145,7 +9323,7 @@ function AdminMainContent(props: any) {
                                                         outline: "none",
                                                         fontSize: 14,
                                                         fontFamily:
-                                                            "Pretendard Regular",
+                                                            theme.font.body,
                                                         color: selectedContact?.bride_father_bank
                                                             ? "black"
                                                             : "#ADADAD",
@@ -9183,7 +9361,7 @@ function AdminMainContent(props: any) {
                                                         outline: "none",
                                                         fontSize: 14,
                                                         fontFamily:
-                                                            "Pretendard Regular",
+                                                            theme.font.body,
                                                         color: selectedContact?.bride_father_account
                                                             ? "black"
                                                             : "#ADADAD",
@@ -9236,8 +9414,7 @@ function AdminMainContent(props: any) {
                                                     border: "none",
                                                     outline: "none",
                                                     fontSize: 14,
-                                                    fontFamily:
-                                                        "Pretendard Regular",
+                                                    fontFamily: theme.font.body,
                                                     color: selectedContact?.bride_mother_name
                                                         ? "black"
                                                         : "#ADADAD",
@@ -9282,7 +9459,7 @@ function AdminMainContent(props: any) {
                                                         outline: "none",
                                                         fontSize: 14,
                                                         fontFamily:
-                                                            "Pretendard Regular",
+                                                            theme.font.body,
                                                         color: selectedContact?.bride_mother_bank
                                                             ? "black"
                                                             : "#ADADAD",
@@ -9320,7 +9497,7 @@ function AdminMainContent(props: any) {
                                                         outline: "none",
                                                         fontSize: 14,
                                                         fontFamily:
-                                                            "Pretendard Regular",
+                                                            theme.font.body,
                                                         color: selectedContact?.bride_mother_account
                                                             ? "black"
                                                             : "#ADADAD",
@@ -9344,8 +9521,8 @@ function AdminMainContent(props: any) {
                     <AccordionSection
                         title="배경음악"
                         sectionKey="bgm"
-                        openMap={openSections}
-                        onToggle={(key) => toggleSection(key as any)}
+                        isOpen={currentOpenSection === "bgm"}
+                        onToggle={() => toggleSection("bgm")}
                     >
                         <div
                             style={{
@@ -9367,7 +9544,7 @@ function AdminMainContent(props: any) {
                                     style={{
                                         color: "black",
                                         fontSize: 14,
-                                        fontFamily: "Pretendard SemiBold",
+                                        ...theme.font.bodyBold,
                                     }}
                                 >
                                     무료 음원
@@ -9376,7 +9553,7 @@ function AdminMainContent(props: any) {
                                     style={{
                                         color: "#ADADAD",
                                         fontSize: 14,
-                                        fontFamily: "Pretendard Regular",
+                                        fontFamily: theme.font.body,
                                         lineHeight: "16px",
                                     }}
                                 >
@@ -9431,8 +9608,7 @@ function AdminMainContent(props: any) {
                                                             ? "black"
                                                             : "#AEAEAE",
                                                     fontSize: 12,
-                                                    fontFamily:
-                                                        "Pretendard Regular",
+                                                    fontFamily: theme.font.body,
                                                 }}
                                             >
                                                 {bgm.id}
@@ -9488,8 +9664,7 @@ function AdminMainContent(props: any) {
                                                             ? "black"
                                                             : "#AEAEAE",
                                                     fontSize: 12,
-                                                    fontFamily:
-                                                        "Pretendard Regular",
+                                                    fontFamily: theme.font.body,
                                                 }}
                                             >
                                                 {bgm.id}
@@ -9511,7 +9686,7 @@ function AdminMainContent(props: any) {
                                     style={{
                                         color: "black",
                                         fontSize: 14,
-                                        fontFamily: "Pretendard SemiBold",
+                                        ...theme.font.bodyBold,
                                     }}
                                 >
                                     직접 업로드 (선택)
@@ -9520,7 +9695,7 @@ function AdminMainContent(props: any) {
                                     style={{
                                         color: "#ADADAD",
                                         fontSize: 14,
-                                        fontFamily: "Pretendard Regular",
+                                        fontFamily: theme.font.body,
                                         lineHeight: "16px",
                                     }}
                                 >
@@ -9672,8 +9847,7 @@ function AdminMainContent(props: any) {
                                                 style={{
                                                     color: "black",
                                                     fontSize: 14,
-                                                    fontFamily:
-                                                        "Pretendard Regular",
+                                                    fontFamily: theme.font.body,
                                                 }}
                                             >
                                                 {settingsLoading
@@ -9699,7 +9873,7 @@ function AdminMainContent(props: any) {
                                     style={{
                                         color: "black",
                                         fontSize: 14,
-                                        fontFamily: "Pretendard SemiBold",
+                                        ...theme.font.bodyBold,
                                     }}
                                 >
                                     자동 재생
@@ -9708,7 +9882,7 @@ function AdminMainContent(props: any) {
                                     style={{
                                         color: "#ADADAD",
                                         fontSize: 14,
-                                        fontFamily: "Pretendard Regular",
+                                        fontFamily: theme.font.body,
                                         lineHeight: "16px",
                                     }}
                                 >
@@ -9754,8 +9928,7 @@ function AdminMainContent(props: any) {
                                                     ? "black"
                                                     : "#AEAEAE",
                                                 fontSize: 12,
-                                                fontFamily:
-                                                    "Pretendard Regular",
+                                                fontFamily: theme.font.body,
                                             }}
                                         >
                                             자동 재생
@@ -9794,8 +9967,7 @@ function AdminMainContent(props: any) {
                                                     ? "black"
                                                     : "#AEAEAE",
                                                 fontSize: 12,
-                                                fontFamily:
-                                                    "Pretendard Regular",
+                                                fontFamily: theme.font.body,
                                             }}
                                         >
                                             자동 재생 끄기
@@ -9828,7 +10000,7 @@ function AdminMainContent(props: any) {
                                     style={{
                                         color: "#E6E6E6",
                                         fontSize: 14,
-                                        fontFamily: "Pretendard SemiBold",
+                                        ...theme.font.bodyBold,
                                     }}
                                 >
                                     {settingsLoading ? "저장 중..." : "저장"}
@@ -9841,8 +10013,8 @@ function AdminMainContent(props: any) {
                     <AccordionSection
                         title="RSVP"
                         sectionKey="rsvp"
-                        openMap={openSections}
-                        onToggle={(key) => toggleSection(key as any)}
+                        isOpen={currentOpenSection === "rsvp"}
+                        onToggle={() => toggleSection("rsvp")}
                     >
                         <div>
                             <div
@@ -9918,12 +10090,95 @@ function AdminMainContent(props: any) {
                         </div>
                     </AccordionSection>
 
+                    {/* 방명록 활성화 */}
+                    <AccordionSection
+                        title="방명록"
+                        sectionKey="comments"
+                        isOpen={currentOpenSection === "comments"}
+                        onToggle={() => toggleSection("comments")}
+                    >
+                        <div>
+                            <div
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    marginBottom: "16px",
+                                }}
+                            >
+                                <span
+                                    style={{
+                                        fontSize: "14px",
+                                        fontWeight: "500",
+                                        color: theme.color.text,
+                                    }}
+                                >
+                                    방명록 활성화
+                                </span>
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "8px",
+                                    }}
+                                >
+                                    <button
+                                        onClick={() => {
+                                            const newComments =
+                                                pageSettings.comments === "on"
+                                                    ? "off"
+                                                    : "on"
+                                            setPageSettings((prev) => ({
+                                                ...prev,
+                                                comments: newComments,
+                                            }))
+                                            // 즉시 저장
+                                            savePageSettings({
+                                                comments: newComments,
+                                            })
+                                        }}
+                                        style={{
+                                            padding: "6px 12px",
+                                            borderRadius: "4px",
+                                            border: `1px solid ${theme.color.border}`,
+                                            backgroundColor:
+                                                pageSettings.comments === "on"
+                                                    ? theme.color.primary
+                                                    : theme.color.surface,
+                                            color:
+                                                pageSettings.comments === "on"
+                                                    ? "white"
+                                                    : theme.color.text,
+                                            cursor: "pointer",
+                                            fontSize: "12px",
+                                            fontWeight: "500",
+                                            transition: "all 0.2s",
+                                        }}
+                                    >
+                                        {pageSettings.comments === "on"
+                                            ? "ON"
+                                            : "OFF"}
+                                    </button>
+                                </div>
+                            </div>
+                            <div
+                                style={{
+                                    fontSize: "12px",
+                                    color: theme.color.textSecondary,
+                                    lineHeight: "1.4",
+                                }}
+                            >
+                                청첩장 하단에 방명록 댓글 기능이 표시됩니다.
+                            </div>
+                        </div>
+                    </AccordionSection>
+
                     {/* 카카오톡 공유 */}
                     <AccordionSection
                         title="카카오톡 공유"
                         sectionKey="kakaoShare"
-                        openMap={openSections}
-                        onToggle={(key) => toggleSection(key as any)}
+                        isOpen={currentOpenSection === "kakaoShare"}
+                        onToggle={() => toggleSection("kakaoShare")}
                     >
                         <div
                             style={{
@@ -9986,8 +10241,7 @@ function AdminMainContent(props: any) {
                                                 style={{
                                                     color: theme.color.muted,
                                                     fontSize: 13,
-                                                    fontFamily:
-                                                        "Pretendard Regular",
+                                                    fontFamily: theme.font.body,
                                                     textAlign: "center",
                                                     lineHeight: 1.5,
                                                     whiteSpace: "pre-line",
@@ -10056,14 +10310,7 @@ function AdminMainContent(props: any) {
 
                             <FormField
                                 label="제목"
-                                helpText={
-                                    <>
-                                        카카오톡 공유 카드에 굵은 글씨로
-                                        표시됩니다. <br />
-                                        설정하지 않아도 신랑 신부의 이름이
-                                        표시됩니다.
-                                    </>
-                                }
+                                helpText="카카오톡 공유 카드에 굵은 글씨로 표시됩니다. 설정하지 않아도 신랑 신부의 이름이 표시됩니다."
                             >
                                 <InputBase
                                     value={pageSettings.kko_title || ""}
@@ -10085,14 +10332,7 @@ function AdminMainContent(props: any) {
 
                             <FormField
                                 label="본문"
-                                helpText={
-                                    <>
-                                        카카오톡 공유 카드에 작은 글씨로
-                                        표시됩니다.
-                                        <br />
-                                        설정하지 않아도 날짜가 표시됩니다.
-                                    </>
-                                }
+                                helpText="카카오톡 공유 카드에 작은 글씨로 표시됩니다. 설정하지 않아도 날짜가 표시됩니다."
                             >
                                 <textarea
                                     value={pageSettings.kko_date || ""}
@@ -10120,7 +10360,7 @@ function AdminMainContent(props: any) {
                                         borderRadius: theme.border.radius,
                                         background: theme.color.surface,
                                         color: theme.color.text,
-                                        fontFamily: "Pretendard Regular",
+                                        fontFamily: theme.font.body,
                                         fontSize: 14,
                                         lineHeight: 1.5,
                                         resize: "vertical",
@@ -10159,7 +10399,7 @@ function AdminMainContent(props: any) {
                                 style={{
                                     color: "black",
                                     fontSize: "16px",
-                                    fontFamily: "Pretendard SemiBold",
+                                    ...theme.font.bodyBold,
                                     wordWrap: "break-word",
                                     marginBottom: theme.space(6),
                                 }}
@@ -10187,9 +10427,8 @@ function AdminMainContent(props: any) {
                                                 <div>
                                                     <div
                                                         style={{
-                                                            fontFamily:
-                                                                theme.font
-                                                                    .bodyBold,
+                                                            ...theme.font
+                                                                .bodyBold,
                                                             fontSize:
                                                                 theme.text.base,
                                                         }}
@@ -10272,9 +10511,8 @@ function AdminMainContent(props: any) {
                                                 <div>
                                                     <div
                                                         style={{
-                                                            fontFamily:
-                                                                theme.font
-                                                                    .bodyBold,
+                                                            ...theme.font
+                                                                .bodyBold,
                                                             fontSize:
                                                                 theme.text.base,
                                                         }}
@@ -10365,8 +10603,7 @@ function AdminMainContent(props: any) {
                                                 />
                                                 <div
                                                     style={{
-                                                        fontFamily:
-                                                            theme.font.bodyBold,
+                                                        ...theme.font.bodyBold,
                                                         fontSize:
                                                             theme.text.base,
                                                         color: theme.color.text,
@@ -10512,8 +10749,7 @@ function AdminMainContent(props: any) {
                                             style={{
                                                 color: "var(--Black, black)",
                                                 fontSize: 14,
-                                                fontFamily:
-                                                    "Pretendard Regular",
+                                                fontFamily: theme.font.body,
                                                 wordWrap: "break-word",
                                             }}
                                         >
@@ -10553,7 +10789,7 @@ function AdminMainContent(props: any) {
                                     >
                                         <div
                                             style={{
-                                                fontFamily: theme.font.bodyBold,
+                                                ...theme.font.bodyBold,
                                                 marginBottom: theme.space(1),
                                             }}
                                         >
@@ -10727,8 +10963,7 @@ function AdminMainContent(props: any) {
                                                     ? "not-allowed"
                                                     : "pointer",
                                                 fontSize: "14px",
-                                                fontFamily:
-                                                    "Pretendard SemiBold",
+                                                ...theme.font.bodyBold,
                                                 marginTop: "16px",
                                                 marginBottom: "48px",
                                             }}
@@ -10766,7 +11001,8 @@ function InfoTab({
     const DEFAULT_ITEMS: InfoItem[] = [
         {
             title: "안내 사항 제목",
-            description: "안내 사항 내용을 입력해주세요. **굵은글씨**와 {작은글씨}를 사용할 수 있습니다.",
+            description:
+                "안내 사항 내용을 입력해주세요. **굵은글씨**와 {작은글씨}를 사용할 수 있습니다.",
             display_order: 1,
         },
     ]
@@ -11055,7 +11291,7 @@ function InfoTab({
                                         textAlign: "center",
                                         color: "black",
                                         fontSize: 14,
-                                        fontFamily: "Pretendard SemiBold",
+                                        ...theme.font.bodyBold,
                                     }}
                                 >
                                     안내 사항
@@ -11093,14 +11329,18 @@ function InfoTab({
                                                 alignItems: "center",
                                             }}
                                         >
-                                            <div
-                                                style={{
-                                                    width: 12,
-                                                    height: 5.5,
-                                                    border: "1.5px solid #757575",
-                                                    borderRadius: 1,
-                                                }}
-                                            />
+                                            <svg
+                                                width="12"
+                                                height="12"
+                                                viewBox="0 0 12 12"
+                                                fill="none"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                            >
+                                                <path
+                                                    d="M6 3L9 6L3 6L6 3Z"
+                                                    fill="#757575"
+                                                />
+                                            </svg>
                                         </div>
                                     </button>
                                     <button
@@ -11154,7 +11394,7 @@ function InfoTab({
                                     border: `1px solid ${theme.color.border}`,
                                     outlineOffset: -0.25,
                                     fontSize: 14,
-                                    fontFamily: "Pretendard Regular",
+                                    fontFamily: theme.font.body,
                                     color:
                                         item.title === "" ? "#ADADAD" : "black",
                                 }}
@@ -11174,7 +11414,7 @@ function InfoTab({
                                     border: `1px solid ${theme.color.border}`,
                                     outlineOffset: -0.25,
                                     fontSize: 14,
-                                    fontFamily: "Pretendard Regular",
+                                    fontFamily: theme.font.body,
                                     color:
                                         item.description === ""
                                             ? "#ADADAD"
@@ -11206,7 +11446,7 @@ function InfoTab({
                                         background: "white",
                                         cursor: "pointer",
                                         fontSize: 10,
-                                        fontFamily: "Pretendard SemiBold",
+                                        ...theme.font.bodyBold,
                                         color: "#7F7F7F",
                                         lineHeight: "20px",
                                     }}
@@ -11224,7 +11464,7 @@ function InfoTab({
                                         background: "white",
                                         cursor: "pointer",
                                         fontSize: 10,
-                                        fontFamily: "Pretendard Regular",
+                                        fontFamily: theme.font.body,
                                         color: "#7F7F7F",
                                         lineHeight: "20px",
                                     }}
@@ -11249,7 +11489,7 @@ function InfoTab({
                             alignItems: "center",
                             cursor: "pointer",
                             fontSize: 14,
-                            fontFamily: "Pretendard Regular",
+                            fontFamily: theme.font.body,
                             color: "black",
                         }}
                     >
@@ -11270,7 +11510,7 @@ function InfoTab({
                     border: "none",
                     borderRadius: 2,
                     fontSize: 14,
-                    fontFamily: "Pretendard SemiBold",
+                    ...theme.font.bodyBold,
                     cursor: saving ? "not-allowed" : "pointer",
                     display: "flex",
                     justifyContent: "center",
@@ -11340,6 +11580,7 @@ function TransportTab({
     const [items, setItems] = React.useState<TransportItem[]>(DEFAULT_ITEMS)
     const [locationName, setLocationName] = React.useState<string>("")
     const [venue_address, setVenue_address] = React.useState<string>("")
+    const [detailAddress, setDetailAddress] = React.useState<string>("")
     const [loading, setLoading] = React.useState(false)
     const [saving, setSaving] = React.useState(false)
     const [errorMsg, setErrorMsg] = React.useState<string>("")
@@ -11552,12 +11793,16 @@ function TransportTab({
 
             new (window as any).daum.Postcode({
                 oncomplete: async (data: DaumPostcodeData) => {
-                    const fullAddress = data.roadAddress || data.jibunAddress
+                    const baseAddress = data.roadAddress || data.jibunAddress
+                    // 상세주소는 사용자가 별도 입력 (state 유지)
+                    const fullAddress = detailAddress
+                        ? `${baseAddress} ${detailAddress}`.trim()
+                        : baseAddress
                     setVenue_address(fullAddress)
 
                     try {
                         // 주소를 좌표로 변환
-                        const coordinates = await geocodeAddress(fullAddress)
+                        const coordinates = await geocodeAddress(baseAddress)
 
                         // 페이지 설정에 좌표 저장
                         await saveCoordinatesToServer(
@@ -11592,6 +11837,15 @@ function TransportTab({
                 width: "100%",
                 height: "100%",
                 maxSuggestItems: 5,
+                theme: {
+                    // 가이드 권장 테마 적용 (검색창/테두리 등)
+                    borderColor: "#AEAEAE",
+                    emphTextColor: "#111827",
+                    pageBgColor: "#FFFFFF",
+                    bgColor: "#FFFFFF",
+                    queryTextColor: "#111827",
+                    outlineColor: "#AEAEAE",
+                },
             }).embed(element_layer)
 
             // 레이어 보이기
@@ -11949,9 +12203,7 @@ function TransportTab({
                 <div
                     style={{
                         textAlign: "center",
-                        color: "black",
-                        fontSize: 14,
-                        fontFamily: "Pretendard SemiBold",
+                        ...theme.typography.label,
                     }}
                 >
                     식장 이름
@@ -11961,7 +12213,7 @@ function TransportTab({
                         textAlign: "center",
                         color: "#AEAEAE",
                         fontSize: 14,
-                        fontFamily: "Pretendard Regular",
+                        fontFamily: theme.font.body,
                     }}
                 >
                     식장 이름에 홀 이름을 쓰고싶다면 여기에 써주세요
@@ -11975,7 +12227,7 @@ function TransportTab({
                         border: `1px solid ${theme.color.border}`,
                         outlineOffset: -0.25,
                         fontSize: 14,
-                        fontFamily: "Pretendard Regular",
+                        fontFamily: theme.font.body,
                         color: locationName ? "black" : "#ADADAD",
                         width: "100%",
                     }}
@@ -11990,7 +12242,7 @@ function TransportTab({
                         textAlign: "center",
                         color: "black",
                         fontSize: 14,
-                        fontFamily: "Pretendard SemiBold",
+                        ...theme.font.bodyBold,
                         marginTop: 16,
                     }}
                 >
@@ -12001,7 +12253,7 @@ function TransportTab({
                         textAlign: "center",
                         color: "#AEAEAE",
                         fontSize: 14,
-                        fontFamily: "Pretendard Regular",
+                        fontFamily: theme.font.body,
                     }}
                 >
                     도로명 주소를 입력해주세요
@@ -12015,7 +12267,7 @@ function TransportTab({
                         border: `1px solid ${theme.color.border}`,
                         outlineOffset: -0.25,
                         fontSize: 14,
-                        fontFamily: "Pretendard Regular",
+                        fontFamily: theme.font.body,
                         color: venue_address ? "black" : "#ADADAD",
                         width: "100%",
                         marginTop: 0,
@@ -12026,6 +12278,32 @@ function TransportTab({
                     readOnly={true}
                     onClick={openDaumPostcode}
                     onChange={() => {}} // 직접 입력 방지
+                />
+
+                {/* 상세 주소 입력 */}
+                <input
+                    style={{
+                        flex: 1,
+                        height: 40,
+                        padding: 12,
+                        background: "#ffffff",
+                        border: `1px solid ${theme.color.border}`,
+                        outlineOffset: -0.25,
+                        fontSize: 14,
+                        fontFamily: theme.font.body,
+                        color: detailAddress ? "black" : "#ADADAD",
+                        width: "100%",
+                    }}
+                    placeholder="상세 주소를 입력하세요"
+                    value={detailAddress || ""}
+                    onChange={(e) => setDetailAddress(e.target.value)}
+                    onBlur={() => {
+                        // 상세 주소 입력 변경 시 전체 주소 프리뷰 갱신
+                        const combined = venue_address
+                            ? `${venue_address} ${detailAddress || ""}`.trim()
+                            : detailAddress || ""
+                        setVenue_address(combined)
+                    }}
                 />
 
                 {/* 다음 주소 검색 레이어 */}
@@ -12040,9 +12318,8 @@ function TransportTab({
                         left: "50%",
                         top: "50%",
                         transform: "translate(-50%, -50%)",
-                        width: "300px",
+                        width: "88%",
                         height: "400px",
-                        border: "1px solid #e0e0e0",
                         backgroundColor: "white",
                         boxShadow: "0 10px 30px rgba(0, 0, 0, 0.3)",
                         borderRadius: "2px",
@@ -12050,19 +12327,41 @@ function TransportTab({
                         maxHeight: "70vh",
                     }}
                 >
-                    <img
-                        src="//t1.daumcdn.net/postcode/resource/images/close.png"
+                    <div
                         id="btnCloseLayer"
+                        onClick={closeDaumPostcode}
+                        aria-label="닫기 버튼"
+                        role="button"
                         style={{
                             cursor: "pointer",
                             position: "absolute",
                             right: "-3px",
                             top: "-3px",
                             zIndex: 1,
+                            width: 18,
+                            height: 18,
                         }}
-                        onClick={closeDaumPostcode}
-                        alt="닫기 버튼"
-                    />
+                    >
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="18"
+                            height="18"
+                            viewBox="0 0 18 18"
+                            fill="none"
+                        >
+                            <rect width="18" height="18" fill="black" />
+                            <path
+                                d="M3.85742 3.85714L14.1431 14.1429"
+                                stroke="white"
+                                strokeWidth="1.71429"
+                            />
+                            <path
+                                d="M14.1426 3.85714L3.85686 14.1429"
+                                stroke="white"
+                                strokeWidth="1.71429"
+                            />
+                        </svg>
+                    </div>
                 </div>
 
                 {/* 도로명 주소 입력 버튼 */}
@@ -12071,13 +12370,13 @@ function TransportTab({
                     onClick={openDaumPostcode}
                     style={{
                         flex: "1 1 0",
-                        height: 50,
+                        width: "100%",
                         paddingLeft: 12,
                         paddingRight: 12,
                         paddingTop: 8,
                         paddingBottom: 8,
-                        backgroundColor: "#4285f4",
-                        color: "white",
+                        backgroundColor: "#e0e0e0",
+                        color: "black",
                         outline: "0.50px var(--roarc-grey-500, #AEAEAE) solid",
                         outlineOffset: "-0.50px",
                         justifyContent: "center",
@@ -12089,7 +12388,7 @@ function TransportTab({
                         cursor: "pointer",
                         opacity: 1,
                         fontSize: "14px",
-                        fontFamily: "Pretendard Regular",
+                        fontFamily: theme.font.body,
                     }}
                 >
                     도로명 주소 입력
@@ -12106,7 +12405,7 @@ function TransportTab({
                             border: "1px solid #c3e6cb",
                             borderRadius: "4px",
                             fontSize: "14px",
-                            fontFamily: "Pretendard Regular",
+                            fontFamily: theme.font.body,
                         }}
                     >
                         {successMsg}
@@ -12122,7 +12421,7 @@ function TransportTab({
                             border: "1px solid #f5c6cb",
                             borderRadius: "4px",
                             fontSize: "14px",
-                            fontFamily: "Pretendard Regular",
+                            fontFamily: theme.font.body,
                         }}
                     >
                         {errorMsg}
@@ -12162,9 +12461,7 @@ function TransportTab({
                                 <div
                                     style={{
                                         textAlign: "center",
-                                        color: "black",
-                                        fontSize: 14,
-                                        fontFamily: "Pretendard SemiBold",
+                                        ...theme.typography.label,
                                     }}
                                 >
                                     교통 안내
@@ -12263,7 +12560,7 @@ function TransportTab({
                                     border: `1px solid ${theme.color.border}`,
                                     outlineOffset: -0.25,
                                     fontSize: 14,
-                                    fontFamily: "Pretendard Regular",
+                                    fontFamily: theme.font.body,
                                     color:
                                         item.title === "" ? "#ADADAD" : "black",
                                 }}
@@ -12283,7 +12580,7 @@ function TransportTab({
                                     border: `1px solid ${theme.color.border}`,
                                     outlineOffset: -0.25,
                                     fontSize: 14,
-                                    fontFamily: "Pretendard Regular",
+                                    fontFamily: theme.font.body,
                                     color:
                                         item.description === ""
                                             ? "#ADADAD"
@@ -12315,7 +12612,7 @@ function TransportTab({
                                         background: "white",
                                         cursor: "pointer",
                                         fontSize: 10,
-                                        fontFamily: "Pretendard SemiBold",
+                                        ...theme.font.bodyBold,
                                         color: "#7F7F7F",
                                         lineHeight: "20px",
                                     }}
@@ -12333,7 +12630,7 @@ function TransportTab({
                                         background: "white",
                                         cursor: "pointer",
                                         fontSize: 10,
-                                        fontFamily: "Pretendard Regular",
+                                        fontFamily: theme.font.body,
                                         color: "#7F7F7F",
                                         lineHeight: "20px",
                                     }}
@@ -12358,7 +12655,7 @@ function TransportTab({
                             alignItems: "center",
                             cursor: "pointer",
                             fontSize: 14,
-                            fontFamily: "Pretendard Regular",
+                            fontFamily: theme.font.body,
                             color: "black",
                         }}
                     >
@@ -12380,7 +12677,7 @@ function TransportTab({
                     border: "none",
                     borderRadius: 2,
                     fontSize: 14,
-                    fontFamily: "Pretendard SemiBold",
+                    ...theme.font.bodyBold,
                     cursor: saving ? "not-allowed" : "pointer",
                     display: "flex",
                     justifyContent: "center",
@@ -12501,7 +12798,7 @@ export default function AdminNew(props: any) {
                     style={{
                         color: "#BABABA",
                         fontSize: 12,
-                        fontFamily: "Pretendard Regular",
+                        fontFamily: theme.font.body,
                         wordWrap: "break-word",
                     }}
                 >
@@ -12610,7 +12907,7 @@ function SaveActionBar({
                     border: "none",
                     borderRadius: 0,
                     fontSize: 16,
-                    fontFamily: "Pretendard SemiBold",
+                    ...theme.font.bodyBold,
                     cursor: isSaving ? "not-allowed" : "pointer",
                     display: "flex",
                     justifyContent: "center",
@@ -12855,7 +13152,7 @@ function CustomOrderDropdown({
                     backgroundColor: "#ffffff",
                     border: `1px solid ${theme.color.border}`,
                     fontSize: 12, // 모바일 줌 방지
-                    fontFamily: "Pretendard SemiBold",
+                    ...theme.font.bodyBold,
                     color: "#757575",
                     cursor: "pointer",
                     display: "flex",
@@ -12923,7 +13220,7 @@ function CustomOrderDropdown({
                                 style={{
                                     padding: "12px 14px",
                                     fontSize: 12,
-                                    fontFamily: "Pretendard SemiBold",
+                                    ...theme.font.bodyBold,
                                     lineHeight: "18px",
                                     color: "#757575",
                                     backgroundColor:

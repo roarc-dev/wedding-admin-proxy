@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react"
 import { addPropertyControls, ControlType } from "framer"
+// @ts-ignore
+import typography from "https://cdn.roarc.kr/fonts/typography.js?v=27c65dba30928cbbce6839678016d9ac"
 
 // 프록시 서버 URL (고정된 Production URL)
 const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app"
@@ -48,17 +50,6 @@ async function getPageSettingsByPageId(
 
 interface PhotoSectionProxyProps {
     pageId?: string
-    imageUrl?: string | null
-    displayDateTime?: string
-    location?: string
-    useOverrideDateTime?: boolean
-    useOverrideLocation?: boolean
-    useOverrideOverlayTextColor?: boolean
-    useOverrideOverlayPosition?: boolean
-    useOverrideLocale?: boolean
-    overlayPosition?: "top" | "bottom"
-    overlayTextColor?: "#ffffff" | "#000000"
-    locale?: "en" | "ko"
     style?: React.CSSProperties
 }
 
@@ -94,22 +85,31 @@ function toTransformedUrl(
 export default function PhotoSectionProxy(props: PhotoSectionProxyProps) {
     const {
         pageId,
-        imageUrl,
-        displayDateTime,
-        location,
-        useOverrideDateTime = false,
-        useOverrideLocation = false,
-        useOverrideOverlayTextColor = false,
-        useOverrideOverlayPosition = false,
-        useOverrideLocale = false,
-        overlayPosition,
-        overlayTextColor,
-        locale = "en",
         style,
     } = props
 
     const [settings, setSettings] = useState<PageSettings | null>(null)
     // 버전 키는 updated_at을 사용하고, 랜덤 증분은 제거 (캐시 히트 보존)
+
+    // Typography 폰트 로딩
+    useEffect(() => {
+        try {
+            if (typography && typeof typography.ensure === "function") {
+                typography.ensure()
+            }
+        } catch (error) {
+            console.warn("[PhotoSectionProxy] Typography loading failed:", error)
+        }
+    }, [])
+
+    // Pretendard 폰트 스택을 안전하게 가져오기
+    const pretendardFontFamily = React.useMemo(() => {
+        try {
+            return typography?.helpers?.stacks?.pretendardVariable || '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
+        } catch {
+            return '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
+        }
+    }, [])
 
     // 페이지 설정 로드
     useEffect(() => {
@@ -195,27 +195,12 @@ export default function PhotoSectionProxy(props: PhotoSectionProxyProps) {
         return base
     }
 
-    const effectiveImageUrl = imageUrl ?? buildImageUrlFromSettings(settings)
-    const effectiveLocale: "en" | "kr" = useOverrideLocale
-        ? locale === "en"
-            ? "en"
-            : "kr"
-        : settings?.photo_section_locale === "en"
-          ? "en"
-          : "kr"
-    const effectiveDisplayDateTime = useOverrideDateTime
-        ? displayDateTime || ""
-        : buildDisplayDateTimeFromSettings(settings, effectiveLocale)
-    const effectiveLocation = useOverrideLocation
-        ? location || undefined
-        : settings?.venue_name || undefined
-    // overlayPosition 우선순위: 수동 입력 Yes일 때만 props 사용, 그 외에는 settings > 기본값
-    const effectiveOverlayPosition = useOverrideOverlayPosition
-        ? overlayPosition || "bottom"
-        : settings?.photo_section_overlay_position || "bottom"
-    const effectiveOverlayTextColor = useOverrideOverlayTextColor
-        ? overlayTextColor || "#ffffff"
-        : settings?.photo_section_overlay_color || "#ffffff"
+    const effectiveImageUrl = buildImageUrlFromSettings(settings)
+    const effectiveLocale: "en" | "kr" = settings?.photo_section_locale === "en" ? "en" : "kr"
+    const effectiveDisplayDateTime = buildDisplayDateTimeFromSettings(settings, effectiveLocale)
+    const effectiveLocation = settings?.venue_name || undefined
+    const effectiveOverlayPosition = settings?.photo_section_overlay_position || "bottom"
+    const effectiveOverlayTextColor = settings?.photo_section_overlay_color || "#ffffff"
 
     return (
         <div
@@ -295,7 +280,7 @@ export default function PhotoSectionProxy(props: PhotoSectionProxyProps) {
                         justifyContent: "center",
                         background: "#f5f5f5",
                         color: "#6b7280",
-                        fontFamily: "'Pretendard Regular', sans-serif",
+                        fontFamily: pretendardFontFamily,
                         fontSize: 14,
                         letterSpacing: 0.2,
                     }}
@@ -311,7 +296,7 @@ export default function PhotoSectionProxy(props: PhotoSectionProxyProps) {
                         width: "100%",
                         textAlign: "center",
                         color: effectiveOverlayTextColor,
-                        fontFamily: "'Pretendard Regular', sans-serif",
+                        fontFamily: pretendardFontFamily,
                         fontSize: "15px",
                         lineHeight: "1.4",
                         zIndex: 10,
@@ -338,17 +323,6 @@ export default function PhotoSectionProxy(props: PhotoSectionProxyProps) {
 
 const defaultPhotoProps: PhotoSectionProxyProps = {
     pageId: undefined,
-    imageUrl: null,
-    displayDateTime: "2025. 0. 00. SUN. 0 PM",
-    location: "LOCATION",
-    useOverrideDateTime: false,
-    useOverrideLocation: false,
-    useOverrideOverlayTextColor: false,
-    useOverrideOverlayPosition: false,
-    useOverrideLocale: false,
-    overlayPosition: "bottom",
-    overlayTextColor: "#ffffff",
-    locale: "en",
 }
 
 PhotoSectionProxy.defaultProps = defaultPhotoProps
@@ -359,77 +333,5 @@ addPropertyControls(PhotoSectionProxy, {
         title: "Page ID",
         defaultValue: "",
         placeholder: "예: mypageid",
-    },
-    imageUrl: {
-        type: ControlType.File,
-        title: "이미지 업로드",
-        allowedFileTypes: ["image/*"],
-    },
-    useOverrideDateTime: {
-        type: ControlType.Boolean,
-        title: "일시 수동 입력(Override)",
-        defaultValue: false,
-        /** Note: Boolean control in Framer does not support segmented titles */
-    },
-    displayDateTime: {
-        type: ControlType.String,
-        title: "예식 일시",
-        defaultValue: "2025. 0. 00. SUN. 0 PM",
-        placeholder: "예: 2025. 12. 25. SUN. 2 PM",
-        hidden: (props: any) => !props.useOverrideDateTime,
-    },
-    useOverrideLocation: {
-        type: ControlType.Boolean,
-        title: "장소 수동 입력(Override)",
-        defaultValue: false,
-        /** Note: Boolean control in Framer does not support segmented titles */
-    },
-    location: {
-        type: ControlType.String,
-        title: "예식 장소",
-        defaultValue: "LOCATION",
-        placeholder: "예식장 이름을 입력하세요",
-        hidden: (props: any) => !props.useOverrideLocation,
-    },
-    overlayPosition: {
-        type: ControlType.Enum,
-        title: "날짜/장소 위치",
-        options: ["top", "bottom"],
-        optionTitles: ["상단", "하단"],
-        defaultValue: "bottom",
-        displaySegmentedControl: true,
-    },
-    overlayTextColor: {
-        type: ControlType.Enum,
-        title: "오버레이 텍스트 색상",
-        options: ["#ffffff", "#000000"],
-        optionTitles: ["흰색", "검정"],
-        defaultValue: "#ffffff",
-        displaySegmentedControl: true,
-        hidden: (props: any) => !props.useOverrideOverlayTextColor,
-    },
-    useOverrideOverlayTextColor: {
-        type: ControlType.Boolean,
-        title: "텍스트 색상 수동 입력(Override)",
-        defaultValue: false,
-    },
-    useOverrideOverlayPosition: {
-        type: ControlType.Boolean,
-        title: "날짜/장소 위치 수동 입력(Override)",
-        defaultValue: false,
-    },
-    useOverrideLocale: {
-        type: ControlType.Boolean,
-        title: "언어 수동 입력(Override)",
-        defaultValue: false,
-    },
-    locale: {
-        type: ControlType.Enum,
-        title: "날짜/시간 언어",
-        options: ["en", "ko"],
-        optionTitles: ["영문", "한글"],
-        defaultValue: "en",
-        displaySegmentedControl: true,
-        hidden: (props: any) => !props.useOverrideLocale,
     },
 })

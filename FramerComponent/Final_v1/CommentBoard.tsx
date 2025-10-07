@@ -1,6 +1,9 @@
 import * as React from "react"
 import { useState, useEffect } from "react"
 import { addPropertyControls, ControlType } from "framer"
+import { motion } from "framer-motion"
+// @ts-ignore
+import typography from "https://cdn.roarc.kr/fonts/typography.js?v=27c65dba30928cbbce6839678016d9ac"
 
 // 프록시 서버 URL
 const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app"
@@ -9,23 +12,41 @@ const ITEMS_PER_PAGE = 5
 
 interface CommentBoardProps {
     pageId?: string
-    backgroundColor?: string
-    textColor?: string
     fontFamily?: any
-    inputBackgroundColor?: string
-    inputTextColor?: string
-    commentBackgroundColor?: string
 }
 
 export default function CommentBoard({
     pageId = "default",
-    backgroundColor = "#ffffff",
-    textColor = "#000000",
     fontFamily = "Pretendard Regular",
-    inputBackgroundColor = "#f5f5f5",
-    inputTextColor = "#000000",
-    commentBackgroundColor = "rgba(0,0,0,0)",
 }: CommentBoardProps) {
+    // Typography 폰트 로딩
+    useEffect(() => {
+        try {
+            if (typography && typeof typography.ensure === "function") {
+                typography.ensure()
+            }
+        } catch (_) {}
+    }, [])
+
+    // Pretendard 폰트 스택
+    const pretendardFontFamily = React.useMemo(() => {
+        try {
+            return (
+                typography?.helpers?.stacks?.pretendardVariable ||
+                '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
+            )
+        } catch {
+            return '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
+        }
+    }, [])
+
+    // 고정 색상 값
+    const BG = "#ffffff"
+    const TXT = "#000"
+    const INPUT_BG = "#F5f5f5"
+    const INPUT_TXT = "#000"
+    const COMMENT_BG = "transparent"
+    const [displayStyle, setDisplayStyle] = useState<"none" | "block">("none")
     const [name, setName] = useState("")
     const [password, setPassword] = useState("")
     const [commentText, setCommentText] = useState("")
@@ -247,17 +268,117 @@ export default function CommentBoard({
         })
     }
 
+    // 서버에서 page_settings.comments 값을 조회해 표시 상태를 동기화
+    useEffect(() => {
+        let cancelled = false
+        async function fetchCommentsToggle() {
+            try {
+                if (!pageId) return
+                const url = `${PROXY_BASE_URL}/api/page-settings?pageId=${encodeURIComponent(pageId)}`
+                const res = await fetch(url, { cache: "no-store" })
+                if (!res.ok) return
+                const json = await res.json()
+                const serverComments = (json && json.data && json.data.comments) || json?.comments
+                if (!cancelled && (serverComments === "on" || serverComments === "off")) {
+                    setDisplayStyle(serverComments === "on" ? "block" : "none")
+                }
+            } catch (_) {}
+        }
+        fetchCommentsToggle()
+        return () => {
+            cancelled = true
+        }
+    }, [pageId])
+
+    if (displayStyle === "none") {
+        return <div style={{ display: "none" }} />
+    }
+
     return (
         <div
             style={{
                 width: "100%",
                 height: "auto",
-                backgroundColor: backgroundColor,
+                backgroundColor: BG,
                 padding: 0,
                 WebkitTextSizeAdjust: "100%",
                 textSizeAdjust: "100%",
             }}
         >
+            {/* 아웃터 래퍼: 상하 80px, fill #fff, overflow hidden */}
+            <div
+                style={{
+                    width: "100%",
+                    paddingTop: 80,
+                    paddingBottom: 80,
+                    backgroundColor: BG,
+                    overflow: "hidden",
+                }}
+            >
+                {/* 헤더 영역 (제목 + 서브텍스트) */}
+                <div
+                    style={{
+                        width: "100%",
+                        paddingBottom: "30px",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                    }}
+                >
+                    {/* 제목 */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 50 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true, amount: 0.3 }}
+                        transition={{ type: "spring", stiffness: 100, damping: 60, mass: 1, delay: 0 }}
+                        style={{
+                            width: "100%",
+                            height: 20,
+                            textAlign: "center",
+                            fontFamily: pretendardFontFamily,
+                            fontWeight: 600,
+                            fontSize: 22,
+                            lineHeight: "0.7em",
+                            color: "#000",
+                        }}
+                    >
+                        축하 전하기
+                    </motion.div>
+                    {/* 서브텍스트 */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 50 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true, amount: 0.3 }}
+                        transition={{ type: "spring", stiffness: 100, damping: 60, mass: 1, delay: 0 }}
+                        style={{
+                            marginTop: 20,
+                            width: "fit-content",
+                            height: "fit-content",
+                            textAlign: "center",
+                            fontFamily: pretendardFontFamily,
+                            fontWeight: 400,
+                            fontSize: 15,
+                            lineHeight: "1.8em",
+                            color: "#8c8c8c",
+                        }}
+                    >
+                        신랑 신부에게 축하의 한 마디를 남겨주세요
+                    </motion.div>
+                </div>
+
+                {/* 인너 래퍼: 기존 컴포넌트 컨테이너 (80% 폭, 가운데) */}
+                <motion.div
+                    initial={{ opacity: 0, y: 50 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, amount: 0.2 }}
+                    transition={{ type: "spring", stiffness: 100, damping: 60, mass: 1, delay: 0 }}
+                    style={{
+                        width: "80%",
+                        height: "fit-content",
+                        margin: "0 auto",
+                    }}
+                >
             {/* 댓글 남기기 버튼 */}
             <div style={{ marginBottom: 16 }}>
                 <button
@@ -269,9 +390,10 @@ export default function CommentBoard({
                         width: "100%",
                         height: 54,
                         backgroundColor: "#ECECEC",
-                        color: "black",
+                        color: TXT,
                         fontSize: 14, // iOS 확대 방지
-                        fontFamily: "Pretendard SemiBold",
+                        fontFamily: pretendardFontFamily,
+                        fontWeight: 600,
                         border: "none",
                         borderRadius: 0,
                         cursor: "pointer",
@@ -318,7 +440,7 @@ export default function CommentBoard({
                             paddingBottom: 16,
                             paddingLeft: 0,
                             marginBottom: index === comments.length - 1 ? 0 : 0,
-                            backgroundColor: commentBackgroundColor,
+                            backgroundColor: COMMENT_BG,
                             borderRadius: 0,
                             border: "none",
                             borderBottom:
@@ -346,7 +468,8 @@ export default function CommentBoard({
                                     style={{
                                         fontSize: 14,
                                         color: "#757575",
-                                        fontFamily: "Pretendard SemiBold",
+                                        fontFamily: pretendardFontFamily,
+                                        fontWeight: 600,
                                     }}
                                 >
                                     {c.name}
@@ -356,7 +479,8 @@ export default function CommentBoard({
                                         fontSize: 12,
                                         color: "#aeaeae",
                                         opacity: 0.6,
-                                        fontFamily: "Pretendard Regular",
+                                        fontFamily: pretendardFontFamily,
+                                        fontWeight: 400,
                                     }}
                                 >
                                     {formattedDate}
@@ -398,8 +522,9 @@ export default function CommentBoard({
                         <div
                             style={{
                                 fontSize: 14,
-                                color: textColor,
-                                fontFamily: "Pretendard Regular",
+                                color: TXT,
+                                fontFamily: pretendardFontFamily,
+                                fontWeight: 400,
                                 lineHeight: "1.5",
                                 maxHeight: isExpanded ? "200px" : "80px",
                                 overflowY: isExpanded ? "auto" : "hidden",
@@ -419,7 +544,8 @@ export default function CommentBoard({
                                         left: 0,
                                         right: 0,
                                         height: "40px",
-                                        background: "linear-gradient(to bottom, transparent 0%, rgba(255, 255, 255, 0.8) 50%, white 100%)",
+                                        background:
+                                            "linear-gradient(to bottom, transparent 0%, rgba(255, 255, 255, 0.8) 50%, white 100%)",
                                         pointerEvents: "none",
                                     }}
                                 />
@@ -429,7 +555,6 @@ export default function CommentBoard({
                         {!isExpanded && isLongComment && (
                             <div
                                 style={{
-                                    marginTop: "12px",
                                     textAlign: "right",
                                 }}
                             >
@@ -437,12 +562,13 @@ export default function CommentBoard({
                                     onClick={() => toggleComment(c.id)}
                                     style={{
                                         fontSize: 12,
-                                        color: textColor,
+                                        color: TXT,
                                         opacity: 0.7,
                                         backgroundColor: "transparent",
                                         border: "none",
                                         cursor: "pointer",
-                                        fontFamily: "Pretendard Regular",
+                                        fontFamily: pretendardFontFamily,
+                                        fontWeight: 400,
                                         textDecoration: "underline",
                                         padding: "4px 4px",
                                     }}
@@ -455,7 +581,6 @@ export default function CommentBoard({
                         {isExpanded && isLongComment && (
                             <div
                                 style={{
-                                    marginTop: "8px",
                                     textAlign: "right",
                                 }}
                             >
@@ -463,12 +588,13 @@ export default function CommentBoard({
                                     onClick={() => toggleComment(c.id)}
                                     style={{
                                         fontSize: 12,
-                                        color: textColor,
+                                        color: TXT,
                                         opacity: 0.7,
                                         backgroundColor: "transparent",
                                         border: "none",
                                         cursor: "pointer",
-                                        fontFamily: "Pretendard Regular",
+                                        fontFamily: pretendardFontFamily,
+                                        fontWeight: 400,
                                         textDecoration: "underline",
                                         marginTop: 8,
                                     }}
@@ -486,10 +612,11 @@ export default function CommentBoard({
                     style={{
                         textAlign: "center",
                         padding: 40,
-                        color: textColor,
+                        color: TXT,
                         opacity: 0.6,
                         fontSize: 14,
-                        fontFamily: fontFamily,
+                        fontFamily: pretendardFontFamily,
+                        fontWeight: 400,
                     }}
                 >
                     신랑 신부에게 축하의 한 마디를 남겨보세요.
@@ -548,7 +675,7 @@ export default function CommentBoard({
                 >
                     <div
                         style={{
-                            backgroundColor: backgroundColor,
+                            backgroundColor: BG,
                             padding: 24,
                             borderRadius: 0,
                             width: "min(560px, 92vw)",
@@ -573,12 +700,13 @@ export default function CommentBoard({
                                 style={{
                                     width: "calc(50% - 4px)",
                                     padding: 12,
-                                    backgroundColor: inputBackgroundColor,
-                                    color: inputTextColor,
+                                    backgroundColor: INPUT_BG,
+                                    color: INPUT_TXT,
                                     border: "none",
                                     borderRadius: 0,
                                     fontSize: 16, // iOS 확대 방지
-                                    fontFamily: fontFamily,
+                                    fontFamily: pretendardFontFamily,
+                                    fontWeight: 400,
                                     outline: "none",
                                     boxSizing: "border-box",
                                 }}
@@ -596,12 +724,13 @@ export default function CommentBoard({
                                 style={{
                                     width: "calc(50% - 4px)",
                                     padding: 12,
-                                    backgroundColor: inputBackgroundColor,
-                                    color: inputTextColor,
+                                    backgroundColor: INPUT_BG,
+                                    color: INPUT_TXT,
                                     border: "none",
                                     borderRadius: 0,
                                     fontSize: 16, // iOS 확대 방지
-                                    fontFamily: fontFamily,
+                                    fontFamily: pretendardFontFamily,
+                                    fontWeight: 400,
                                     outline: "none",
                                     boxSizing: "border-box",
                                 }}
@@ -617,12 +746,13 @@ export default function CommentBoard({
                                 width: "100%",
                                 marginBottom: 8,
                                 padding: 12,
-                                backgroundColor: inputBackgroundColor,
-                                color: inputTextColor,
+                                backgroundColor: INPUT_BG,
+                                color: INPUT_TXT,
                                 border: "none",
                                 borderRadius: 0,
                                 fontSize: 16, // iOS 확대 방지
-                                fontFamily: fontFamily,
+                                fontFamily: pretendardFontFamily,
+                                fontWeight: 400,
                                 outline: "none",
                                 resize: "vertical",
                                 minHeight: 100,
@@ -642,7 +772,8 @@ export default function CommentBoard({
                                     border: "none",
                                     borderRadius: 0,
                                     fontSize: 12,
-                                    fontFamily: fontFamily,
+                                    fontFamily: pretendardFontFamily,
+                                    fontWeight: 400,
                                 }}
                             >
                                 {errorMessage}
@@ -664,13 +795,14 @@ export default function CommentBoard({
                                 }}
                                 style={{
                                     padding: "10px 20px",
-                                    backgroundColor: backgroundColor,
-                                    color: textColor,
+                                    backgroundColor: BG,
+                                    color: TXT,
                                     border: "none",
                                     borderRadius: 0,
                                     cursor: "pointer",
                                     fontSize: 14,
-                                    fontFamily: "Pretendard SemiBold",
+                                    fontFamily: pretendardFontFamily,
+                                    fontWeight: 600,
                                     opacity: 0.7,
                                 }}
                             >
@@ -681,12 +813,13 @@ export default function CommentBoard({
                                 style={{
                                     padding: "10px 20px",
                                     backgroundColor: "#727272",
-                                    color: backgroundColor,
+                                    color: BG,
                                     border: "none",
                                     borderRadius: 0,
                                     cursor: "pointer",
                                     fontSize: 14, // iOS 확대 방지
-                                    fontFamily: "Pretendard SemiBold",
+                                    fontFamily: pretendardFontFamily,
+                                    fontWeight: 600,
                                 }}
                             >
                                 등록
@@ -714,7 +847,7 @@ export default function CommentBoard({
                 >
                     <div
                         style={{
-                            backgroundColor: backgroundColor,
+                            backgroundColor: BG,
                             padding: 32,
                             borderRadius: 0,
                             boxShadow: "0 8px 32px rgba(0, 0, 0, 0.2)",
@@ -726,8 +859,9 @@ export default function CommentBoard({
                             style={{
                                 margin: "0 0 16px 0",
                                 fontSize: 16,
-                                fontFamily: "Pretendard SemiBold",
-                                color: textColor,
+                                fontFamily: pretendardFontFamily,
+                                fontWeight: 600,
+                                color: TXT,
                             }}
                         >
                             댓글 삭제
@@ -736,8 +870,9 @@ export default function CommentBoard({
                             style={{
                                 margin: "0 0 16px 0",
                                 fontSize: 14,
-                                fontFamily: "Pretendard Regular",
-                                color: textColor,
+                                fontFamily: pretendardFontFamily,
+                                fontWeight: 400,
+                                color: TXT,
                                 opacity: 0.8,
                             }}
                         >
@@ -755,9 +890,10 @@ export default function CommentBoard({
                                 border: "none",
                                 borderRadius: 0,
                                 fontSize: 16, // iOS 확대 방지
-                                fontFamily: "Pretendard Regular",
-                                backgroundColor: inputBackgroundColor,
-                                color: inputTextColor,
+                                fontFamily: pretendardFontFamily,
+                                fontWeight: 400,
+                                backgroundColor: INPUT_BG,
+                                color: INPUT_TXT,
                                 outline: "none",
                                 boxSizing: "border-box",
                             }}
@@ -776,13 +912,14 @@ export default function CommentBoard({
                                 onClick={cancelDelete}
                                 style={{
                                     padding: "10px 20px",
-                                    backgroundColor: backgroundColor,
-                                    color: textColor,
+                                    backgroundColor: BG,
+                                    color: TXT,
                                     border: "none",
                                     borderRadius: 0,
                                     cursor: "pointer",
                                     fontSize: 14,
-                                    fontFamily: "Pretendard SemiBold",
+                                    fontFamily: pretendardFontFamily,
+                                    fontWeight: 600,
                                     opacity: 0.7,
                                 }}
                             >
@@ -798,7 +935,8 @@ export default function CommentBoard({
                                     borderRadius: 0,
                                     cursor: "pointer",
                                     fontSize: 14,
-                                    fontFamily: "Pretendard SemiBold",
+                                    fontFamily: pretendardFontFamily,
+                                    fontWeight: 600,
                                 }}
                             >
                                 삭제
@@ -807,6 +945,8 @@ export default function CommentBoard({
                     </div>
                 </div>
             )}
+                </motion.div>
+            </div>
         </div>
     )
 }
@@ -818,41 +958,5 @@ addPropertyControls(CommentBoard, {
         description: "각 페이지를 구분하는 고유 키입니다.",
         defaultValue: "default",
         placeholder: "예: home, about, contact",
-    },
-    backgroundColor: {
-        type: ControlType.Color,
-        title: "배경색",
-        description: "컴포넌트의 배경색을 설정합니다.",
-        defaultValue: "#ffffff",
-    },
-    textColor: {
-        type: ControlType.Color,
-        title: "텍스트 색상",
-        description: "텍스트 색상을 설정합니다.",
-        defaultValue: "#000000",
-    },
-    inputBackgroundColor: {
-        type: ControlType.Color,
-        title: "입력창 배경색",
-        description: "입력창의 배경색을 설정합니다.",
-        defaultValue: "#f5f5f5",
-    },
-    inputTextColor: {
-        type: ControlType.Color,
-        title: "입력창 텍스트 색상",
-        description: "입력창의 텍스트 색상을 설정합니다.",
-        defaultValue: "#000000",
-    },
-    commentBackgroundColor: {
-        type: ControlType.Color,
-        title: "댓글 배경색",
-        description: "댓글 영역의 배경색을 설정합니다.",
-        defaultValue: "#ffffff",
-    },
-    fontFamily: {
-        type: ControlType.Font,
-        title: "폰트",
-        description: "사용할 폰트를 선택합니다.",
-        defaultValue: "Pretendard Regular" as any,
     },
 })

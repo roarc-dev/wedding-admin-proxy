@@ -1,16 +1,15 @@
 import React, { useEffect, useRef, useState } from "react"
 import { addPropertyControls, ControlType } from "framer"
+import typography from "https://cdn.roarc.kr/fonts/typography.js?v=6fdc95bcc8fd197d879c051a8c2d5a03"
 
 interface EternalNameSectionProps {
     groomName: string
     brideName: string
-    groomFont?: any
-    brideFont?: any
     style?: React.CSSProperties
 }
 
 export default function EternalNameSection(props: EternalNameSectionProps) {
-    const { groomName, brideName, groomFont, brideFont, style } = props
+    const { groomName, brideName, style } = props
 
     const nameContainerRef = useRef<HTMLDivElement | null>(null)
     const groomRef = useRef<HTMLDivElement | null>(null)
@@ -59,11 +58,23 @@ export default function EternalNameSection(props: EternalNameSectionProps) {
     }
 
     useEffect(() => {
+        try {
+            typography && typeof typography.ensure === "function" && typography.ensure()
+        } catch {}
         adjustTextSize()
         const handleResize = () => setTimeout(adjustTextSize, 100)
         window.addEventListener("resize", handleResize)
         return () => window.removeEventListener("resize", handleResize)
-    }, [groomName, brideName, groomFont, brideFont])
+    }, [groomName, brideName])
+
+    // Goldenbook 폰트 스택을 안전하게 가져오기
+    const goldenbookFontFamily = React.useMemo(() => {
+        try {
+            return typography?.helpers?.stacks?.goldenbook || '"Goldenbook", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Apple SD Gothic Neo", "Noto Sans KR", "Apple Color Emoji", "Segoe UI Emoji"'
+        } catch {
+            return '"Goldenbook", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Apple SD Gothic Neo", "Noto Sans KR", "Apple Color Emoji", "Segoe UI Emoji"'
+        }
+    }, [])
 
     return (
         <div
@@ -86,7 +97,8 @@ export default function EternalNameSection(props: EternalNameSectionProps) {
                     textAlign: "center",
                     color: "black",
                     fontSize: `${nameFontSize}px`,
-                    ...groomFont,
+                    fontFamily: goldenbookFontFamily,
+                    fontWeight: 400,
                     lineHeight: "32px",
                     wordWrap: "break-word",
                     letterSpacing: "0.02em",
@@ -123,7 +135,8 @@ export default function EternalNameSection(props: EternalNameSectionProps) {
                     textAlign: "center",
                     color: "black",
                     fontSize: `${nameFontSize}px`,
-                    ...brideFont,
+                    fontFamily: goldenbookFontFamily,
+                    fontWeight: 400,
                     lineHeight: "32px",
                     wordWrap: "break-word",
                     letterSpacing: "0.02em",
@@ -154,15 +167,5 @@ addPropertyControls(EternalNameSection, {
         title: "신부 이름",
         defaultValue: "BRIDE NAME",
         placeholder: "신부 이름을 입력하세요 (자동 대문자 변환)",
-    },
-    groomFont: {
-        type: ControlType.Font,
-        title: "신랑 폰트",
-        controls: "extended",
-    },
-    brideFont: {
-        type: ControlType.Font,
-        title: "신부 폰트",
-        controls: "extended",
     },
 })

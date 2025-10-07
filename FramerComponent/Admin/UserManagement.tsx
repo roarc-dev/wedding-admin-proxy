@@ -34,8 +34,12 @@ function validateSessionToken(token: string): AdminTokenPayload | null {
     }
 }
 
-// 페이지 설정 타입 업데이트 함수 (papillon | eternal)
-async function updatePageType(pageId: string, type: "papillon" | "eternal") {
+// 페이지 타입 목록 (확장 가능)
+const PAGE_TYPES = ["papillon", "eternal", "fiore"] as const
+type PageType = (typeof PAGE_TYPES)[number]
+
+// 페이지 설정 타입 업데이트 함수
+async function updatePageType(pageId: string, type: PageType) {
     try {
         const response = await fetch(`${PROXY_BASE_URL}/api/page-settings`, {
             method: "PUT",
@@ -176,6 +180,7 @@ interface UpdateUserData {
     is_active: boolean
     page_id?: string
     newPassword?: string
+    expiry_date?: string | null
 }
 
 async function updateUser(userData: UpdateUserData): Promise<any> {
@@ -203,7 +208,10 @@ async function updateUser(userData: UpdateUserData): Promise<any> {
     }
 }
 
-async function deleteUser(userId: string): Promise<any> {
+async function deleteUser(
+    userId: string,
+    deleteAllData: boolean = false
+): Promise<any> {
     try {
         const response = await fetch(`${PROXY_BASE_URL}/api/user-management`, {
             method: "DELETE",
@@ -211,7 +219,7 @@ async function deleteUser(userId: string): Promise<any> {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${getAuthToken()}`,
             },
-            body: JSON.stringify({ id: userId }),
+            body: JSON.stringify({ id: userId, deleteAllData }),
         })
 
         if (!response.ok) {
@@ -272,6 +280,7 @@ interface User {
     last_login?: string
     approval_status: "pending" | "approved" | "rejected"
     page_id?: string
+    expiry_date?: string | null
 }
 
 export default function UserManagement(props: { style?: React.CSSProperties }) {
@@ -308,8 +317,14 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
         is_active: true,
         newPassword: "",
         page_id: "",
-        type: "papillon" as "papillon" | "eternal",
+        type: "papillon" as PageType,
+        expiry_date: "",
     })
+
+    // 탭 상태
+    const [activeTab, setActiveTab] = useState<
+        "all" | "pending" | "active" | "expired"
+    >("all")
 
     // 세션 확인
     useEffect(() => {
@@ -378,6 +393,7 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
             newPassword: "",
             page_id: "",
             type: "papillon",
+            expiry_date: "",
         })
         setEditingUser(null)
         setShowAddModal(true)
@@ -393,6 +409,7 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
             newPassword: "",
             page_id: user.page_id || "",
             type: "papillon",
+            expiry_date: user.expiry_date || "",
         })
         setEditingUser(user)
         setShowAddModal(true)
@@ -446,6 +463,7 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
                     name: userForm.name,
                     is_active: userForm.is_active,
                     page_id: userForm.page_id,
+                    expiry_date: userForm.expiry_date || null,
                 }
                 if (userForm.newPassword) {
                     updateData.newPassword = userForm.newPassword
@@ -491,14 +509,30 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
 
     // 사용자 삭제
     const handleDeleteUser = async (user: User) => {
-        if (!confirm(`정말로 '${user.name}' 사용자를 삭제하시겠습니까?`)) return
+        const deleteAllData = confirm(
+            `'${user.name}' 사용자를 삭제하시겠습니까?\n\n` +
+                `⚠️ 확인을 누르면 모든 데이터가 삭제됩니다:\n` +
+                `- 사용자 계정\n` +
+                `- Page ID: ${user.page_id || "없음"}\n` +
+                `- 페이지 설정, 연락처, 이미지, 댓글, RSVP 등 모든 데이터\n\n` +
+                `취소를 누르면 계정만 삭제됩니다.`
+        )
+
+        if (
+            !confirm(
+                deleteAllData
+                    ? "⚠️ 경고: 모든 데이터를 영구적으로 삭제합니다. 계속하시겠습니까?"
+                    : `'${user.name}' 사용자 계정만 삭제하시겠습니까?`
+            )
+        )
+            return
 
         setLoading(true)
         try {
-            const result = await deleteUser(user.id)
+            const result = await deleteUser(user.id, deleteAllData)
 
             if (result.success) {
-                setSuccess("사용자가 성공적으로 삭제되었습니다.")
+                setSuccess(result.message || "사용자가 성공적으로 삭제되었습니다.")
                 loadUsers()
             } else {
                 setError(result.error)
@@ -531,6 +565,88 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
     const rejectedUsers = users.filter(
         (user: User) => user.approval_status === "rejected"
     )
+
+    // 만료 상태별 사용자 분류
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const expiredUsers = users.filter((user: User) => {
+        if (!user.expiry_date) return false
+        const expiryDate = new Date(user.expiry_date)
+        return expiryDate < today && user.approval_status === "approved"
+    })
+
+    const activeUsers = users.filter((user: User) => {
+        if (!user.expiry_date) {
+            return user.approval_status === "approved" && user.is_active
+        }
+        const expiryDate = new Date(user.expiry_date)
+        return (
+            expiryDate >= today &&
+            user.approval_status === "approved" &&
+            user.is_active
+        )
+    })
+
+    // 탭별 사용자 필터링
+    const getFilteredUsers = () => {
+        switch (activeTab) {
+            case "pending":
+                return pendingUsers
+            case "active":
+                return activeUsers
+            case "expired":
+                return expiredUsers
+            case "all":
+            default:
+                return users
+        }
+    }
+
+    const filteredUsers = getFilteredUsers()
+
+    // 만료된 사용자 일괄 삭제
+    const handleBulkDeleteExpired = async () => {
+        if (expiredUsers.length === 0) {
+            alert("만료된 사용자가 없습니다.")
+            return
+        }
+
+        if (
+            !confirm(
+                `만료된 사용자 ${expiredUsers.length}명을 모두 삭제하시겠습니까?\n\n` +
+                    `⚠️ 다음 사용자들의 모든 데이터가 삭제됩니다:\n` +
+                    expiredUsers.map((u) => `- ${u.name} (${u.username})`).join("\n") +
+                    `\n\n이 작업은 되돌릴 수 없습니다.`
+            )
+        )
+            return
+
+        setLoading(true)
+        try {
+            const deletePromises = expiredUsers.map((user) =>
+                deleteUser(user.id, true)
+            )
+
+            const results = await Promise.all(deletePromises)
+            const successCount = results.filter((r) => r.success).length
+            const failCount = results.length - successCount
+
+            if (failCount > 0) {
+                setError(
+                    `${successCount}명 삭제 성공, ${failCount}명 삭제 실패`
+                )
+            } else {
+                setSuccess(`${successCount}명의 사용자가 성공적으로 삭제되었습니다.`)
+            }
+
+            loadUsers()
+        } catch (err) {
+            setError("일괄 삭제 중 오류가 발생했습니다.")
+        } finally {
+            setLoading(false)
+        }
+    }
 
     // 로그인 화면
     if (!isAuthenticated) {
@@ -757,6 +873,47 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
                 )}
             </AnimatePresence>
 
+            {/* 탭 메뉴 */}
+            <div
+                style={{
+                    display: "flex",
+                    gap: "10px",
+                    backgroundColor: "white",
+                    padding: "10px",
+                    borderRadius: "8px",
+                    boxShadow: "0 2px 4px rgba(0, 0, 0, 0.05)",
+                }}
+            >
+                {[
+                    { key: "all", label: "전체", count: users.length },
+                    { key: "pending", label: "승인 대기", count: pendingUsers.length },
+                    { key: "active", label: "활성", count: activeUsers.length },
+                    { key: "expired", label: "만료", count: expiredUsers.length },
+                ].map((tab) => (
+                    <motion.button
+                        key={tab.key}
+                        onClick={() => setActiveTab(tab.key as any)}
+                        style={{
+                            flex: 1,
+                            padding: "10px 16px",
+                            backgroundColor:
+                                activeTab === tab.key ? "#1a237e" : "#f3f4f6",
+                            color: activeTab === tab.key ? "white" : "#1f2937",
+                            border: "none",
+                            borderRadius: "6px",
+                            cursor: "pointer",
+                            fontSize: "14px",
+                            fontWeight: activeTab === tab.key ? "600" : "500",
+                            transition: "all 0.2s",
+                        }}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                    >
+                        {tab.label} ({tab.count})
+                    </motion.button>
+                ))}
+            </div>
+
             {/* 승인 대기자 섹션 */}
             {pendingUsers.length > 0 && (
                 <div
@@ -885,9 +1042,32 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
                         margin: 0,
                     }}
                 >
-                    전체 사용자 목록 ({users.length})
+                    {activeTab === "all" && `전체 사용자 (${filteredUsers.length})`}
+                    {activeTab === "pending" && `승인 대기 (${filteredUsers.length})`}
+                    {activeTab === "active" && `활성 사용자 (${filteredUsers.length})`}
+                    {activeTab === "expired" && `만료된 사용자 (${filteredUsers.length})`}
                 </h2>
                 <div style={{ display: "flex", gap: "10px" }}>
+                    {activeTab === "expired" && expiredUsers.length > 0 && (
+                        <motion.button
+                            onClick={handleBulkDeleteExpired}
+                            disabled={loading}
+                            style={{
+                                padding: "10px 20px",
+                                backgroundColor: loading ? "#9ca3af" : "#ef4444",
+                                color: "white",
+                                border: "none",
+                                borderRadius: "6px",
+                                fontSize: "14px",
+                                fontWeight: "500",
+                                cursor: loading ? "not-allowed" : "pointer",
+                            }}
+                            whileHover={!loading ? { scale: 1.05 } : {}}
+                            whileTap={!loading ? { scale: 0.95 } : {}}
+                        >
+                            🗑️ 만료된 사용자 일괄 삭제
+                        </motion.button>
+                    )}
                     <motion.button
                         onClick={handleAddUser}
                         style={{
@@ -944,7 +1124,7 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
                     >
                         로딩 중...
                     </div>
-                ) : users.length === 0 ? (
+                ) : filteredUsers.length === 0 ? (
                     <div
                         style={{
                             textAlign: "center",
@@ -952,11 +1132,49 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
                             color: "#6b7280",
                         }}
                     >
-                        등록된 사용자가 없습니다.
+                        {activeTab === "expired"
+                            ? "만료된 사용자가 없습니다."
+                            : activeTab === "active"
+                              ? "활성 사용자가 없습니다."
+                              : activeTab === "pending"
+                                ? "승인 대기 중인 사용자가 없습니다."
+                                : "등록된 사용자가 없습니다."}
                     </div>
                 ) : (
                     <div style={{ padding: "20px" }}>
-                        {users.map((user, index) => (
+                        {filteredUsers.map((user, index) => {
+                            // 만료 상태 계산
+                            const getExpiryStatus = (expiryDate?: string | null) => {
+                                if (!expiryDate) return null
+                                const expiry = new Date(expiryDate)
+                                const today = new Date()
+                                today.setHours(0, 0, 0, 0)
+                                const diffDays = Math.ceil(
+                                    (expiry.getTime() - today.getTime()) /
+                                        (1000 * 60 * 60 * 24)
+                                )
+
+                                if (diffDays < 0)
+                                    return {
+                                        text: `${Math.abs(diffDays)}일 전 만료`,
+                                        color: "#dc2626",
+                                    }
+                                if (diffDays === 0)
+                                    return { text: "오늘 만료", color: "#dc2626" }
+                                if (diffDays <= 7)
+                                    return {
+                                        text: `${diffDays}일 후 만료`,
+                                        color: "#f59e0b",
+                                    }
+                                return {
+                                    text: `${diffDays}일 남음`,
+                                    color: "#10b981",
+                                }
+                            }
+
+                            const expiryStatus = getExpiryStatus(user.expiry_date)
+
+                            return (
                             <motion.div
                                 key={user.id}
                                 initial={{ opacity: 0, y: 20 }}
@@ -1018,6 +1236,18 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
                                         {user.page_id &&
                                             ` | Page ID: ${user.page_id}`}
                                     </p>
+                                    {expiryStatus && (
+                                        <p
+                                            style={{
+                                                fontSize: "13px",
+                                                color: expiryStatus.color,
+                                                margin: "5px 0 0 0",
+                                                fontWeight: "600",
+                                            }}
+                                        >
+                                            📅 {expiryStatus.text}
+                                        </p>
+                                    )}
                                 </div>
                                 <div
                                     style={{
@@ -1079,7 +1309,8 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
                                     </motion.button>
                                 </div>
                             </motion.div>
-                        ))}
+                            )
+                        })}
                     </div>
                 )}
             </div>
@@ -1176,7 +1407,7 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
                                     }
                                 />
 
-                                {/* Type 선택 (papillon | eternal) */}
+                                {/* Type 선택 (동적 타입 관리) */}
                                 <div>
                                     <label
                                         style={{
@@ -1194,7 +1425,8 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
                                         onChange={(e) =>
                                             setUserForm((prev) => ({
                                                 ...prev,
-                                                type: (e.target.value as "papillon" | "eternal") || "papillon",
+                                                type: (e.target
+                                                    .value as PageType),
                                             }))
                                         }
                                         style={{
@@ -1208,8 +1440,11 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
                                             background: "white",
                                         }}
                                     >
-                                        <option value="papillon">papillon</option>
-                                        <option value="eternal">eternal</option>
+                                        {PAGE_TYPES.map((type) => (
+                                            <option key={type} value={type}>
+                                                {type}
+                                            </option>
+                                        ))}
                                     </select>
                                 </div>
 
@@ -1241,6 +1476,49 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
                                         }
                                     />
                                 )}
+
+                                {/* 만료 기간 입력 */}
+                                <div>
+                                    <label
+                                        style={{
+                                            display: "block",
+                                            fontSize: "14px",
+                                            fontWeight: "500",
+                                            color: "#374151",
+                                            marginBottom: "5px",
+                                        }}
+                                    >
+                                        서비스 만료 기간
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={userForm.expiry_date}
+                                        onChange={(e) =>
+                                            setUserForm((prev) => ({
+                                                ...prev,
+                                                expiry_date: e.target.value,
+                                            }))
+                                        }
+                                        style={{
+                                            width: "100%",
+                                            padding: "10px",
+                                            border: "1px solid #d1d5db",
+                                            borderRadius: "6px",
+                                            fontSize: "14px",
+                                            outline: "none",
+                                            boxSizing: "border-box",
+                                        }}
+                                    />
+                                    <p
+                                        style={{
+                                            fontSize: "12px",
+                                            color: "#6b7280",
+                                            margin: "5px 0 0 0",
+                                        }}
+                                    >
+                                        만료 기간을 설정하지 않으면 무제한입니다.
+                                    </p>
+                                </div>
 
                                 <div>
                                     <label

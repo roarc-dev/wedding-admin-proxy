@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { addPropertyControls, ControlType } from "framer"
+// @ts-ignore
+import typography from "https://cdn.roarc.kr/fonts/typography.js?v=27c65dba30928cbbce6839678016d9ac"
 
 // 프록시 서버 URL (고정된 Production URL)
 const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app"
@@ -92,6 +94,26 @@ export default function AccountBtn(props: AccountBtnProps) {
     const [error, setError] = useState("")
     const [copyMessage, setCopyMessage] = useState("")
     const [showCopyMessage, setShowCopyMessage] = useState(false)
+
+    // Typography 폰트 로딩
+    useEffect(() => {
+        try {
+            if (typography && typeof typography.ensure === "function") {
+                typography.ensure()
+            }
+        } catch (error) {
+            console.warn("[Account] Typography loading failed:", error)
+        }
+    }, [])
+
+    // Pretendard 폰트 스택을 안전하게 가져오기
+    const pretendardFontFamily = useMemo(() => {
+        try {
+            return typography?.helpers?.stacks?.pretendardVariable || '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
+        } catch {
+            return '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
+        }
+    }, [])
 
     // 계좌 정보 로드
     const loadAccountInfo = async () => {
@@ -220,7 +242,8 @@ export default function AccountBtn(props: AccountBtnProps) {
                         style={{
                             color: "black",
                             fontSize: 14,
-                            fontFamily: "Pretendard SemiBold",
+                            fontFamily: pretendardFontFamily,
+                            fontWeight: 600,
                         }}
                     >
                         로딩 중...
@@ -256,7 +279,8 @@ export default function AccountBtn(props: AccountBtnProps) {
                         style={{
                             color: "black",
                             fontSize: 14,
-                            fontFamily: "Pretendard SemiBold",
+                            fontFamily: pretendardFontFamily,
+                            fontWeight: 600,
                         }}
                     >
                         계좌 정보 없음
@@ -292,7 +316,8 @@ export default function AccountBtn(props: AccountBtnProps) {
                         style={{
                             color: "black",
                             fontSize: 14,
-                            fontFamily: "Pretendard SemiBold",
+                            fontFamily: pretendardFontFamily,
+                            fontWeight: 600,
                         }}
                     >
                         계좌 정보 없음
@@ -340,7 +365,8 @@ export default function AccountBtn(props: AccountBtnProps) {
                         style={{
                             width: "100%",
                             height: 20,
-                            fontFamily: "Pretendard SemiBold",
+                            fontFamily: pretendardFontFamily,
+                            fontWeight: 600,
                             fontSize: 22,
                             lineHeight: "0.7em",
                             color: "#000000",
@@ -352,7 +378,8 @@ export default function AccountBtn(props: AccountBtnProps) {
                     <div
                         style={{
                             width: "100%",
-                            fontFamily: "Pretendard Regular",
+                            fontFamily: pretendardFontFamily,
+                            fontWeight: 400,
                             fontSize: 15,
                             lineHeight: "1.8em",
                             color: "#8c8c8c",
@@ -385,22 +412,28 @@ export default function AccountBtn(props: AccountBtnProps) {
                         onCopyGroom={copyGroomAccount}
                         onCopyGroomFather={copyGroomFatherAccount}
                         onCopyGroomMother={copyGroomMotherAccount}
+                        pretendardFontFamily={pretendardFontFamily}
                     />
 
                     {/* 신부측에게 버튼 */}
                     <motion.div
                         initial={{ opacity: 0, y: 16 }}
                         whileInView={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.5, ease: "easeOut", delay: 0.3 }}
+                        transition={{
+                            duration: 0.5,
+                            ease: "easeOut",
+                            delay: 0.3,
+                        }}
                         viewport={{ once: true, amount: 0.3 }}
                     >
                         <BrideAccountButton
-                        accountInfo={accountInfo}
-                        viewState={brideViewState}
-                        onToggle={toggleBrideView}
-                        onCopyBride={copyBrideAccount}
-                        onCopyBrideFather={copyBrideFatherAccount}
-                        onCopyBrideMother={copyBrideMotherAccount}
+                            accountInfo={accountInfo}
+                            viewState={brideViewState}
+                            onToggle={toggleBrideView}
+                            onCopyBride={copyBrideAccount}
+                            onCopyBrideFather={copyBrideFatherAccount}
+                            onCopyBrideMother={copyBrideMotherAccount}
+                            pretendardFontFamily={pretendardFontFamily}
                         />
                     </motion.div>
                 </motion.div>
@@ -435,7 +468,8 @@ export default function AccountBtn(props: AccountBtnProps) {
                                 style={{
                                     color: "#000000",
                                     fontSize: 14,
-                                    fontFamily: "Pretendard Regular",
+                                    fontFamily: pretendardFontFamily,
+                                    fontWeight: 400,
                                     textAlign: "center",
                                 }}
                             >
@@ -457,6 +491,7 @@ interface GroomAccountButtonProps {
     onCopyGroom: () => void
     onCopyGroomFather: () => void
     onCopyGroomMother: () => void
+    pretendardFontFamily: string
 }
 
 const GroomAccountButton = React.memo(function GroomAccountButton({
@@ -466,6 +501,7 @@ const GroomAccountButton = React.memo(function GroomAccountButton({
     onCopyGroom,
     onCopyGroomFather,
     onCopyGroomMother,
+    pretendardFontFamily,
 }: GroomAccountButtonProps) {
     const isOpen = viewState === "open"
 
@@ -511,7 +547,8 @@ const GroomAccountButton = React.memo(function GroomAccountButton({
                     style={{
                         color: "black",
                         fontSize: 14,
-                        fontFamily: "Pretendard SemiBold",
+                        fontFamily: pretendardFontFamily,
+                        fontWeight: 600,
                         wordWrap: "break-word",
                     }}
                 >
@@ -548,6 +585,7 @@ const GroomAccountButton = React.memo(function GroomAccountButton({
                     <motion.div
                         style={{
                             alignSelf: "stretch",
+                            padding: "15px 15px 0px 15px",
                             flexDirection: "column",
                             justifyContent: "flex-start",
                             alignItems: "flex-start",
@@ -606,6 +644,7 @@ const GroomAccountButton = React.memo(function GroomAccountButton({
                                             bank={accountInfo.groom_bank}
                                             onCopy={onCopyGroom}
                                             isLast={isLast}
+                                            pretendardFontFamily={pretendardFontFamily}
                                         />
                                     )
                                 } else if (acc.component === "groom_father") {
@@ -620,6 +659,7 @@ const GroomAccountButton = React.memo(function GroomAccountButton({
                                             bank={accountInfo.groom_father_bank}
                                             onCopy={onCopyGroomFather}
                                             isLast={isLast}
+                                            pretendardFontFamily={pretendardFontFamily}
                                         />
                                     )
                                 } else if (acc.component === "groom_mother") {
@@ -634,6 +674,7 @@ const GroomAccountButton = React.memo(function GroomAccountButton({
                                             bank={accountInfo.groom_mother_bank}
                                             onCopy={onCopyGroomMother}
                                             isLast={isLast}
+                                            pretendardFontFamily={pretendardFontFamily}
                                         />
                                     )
                                 }
@@ -655,6 +696,7 @@ interface BrideAccountButtonProps {
     onCopyBride: () => void
     onCopyBrideFather: () => void
     onCopyBrideMother: () => void
+    pretendardFontFamily: string
 }
 
 const BrideAccountButton = React.memo(function BrideAccountButton({
@@ -664,6 +706,7 @@ const BrideAccountButton = React.memo(function BrideAccountButton({
     onCopyBride,
     onCopyBrideFather,
     onCopyBrideMother,
+    pretendardFontFamily,
 }: BrideAccountButtonProps) {
     const isOpen = viewState === "open"
 
@@ -709,7 +752,8 @@ const BrideAccountButton = React.memo(function BrideAccountButton({
                     style={{
                         color: "black",
                         fontSize: 14,
-                        fontFamily: "Pretendard SemiBold",
+                        fontFamily: pretendardFontFamily,
+                        fontWeight: 600,
                         wordWrap: "break-word",
                     }}
                 >
@@ -805,6 +849,7 @@ const BrideAccountButton = React.memo(function BrideAccountButton({
                                             bank={accountInfo.bride_bank}
                                             onCopy={onCopyBride}
                                             isLast={isLast}
+                                            pretendardFontFamily={pretendardFontFamily}
                                         />
                                     )
                                 } else if (acc.component === "bride_father") {
@@ -819,6 +864,7 @@ const BrideAccountButton = React.memo(function BrideAccountButton({
                                             bank={accountInfo.bride_father_bank}
                                             onCopy={onCopyBrideFather}
                                             isLast={isLast}
+                                            pretendardFontFamily={pretendardFontFamily}
                                         />
                                     )
                                 } else if (acc.component === "bride_mother") {
@@ -833,6 +879,7 @@ const BrideAccountButton = React.memo(function BrideAccountButton({
                                             bank={accountInfo.bride_mother_bank}
                                             onCopy={onCopyBrideMother}
                                             isLast={isLast}
+                                            pretendardFontFamily={pretendardFontFamily}
                                         />
                                     )
                                 }
@@ -854,6 +901,7 @@ interface AccountItemProps {
     bank: string
     onCopy: () => void
     isLast: boolean
+    pretendardFontFamily: string
 }
 
 const AccountItem = React.memo(function AccountItem({
@@ -863,6 +911,7 @@ const AccountItem = React.memo(function AccountItem({
     bank,
     onCopy,
     isLast,
+    pretendardFontFamily,
 }: AccountItemProps) {
     return (
         <div
@@ -882,7 +931,8 @@ const AccountItem = React.memo(function AccountItem({
                 style={{
                     color: "#707070",
                     fontSize: 14,
-                    fontFamily: "Pretendard SemiBold",
+                    fontFamily: pretendardFontFamily,
+                    fontWeight: 600,
                     wordWrap: "break-word",
                 }}
             >
@@ -908,7 +958,8 @@ const AccountItem = React.memo(function AccountItem({
                         style={{
                             color: "black",
                             fontSize: 14,
-                            fontFamily: "Pretendard SemiBold",
+                            fontFamily: pretendardFontFamily,
+                            fontWeight: 600,
                             wordWrap: "break-word",
                         }}
                     >
@@ -918,7 +969,8 @@ const AccountItem = React.memo(function AccountItem({
                         style={{
                             color: "black",
                             fontSize: 14,
-                            fontFamily: "Pretendard Regular",
+                            fontFamily: pretendardFontFamily,
+                            fontWeight: 400,
                             wordWrap: "break-word",
                         }}
                     >
@@ -928,7 +980,8 @@ const AccountItem = React.memo(function AccountItem({
                         style={{
                             color: "black",
                             fontSize: 14,
-                            fontFamily: "Pretendard Regular",
+                            fontFamily: pretendardFontFamily,
+                            fontWeight: 400,
                             wordWrap: "break-word",
                         }}
                     >
@@ -968,7 +1021,8 @@ const AccountItem = React.memo(function AccountItem({
                         style={{
                             color: "#8C8C8C",
                             fontSize: 14,
-                            fontFamily: "Pretendard Regular",
+                            fontFamily: pretendardFontFamily,
+                            fontWeight: 400,
                             wordWrap: "break-word",
                         }}
                     >
