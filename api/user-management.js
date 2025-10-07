@@ -277,76 +277,100 @@ async function handleDeleteRequest(req, res) {
       if (pageId) {
         console.log(`[DELETE] 페이지 ID "${pageId}"의 모든 데이터를 삭제합니다...`)
 
-        // 2. images 테이블에서 이미지 URL 조회 및 삭제
+        // 2. R2에서 images/{page_id}/ 폴더 전체 삭제
+        try {
+          const { S3Client, ListObjectsV2Command, DeleteObjectsCommand } = require('@aws-sdk/client-s3')
+          const r2Client = new S3Client({
+            region: 'auto',
+            endpoint: process.env.R2_ENDPOINT,
+            forcePathStyle: true,
+            credentials: {
+              accessKeyId: process.env.R2_ACCESS_KEY_ID,
+              secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+            },
+          })
+
+          // R2에서 images/{page_id}/ 경로의 모든 객체 조회
+          const r2Prefix = `images/${pageId}/`
+          console.log(`[DELETE] R2 폴더 조회: ${r2Prefix}`)
+
+          const listCommand = new ListObjectsV2Command({
+            Bucket: process.env.R2_BUCKET,
+            Prefix: r2Prefix,
+          })
+
+          const listResponse = await r2Client.send(listCommand)
+
+          if (listResponse.Contents && listResponse.Contents.length > 0) {
+            console.log(`[DELETE] R2에서 ${listResponse.Contents.length}개의 객체를 찾았습니다`)
+
+            // 최대 1000개까지 한 번에 삭제 가능
+            const objectsToDelete = listResponse.Contents.map(obj => ({ Key: obj.Key }))
+
+            const deleteCommand = new DeleteObjectsCommand({
+              Bucket: process.env.R2_BUCKET,
+              Delete: {
+                Objects: objectsToDelete,
+                Quiet: false,
+              },
+            })
+
+            const deleteResponse = await r2Client.send(deleteCommand)
+            console.log(`[DELETE] R2 폴더 삭제 완료: ${r2Prefix}`, {
+              deleted: deleteResponse.Deleted?.length || 0,
+              errors: deleteResponse.Errors?.length || 0,
+            })
+
+            if (deleteResponse.Errors && deleteResponse.Errors.length > 0) {
+              console.warn(`[DELETE] R2 일부 파일 삭제 실패:`, deleteResponse.Errors)
+            }
+          } else {
+            console.log(`[DELETE] R2 폴더에 객체가 없습니다: ${r2Prefix}`)
+          }
+        } catch (r2Error) {
+          console.error(`[DELETE] R2 폴더 삭제 실패:`, r2Error)
+          // R2 삭제 실패해도 계속 진행
+        }
+
+        // Supabase Storage 이미지도 삭제 (레거시 지원)
         const { data: images, error: imagesError } = await supabase
           .from('images')
           .select('url, public_url')
           .eq('page_id', pageId)
 
         if (!imagesError && images && images.length > 0) {
-          console.log(`[DELETE] ${images.length}개의 이미지를 삭제합니다...`)
+          console.log(`[DELETE] Supabase Storage 이미지 ${images.length}개 확인`)
           
-          // 이미지 파일 삭제 (images API 활용)
           for (const image of images) {
             try {
-              // images API의 handleDeleteImage와 동일한 로직 사용
               const imageUrl = image.url || image.public_url || ''
               
-              // URL에서 키 추출
-              let keyToDelete = imageUrl
-              if (/^https?:\/\//.test(keyToDelete)) {
-                try {
-                  const u = new URL(keyToDelete)
-                  keyToDelete = u.pathname.replace(/^\/+/, '')
-                } catch {
-                  const noProto = keyToDelete.replace(/^https?:\/\//, '')
-                  keyToDelete = noProto.split('/').slice(1).join('/')
-                }
-              }
-              keyToDelete = keyToDelete.split('?')[0].replace(/^\/+/, '')
-
-              // R2 키 판별
-              const isR2Key = /^(files|photos|audio|images|gallery)\//.test(keyToDelete)
-
-              if (isR2Key) {
-                // R2에서 삭제
-                const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3')
-                const r2Client = new S3Client({
-                  region: 'auto',
-                  endpoint: process.env.R2_ENDPOINT,
-                  forcePathStyle: true,
-                  credentials: {
-                    accessKeyId: process.env.R2_ACCESS_KEY_ID,
-                    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
-                  },
-                })
-                await r2Client.send(new DeleteObjectCommand({
-                  Bucket: process.env.R2_BUCKET,
-                  Key: keyToDelete,
-                }))
-                console.log(`[DELETE] R2 이미지 삭제 완료: ${keyToDelete}`)
-              } else if (imageUrl.includes('supabase.co/storage')) {
+              if (imageUrl.includes('supabase.co/storage')) {
                 // Supabase Storage에서 삭제
                 const urlParts = imageUrl.split('/storage/v1/object/public/')
                 if (urlParts.length > 1) {
                   const [bucket, ...pathParts] = urlParts[1].split('/')
                   const filePath = pathParts.join('/')
                   await supabase.storage.from(bucket).remove([filePath])
-                  console.log(`[DELETE] Supabase Storage 이미지 삭제 완료: ${filePath}`)
+                  console.log(`[DELETE] Supabase Storage 이미지 삭제: ${filePath}`)
                 }
               }
             } catch (imgError) {
-              console.error(`[DELETE] 이미지 삭제 실패 (${image.url}):`, imgError)
-              // 개별 이미지 삭제 실패는 무시하고 계속 진행
+              console.warn(`[DELETE] Supabase Storage 이미지 삭제 실패:`, imgError)
             }
           }
+        }
 
-          // images 테이블 레코드 삭제
-          await supabase
-            .from('images')
-            .delete()
-            .eq('page_id', pageId)
+        // images 테이블 레코드 삭제
+        const { error: imagesTableError } = await supabase
+          .from('images')
+          .delete()
+          .eq('page_id', pageId)
+        
+        if (!imagesTableError) {
           console.log(`[DELETE] images 테이블 레코드 삭제 완료`)
+        } else {
+          console.warn(`[DELETE] images 테이블 삭제 실패:`, imagesTableError)
         }
 
         // 3. page_settings 삭제
