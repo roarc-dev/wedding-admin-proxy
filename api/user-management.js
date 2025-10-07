@@ -558,7 +558,7 @@ async function handleRegister(req, res, body) {
 
     return res.status(201).json({
       success: true,
-      message: '회원가입이 완료되었습니다. 관리자 승인을 기다려주세요.',
+      message: '회원가입 신청이 완료되었습니다. 제출주신 정보를 바탕으로 페이지 생성 중입니다. 로그인은 다음날 오전 10시부터 가능합니다.',
       data: newUser
     })
 
