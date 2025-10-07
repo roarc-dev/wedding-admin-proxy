@@ -2118,6 +2118,131 @@ function InlineCalendarPreview({
 // 프록시 서버 URL (고정된 Production URL)
 const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app"
 
+// ============ 유저별 캐시 무효화 유틸리티 ============
+
+/**
+ * 이미지 URL에 캐시 버스터 쿼리 파라미터 추가
+ * @param url 원본 URL
+ * @param userId 현재 로그인한 사용자 ID
+ * @returns 캐시 버스터가 추가된 URL
+ */
+function withCacheBuster(url: string, userId: string): string {
+    if (!url) return url
+    try {
+        const urlObj = new URL(url)
+        urlObj.searchParams.set("uid", userId)
+        urlObj.searchParams.set("ts", Date.now().toString())
+        return urlObj.toString()
+    } catch {
+        // URL 파싱 실패 시 쿼리스트링 직접 추가
+        const separator = url.includes("?") ? "&" : "?"
+        return `${url}${separator}uid=${userId}&ts=${Date.now()}`
+    }
+}
+
+/**
+ * fetch URL에 캐시 무효화 쿼리 파라미터 추가
+ * @param url 원본 URL
+ * @param userId 현재 로그인한 사용자 ID
+ * @returns 캐시 무효화 파라미터가 추가된 URL
+ */
+function withFetchCacheBuster(url: string, userId: string): string {
+    if (!url) return url
+    const separator = url.includes("?") ? "&" : "?"
+    return `${url}${separator}uid=${userId}&ts=${Date.now()}`
+}
+
+/**
+ * 유저별 localStorage 키 생성
+ * @param userId 현재 로그인한 사용자 ID
+ * @param key 저장할 키
+ * @returns 유저별 prefix가 추가된 키
+ */
+function getUserStorageKey(userId: string, key: string): string {
+    return `admin:user:${userId}::${key}`
+}
+
+/**
+ * 유저별 localStorage 값 가져오기
+ */
+function getUserStorage(userId: string, key: string): string | null {
+    if (typeof window === "undefined") return null
+    return localStorage.getItem(getUserStorageKey(userId, key))
+}
+
+/**
+ * 유저별 localStorage 값 저장
+ */
+function setUserStorage(userId: string, key: string, value: string): void {
+    if (typeof window === "undefined") return
+    localStorage.setItem(getUserStorageKey(userId, key), value)
+}
+
+/**
+ * 유저별 localStorage 값 삭제
+ */
+function removeUserStorage(userId: string, key: string): void {
+    if (typeof window === "undefined") return
+    localStorage.removeItem(getUserStorageKey(userId, key))
+}
+
+/**
+ * 특정 유저의 모든 localStorage 데이터 삭제
+ */
+function clearUserStorage(userId: string): void {
+    if (typeof window === "undefined") return
+    const prefix = `admin:user:${userId}::`
+    const keysToRemove: string[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i)
+        if (key && key.startsWith(prefix)) {
+            keysToRemove.push(key)
+        }
+    }
+    keysToRemove.forEach((key) => localStorage.removeItem(key))
+}
+
+/**
+ * 브라우저 CacheStorage 초기화
+ */
+async function clearBrowserCache(): Promise<void> {
+    if (typeof caches === "undefined") return
+    try {
+        const cacheNames = await caches.keys()
+        await Promise.all(cacheNames.map((name) => caches.delete(name)))
+        console.log("[Admin] Browser cache cleared")
+    } catch (error) {
+        console.warn("[Admin] Failed to clear browser cache:", error)
+    }
+}
+
+/**
+ * 캐시 무효화가 적용된 fetch 래퍼
+ * @param url 요청 URL
+ * @param userId 현재 사용자 ID
+ * @param options fetch 옵션
+ * @param signal AbortSignal (선택)
+ */
+async function fetchWithCacheBuster(
+    url: string,
+    userId: string,
+    options?: RequestInit,
+    signal?: AbortSignal
+): Promise<Response> {
+    const urlWithCache = withFetchCacheBuster(url, userId)
+    const mergedOptions: RequestInit = {
+        ...options,
+        cache: "no-store",
+        headers: {
+            ...options?.headers,
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+            Pragma: "no-cache",
+        },
+        signal: signal || options?.signal,
+    }
+    return fetch(urlWithCache, mergedOptions)
+}
+
 // 전역 헬퍼 함수 - 이미지 순서 변경
 function reorderImages(
     existingImages: any[],
@@ -2269,16 +2394,11 @@ async function getAllPages(): Promise<any> {
 
 async function getImagesByPageId(pageId: string): Promise<any> {
     try {
-        // 캐시 버스팅: 타임스탬프 추가로 항상 최신 이미지 목록 로드
-        const cacheBuster = `_=${Date.now()}`
         const response = await fetch(
-            `${PROXY_BASE_URL}/api/images?action=getByPageId&pageId=${pageId}&${cacheBuster}`,
+            `${PROXY_BASE_URL}/api/images?action=getByPageId&pageId=${pageId}`,
             {
                 headers: {
                     Authorization: `Bearer ${getAuthToken()}`,
-                    "Cache-Control": "no-cache, no-store, must-revalidate",
-                    Pragma: "no-cache",
-                    Expires: "0",
                 },
             }
         )
@@ -2347,21 +2467,14 @@ async function updateImageOrder(
 // 연락처 관련 함수들
 async function getAllContacts(pageId: string | null = null): Promise<any> {
     try {
-        // 캐시 버스팅: 타임스탬프 추가로 항상 최신 연락처 목록 로드
-        const cacheBuster = `_=${Date.now()}`
         let url = `${PROXY_BASE_URL}/api/contacts`
         if (pageId) {
-            url += `?pageId=${pageId}&${cacheBuster}`
-        } else {
-            url += `?${cacheBuster}`
+            url += `?pageId=${pageId}`
         }
 
         const response = await fetch(url, {
             headers: {
                 Authorization: `Bearer ${getAuthToken()}`,
-                "Cache-Control": "no-cache, no-store, must-revalidate",
-                Pragma: "no-cache",
-                Expires: "0",
             },
         })
 
@@ -2949,6 +3062,7 @@ function AdminMainContent(props: any) {
     // 공통 상태
     const [isAuthenticated, setIsAuthenticated] = useState(false)
     const [currentUser, setCurrentUser] = useState<any>(null)
+    const [currentUserId, setCurrentUserId] = useState<string>("")
     const [loginForm, setLoginForm] = useState({ username: "", password: "" })
     const [loginError, setLoginError] = useState("")
     const [isLoggingIn, setIsLoggingIn] = useState(false)
@@ -2962,6 +3076,9 @@ function AdminMainContent(props: any) {
     const [currentPageId, setCurrentPageId] = useState("")
     // 페이지 선택/리스트 관련 로직 제거 (사전 부여된 page_id만 사용)
     const [assignedPageId, setAssignedPageId] = useState<string | null>(null)
+
+    // AbortController for canceling in-flight requests
+    const abortControllerRef = useRef<AbortController | null>(null)
 
     // 이미지 관련 상태
     const [existingImages, setExistingImages] = useState<ImageInfo[]>([])
@@ -4249,67 +4366,52 @@ function AdminMainContent(props: any) {
             loginForm.password
         )
         if (result.success) {
-            // 먼저 모든 상태 초기화 (이전 계정 데이터 제거)
-            setPageSettings({
-                groomName: "",
-                groom_name_en: "",
-                brideName: "",
-                bride_name_en: "",
-                wedding_date: "",
-                wedding_hour: "14",
-                wedding_minute: "00",
-                venue_name: "",
-                venue_address: "",
-                photo_section_image_url: "",
-                photo_section_image_path: "",
-                photo_section_location: "",
-                photo_section_overlay_position: "bottom",
-                photo_section_overlay_color: "#ffffff",
-                photo_section_locale: "en",
-                highlight_shape: "circle",
-                highlight_color: "#e0e0e0",
-                highlight_text_color: "black",
-                gallery_type: "thumbnail",
-                rsvp: "off",
-                comments: "off",
-                kko_img: "",
-                kko_title: "",
-                kko_date: "",
-                bgm_url: "",
-                bgm_type: "",
-                bgm_autoplay: false,
-            })
-            setExistingImages([])
-            setContactList([])
-            setHasLoadedSettings(false)
-            setKkoDefaultsApplied(false)
-            setOriginalOrder([])
+            const userId = result.user?.id || result.user?.username || ""
+            const pageId =
+                (result.user && (result.user as any).page_id) || null
+
+            // 이전 유저 데이터 정리
+            if (currentUserId && currentUserId !== userId) {
+                // 진행 중인 fetch 취소
+                if (abortControllerRef.current) {
+                    abortControllerRef.current.abort()
+                    abortControllerRef.current = null
+                }
+                // 이전 유저 localStorage 삭제
+                clearUserStorage(currentUserId)
+                // 브라우저 캐시 삭제
+                await clearBrowserCache()
+            }
+
+            // 새 유저 정보 저장
+            setCurrentUserId(userId)
 
             if (typeof window !== "undefined") {
                 try {
-                    localStorage.setItem(
-                        "admin_session",
-                        generateSessionToken(result.user)
-                    )
+                    const sessionToken = generateSessionToken(result.user)
+                    localStorage.setItem("admin_session", sessionToken)
+                    // 유저별 스토리지에 저장
+                    setUserStorage(userId, "session", sessionToken)
+                    setUserStorage(userId, "last_login", new Date().toISOString())
                 } catch (error) {
                     console.warn("localStorage 저장 실패:", error)
                 }
             }
+
             setIsAuthenticated(true)
             setCurrentUser(result.user)
+
             // 로그인 사용자에 page_id가 할당되어 있으면 강제 적용 (비관리자용)
-            const assigned =
-                (result.user && (result.user as any).page_id) || null
             if (
-                assigned &&
-                typeof assigned === "string" &&
-                assigned.trim().length > 0
+                pageId &&
+                typeof pageId === "string" &&
+                pageId.trim().length > 0
             ) {
-                setAssignedPageId(assigned)
-                setCurrentPageId(assigned)
+                setAssignedPageId(pageId)
+                setCurrentPageId(pageId)
                 if (typeof window !== "undefined") {
                     try {
-                        localStorage.setItem("assigned_page_id", assigned)
+                        setUserStorage(userId, "assigned_page_id", pageId)
                     } catch (error) {
                         console.warn("localStorage 저장 실패:", error)
                     }
@@ -4318,20 +4420,17 @@ function AdminMainContent(props: any) {
                 setAssignedPageId(null)
                 if (typeof window !== "undefined") {
                     try {
-                        localStorage.removeItem("assigned_page_id")
+                        removeUserStorage(userId, "assigned_page_id")
                     } catch (error) {
                         console.warn("localStorage 삭제 실패:", error)
                     }
                 }
             }
+
             setLoginForm({ username: "", password: "" })
-            
-            // 상태 초기화 후 새로운 데이터 로드
-            setTimeout(() => {
-                loadAllPages()
-                loadContactList()
-                loadPageSettings()
-            }, 100)
+            loadAllPages()
+            loadContactList()
+            loadPageSettings()
         } else {
             setLoginError(result.error)
         }
@@ -4339,13 +4438,111 @@ function AdminMainContent(props: any) {
     }
 
     const handleLogout = () => {
+        // 진행 중인 fetch 취소
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort()
+            abortControllerRef.current = null
+        }
+
+        // 현재 유저 데이터 삭제
+        if (currentUserId) {
+            clearUserStorage(currentUserId)
+        }
+
         removeAuthToken()
         setIsAuthenticated(false)
         setCurrentUser(null)
+        setCurrentUserId("")
         setCurrentPageId("")
         setAssignedPageId(null)
-        
-        // 모든 상태 완전 초기화
+        // 페이지 리스트 사용 안함
+        setExistingImages([])
+        setContactList([])
+
+        if (typeof window !== "undefined") {
+            try {
+                localStorage.removeItem("assigned_page_id")
+                localStorage.removeItem("admin_session")
+            } catch (error) {
+                console.warn("localStorage 삭제 실패:", error)
+            }
+        }
+    }
+
+    // 데이터 로드
+    // 페이지 리스트는 더 이상 사용하지 않음
+    const loadAllPages = async () => {
+        return
+    }
+
+    const loadExistingImages = async () => {
+        if (currentPageId) {
+            try {
+                const images = await getImagesByPageId(currentPageId)
+                // 캐시 버스팅 제거: API가 최신 목록을 반환하며, 변경 시 파일 경로가 달라짐
+                setExistingImages(images)
+                setOriginalOrder([...images]) // 원본 순서 저장
+            } catch (err) {
+                console.error("이미지 목록 로드 실패:", err)
+            }
+        }
+    }
+
+    const loadContactList = async () => {
+        setLoading(true)
+        try {
+            const contacts = await getAllContacts(currentPageId)
+            setContactList(contacts)
+        } catch (err) {
+            setError("연락처 목록을 불러오는데 실패했습니다.")
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    // 유저 전환 시 모든 상태 초기화
+    useEffect(() => {
+        if (!currentUserId) return
+
+        console.log("[Admin] User switched, resetting all states for:", currentUserId)
+
+        // 진행 중인 요청 취소
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort()
+        }
+        // 새 AbortController 생성
+        abortControllerRef.current = new AbortController()
+
+        // 모든 in-memory 상태 초기화
+        setExistingImages([])
+        setShowImageManager(true)
+        setUploading(false)
+        setProgress(0)
+        setUploadSuccess(0)
+        setImagesVersion(0)
+
+        setInviteData({
+            invitationText:
+                "저희 두 사람이 하나 되는 약속의 시간에\n마음을 담아 소중한 분들을 모십니다.\n귀한 걸음으로 축복해 주시면 감사하겠습니다.",
+            groomFatherName: "",
+            groomMotherName: "",
+            groomName: "",
+            brideFatherName: "",
+            brideMotherName: "",
+            brideName: "",
+            showGroomFatherChrysanthemum: false,
+            showGroomMotherChrysanthemum: false,
+            showBrideFatherChrysanthemum: false,
+            showBrideMotherChrysanthemum: false,
+            sonLabel: "아들",
+            daughterLabel: "딸",
+        })
+
+        setContactList([])
+        setIsEditingContact(false)
+        setLoading(false)
+        setError(null)
+
         setPageSettings({
             groomName: "",
             groom_name_en: "",
@@ -4375,79 +4572,44 @@ function AdminMainContent(props: any) {
             bgm_type: "",
             bgm_autoplay: false,
         })
-        setExistingImages([])
-        setContactList([])
+
+        setSettingsLoading(false)
         setHasLoadedSettings(false)
+        setCompressProgress(null)
+        setKakaoUploadLoading(false)
         setKkoDefaultsApplied(false)
+
+        setHasUnsavedChanges(false)
+        setIsSavingOrder(false)
         setOriginalOrder([])
-        
-        if (typeof window !== "undefined") {
-            try {
-                localStorage.removeItem("assigned_page_id")
-            } catch (error) {
-                console.warn("localStorage 삭제 실패:", error)
+
+        setCurrentOpenSection("name")
+
+        console.log("[Admin] State reset complete for user:", currentUserId)
+
+        // cleanup 함수: 컴포넌트 언마운트 시 AbortController 정리
+        return () => {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort()
+                abortControllerRef.current = null
             }
         }
-    }
-
-    // 데이터 로드
-    // 페이지 리스트는 더 이상 사용하지 않음
-    const loadAllPages = async () => {
-        return
-    }
-
-    const loadExistingImages = async () => {
-        if (currentPageId) {
-            try {
-                const images = await getImagesByPageId(currentPageId)
-                // 캐시 버스팅: 항상 최신 이미지 목록 로드
-                setExistingImages(images)
-                setOriginalOrder([...images]) // 원본 순서 저장
-            } catch (err) {
-                console.error("이미지 목록 로드 실패:", err)
-            }
-        } else {
-            // currentPageId가 없으면 이미지 목록 초기화
-            setExistingImages([])
-            setOriginalOrder([])
-        }
-    }
-
-    const loadContactList = async () => {
-        if (!currentPageId) {
-            setContactList([])
-            return
-        }
-        
-        setLoading(true)
-        try {
-            const contacts = await getAllContacts(currentPageId)
-            setContactList(contacts)
-        } catch (err) {
-            setError("연락처 목록을 불러오는데 실패했습니다.")
-            setContactList([])
-        } finally {
-            setLoading(false)
-        }
-    }
+    }, [currentUserId])
 
     const loadPageSettings = async () => {
         if (!currentPageId) return
 
         setSettingsLoading(true)
         try {
-            // 캐시 버스팅: 타임스탬프 추가로 항상 최신 데이터 로드
-            const cacheBuster = `_=${Date.now()}`
-            const response = await fetch(
-                `${PROXY_BASE_URL}/api/page-settings?pageId=${currentPageId}&${cacheBuster}`,
+            const response = await fetchWithCacheBuster(
+                `${PROXY_BASE_URL}/api/page-settings?pageId=${currentPageId}`,
+                currentUserId,
                 {
                     headers: {
                         Authorization: `Bearer ${getAuthToken()}`,
-                        "Cache-Control": "no-cache, no-store, must-revalidate",
-                        Pragma: "no-cache",
-                        Expires: "0",
                     },
-                }
+                },
+                abortControllerRef.current?.signal
             )
 
             const result = await response.json()
@@ -5503,6 +5665,7 @@ function AdminMainContent(props: any) {
     if (!isAuthenticated) {
         return (
             <div
+                key={`login::${Date.now()}`}
                 style={{
                     ...style,
                     width: "100%",
@@ -5658,6 +5821,7 @@ function AdminMainContent(props: any) {
     // 관리자 화면
     return (
         <div
+            key={`admin::${currentUserId}::${currentPageId}`}
             style={{
                 ...style,
                 width: "100%",
@@ -11007,9 +11171,10 @@ function AdminMainContent(props: any) {
                                                             }}
                                                         >
                                                             <UiPhotoTile
-                                                                src={
-                                                                    image.public_url
-                                                                }
+                                                                src={withCacheBuster(
+                                                                    image.public_url,
+                                                                    currentUserId
+                                                                )}
                                                                 name={
                                                                     image.original_name
                                                                 }
