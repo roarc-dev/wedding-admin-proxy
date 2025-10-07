@@ -2206,11 +2206,15 @@ function clearUserStorage(userId: string): void {
  * 브라우저 CacheStorage 초기화
  */
 async function clearBrowserCache(): Promise<void> {
+    if (typeof window === "undefined") return
     if (typeof caches === "undefined") return
+    
     try {
         const cacheNames = await caches.keys()
-        await Promise.all(cacheNames.map((name) => caches.delete(name)))
-        console.log("[Admin] Browser cache cleared")
+        if (cacheNames && cacheNames.length > 0) {
+            await Promise.all(cacheNames.map((name) => caches.delete(name)))
+            console.log("[Admin] Browser cache cleared")
+        }
     } catch (error) {
         console.warn("[Admin] Failed to clear browser cache:", error)
     }
@@ -4394,12 +4398,91 @@ function AdminMainContent(props: any) {
                 }
                 // 이전 유저 localStorage 삭제
                 clearUserStorage(currentUserId)
-                // 브라우저 캐시 삭제
-                await clearBrowserCache()
+                // 브라우저 캐시 삭제 (비동기 처리)
+                clearBrowserCache().catch(error => {
+                    console.warn("[Admin] Cache clear failed:", error)
+                })
             }
 
             // 새 유저 정보 저장
             setCurrentUserId(userId)
+
+            // 유저 전환 시 상태 초기화
+            if (currentUserId && currentUserId !== userId) {
+                console.log("[Admin] User switched, resetting states")
+                
+                // 모든 in-memory 상태 초기화
+                setExistingImages([])
+                setShowImageManager(true)
+                setUploading(false)
+                setProgress(0)
+                setUploadSuccess(0)
+                setImagesVersion(0)
+
+                setInviteData({
+                    invitationText:
+                        "저희 두 사람이 하나 되는 약속의 시간에\n마음을 담아 소중한 분들을 모십니다.\n귀한 걸음으로 축복해 주시면 감사하겠습니다.",
+                    groomFatherName: "",
+                    groomMotherName: "",
+                    groomName: "",
+                    brideFatherName: "",
+                    brideMotherName: "",
+                    brideName: "",
+                    showGroomFatherChrysanthemum: false,
+                    showGroomMotherChrysanthemum: false,
+                    showBrideFatherChrysanthemum: false,
+                    showBrideMotherChrysanthemum: false,
+                    sonLabel: "아들",
+                    daughterLabel: "딸",
+                })
+
+                setContactList([])
+                setIsEditingContact(false)
+                setLoading(false)
+                setError(null)
+
+                setPageSettings({
+                    groomName: "",
+                    groom_name_en: "",
+                    brideName: "",
+                    bride_name_en: "",
+                    wedding_date: "",
+                    wedding_hour: "14",
+                    wedding_minute: "00",
+                    venue_name: "",
+                    venue_address: "",
+                    photo_section_image_url: "",
+                    photo_section_image_path: "",
+                    photo_section_location: "",
+                    photo_section_overlay_position: "bottom",
+                    photo_section_overlay_color: "#ffffff",
+                    photo_section_locale: "en",
+                    highlight_shape: "circle",
+                    highlight_color: "#e0e0e0",
+                    highlight_text_color: "black",
+                    gallery_type: "thumbnail",
+                    rsvp: "off",
+                    comments: "off",
+                    kko_img: "",
+                    kko_title: "",
+                    kko_date: "",
+                    bgm_url: "",
+                    bgm_type: "",
+                    bgm_autoplay: false,
+                })
+
+                setSettingsLoading(false)
+                setHasLoadedSettings(false)
+                setCompressProgress(null)
+                setKakaoUploadLoading(false)
+                setKkoDefaultsApplied(false)
+
+                setHasUnsavedChanges(false)
+                setIsSavingOrder(false)
+                setOriginalOrder([])
+
+                setCurrentOpenSection("name")
+            }
 
             if (typeof window !== "undefined") {
                 try {
@@ -4515,101 +4598,15 @@ function AdminMainContent(props: any) {
         }
     }
 
-    // 유저 전환 시 모든 상태 초기화
+    // 컴포넌트 언마운트 시 AbortController 정리
     useEffect(() => {
-        if (!currentUserId) return
-
-        console.log("[Admin] User switched, resetting all states for:", currentUserId)
-
-        // 진행 중인 요청 취소
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort()
-        }
-        // 새 AbortController 생성
-        abortControllerRef.current = new AbortController()
-
-        // 모든 in-memory 상태 초기화
-        setExistingImages([])
-        setShowImageManager(true)
-        setUploading(false)
-        setProgress(0)
-        setUploadSuccess(0)
-        setImagesVersion(0)
-
-        setInviteData({
-            invitationText:
-                "저희 두 사람이 하나 되는 약속의 시간에\n마음을 담아 소중한 분들을 모십니다.\n귀한 걸음으로 축복해 주시면 감사하겠습니다.",
-            groomFatherName: "",
-            groomMotherName: "",
-            groomName: "",
-            brideFatherName: "",
-            brideMotherName: "",
-            brideName: "",
-            showGroomFatherChrysanthemum: false,
-            showGroomMotherChrysanthemum: false,
-            showBrideFatherChrysanthemum: false,
-            showBrideMotherChrysanthemum: false,
-            sonLabel: "아들",
-            daughterLabel: "딸",
-        })
-
-        setContactList([])
-        setIsEditingContact(false)
-        setLoading(false)
-        setError(null)
-
-        setPageSettings({
-            groomName: "",
-            groom_name_en: "",
-            brideName: "",
-            bride_name_en: "",
-            wedding_date: "",
-            wedding_hour: "14",
-            wedding_minute: "00",
-            venue_name: "",
-            venue_address: "",
-            photo_section_image_url: "",
-            photo_section_image_path: "",
-            photo_section_location: "",
-            photo_section_overlay_position: "bottom",
-            photo_section_overlay_color: "#ffffff",
-            photo_section_locale: "en",
-            highlight_shape: "circle",
-            highlight_color: "#e0e0e0",
-            highlight_text_color: "black",
-            gallery_type: "thumbnail",
-            rsvp: "off",
-            comments: "off",
-            kko_img: "",
-            kko_title: "",
-            kko_date: "",
-            bgm_url: "",
-            bgm_type: "",
-            bgm_autoplay: false,
-        })
-
-        setSettingsLoading(false)
-        setHasLoadedSettings(false)
-        setCompressProgress(null)
-        setKakaoUploadLoading(false)
-        setKkoDefaultsApplied(false)
-
-        setHasUnsavedChanges(false)
-        setIsSavingOrder(false)
-        setOriginalOrder([])
-
-        setCurrentOpenSection("name")
-
-        console.log("[Admin] State reset complete for user:", currentUserId)
-
-        // cleanup 함수: 컴포넌트 언마운트 시 AbortController 정리
         return () => {
             if (abortControllerRef.current) {
                 abortControllerRef.current.abort()
                 abortControllerRef.current = null
             }
         }
-    }, [currentUserId])
+    }, [])
 
     const loadPageSettings = async () => {
         if (!currentPageId) return
