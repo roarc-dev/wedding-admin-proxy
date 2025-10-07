@@ -3189,8 +3189,10 @@ type InviteDataState = ReturnType<typeof createInitialInviteData>
 
 const createInitialPageSettings = () => ({
     groomName: "",
+    groom_name_kr: "",
     groom_name_en: "",
     brideName: "",
+    bride_name_kr: "",
     bride_name_en: "",
     wedding_date: "",
     wedding_hour: "14",
@@ -4739,8 +4741,10 @@ function AdminMainContent(props: any) {
 
     const allowedSettingKeys = [
         "groomName",
+        "groom_name_kr",
         "groom_name_en",
         "brideName",
+        "bride_name_kr",
         "bride_name_en",
         "wedding_date",
         "wedding_hour",
