@@ -4501,8 +4501,14 @@ function AdminMainContent(props: any) {
 
             if (result.success) {
                 setSuccess("설정이 저장되었습니다.")
-                // 저장 후 다시 로드해서 동기화
-                setTimeout(() => loadPageSettings(), 500)
+                // 저장 완료 - 재로드 제거 (불필요한 덮어쓰기 방지)
+                // 서버에서 반환된 데이터가 있으면 해당 필드만 업데이트
+                if (result.data) {
+                    setPageSettings((prev) => ({
+                        ...prev,
+                        ...result.data,
+                    }))
+                }
                 return result
             } else {
                 setError(
