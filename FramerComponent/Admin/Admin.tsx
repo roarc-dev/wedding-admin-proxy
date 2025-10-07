@@ -4105,9 +4105,24 @@ function AdminMainContent(props: any) {
         isSaving: isCurrentlySaving,
     }: {
         hasUnsavedChanges: boolean
-        onSave: () => Promise<void>
+        onSave: () => void | Promise<void>
         isSaving: boolean
     }) => {
+        const handleClick = async () => {
+            if (isCurrentlySaving) return
+            try {
+                const maybePromise = onSaveAction()
+                if (
+                    maybePromise &&
+                    typeof (maybePromise as Promise<void>).then === "function"
+                ) {
+                    await maybePromise
+                }
+            } catch (error) {
+                console.error("갤러리 순서 저장 중 오류:", error)
+            }
+        }
+
         if (!hasChanges) return null
 
         return (
@@ -4129,7 +4144,7 @@ function AdminMainContent(props: any) {
                 }}
             >
                 <button
-                    onClick={onSaveAction}
+                    onClick={handleClick}
                     disabled={isCurrentlySaving}
                     style={{
                         width: "100%",
@@ -12989,14 +13004,14 @@ export default function AdminNew(props: any) {
     const [hasChanges, setHasChanges] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
     const [saveFunction, setSaveFunction] = useState<
-        (() => Promise<void>) | null
+        (() => void | Promise<void>) | null
     >(null)
 
     // AdminMainContent에서 상태를 업데이트할 수 있도록 콜백 함수들 제공
     const updateSaveState = (
         hasUnsavedChanges: boolean,
         isSavingOrder: boolean,
-        saveImageOrderFn: () => Promise<void>
+        saveImageOrderFn: () => void | Promise<void>
     ) => {
         setHasChanges(hasUnsavedChanges)
         setIsSaving(isSavingOrder)
@@ -13147,9 +13162,24 @@ function SaveActionBar({
     isSaving,
 }: {
     hasUnsavedChanges: boolean
-    onSave: () => void
+    onSave: () => void | Promise<void>
     isSaving: boolean
 }) {
+    const handleClick = async () => {
+        if (isSaving) return
+        try {
+            const maybePromise = onSave()
+            if (
+                maybePromise &&
+                typeof (maybePromise as Promise<void>).then === "function"
+            ) {
+                await maybePromise
+            }
+        } catch (error) {
+            console.error("저장 작업 중 오류:", error)
+        }
+    }
+
     if (!hasUnsavedChanges) return null
 
     return (
@@ -13163,7 +13193,7 @@ function SaveActionBar({
             }}
         >
             <button
-                onClick={onSave}
+                onClick={handleClick}
                 disabled={isSaving}
                 style={{
                     width: "100%",
