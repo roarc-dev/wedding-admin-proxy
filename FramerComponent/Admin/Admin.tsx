@@ -4255,43 +4255,9 @@ function AdminMainContent(props: any) {
                 }
             }
             
-            // 로그인 전 기존 데이터 완전 초기화 (캐시 문제 방지)
-            setExistingImages([])
-            setContactList([])
-            setPageSettings({
-                groomName: "",
-                groom_name_en: "",
-                brideName: "",
-                bride_name_en: "",
-                wedding_date: "",
-                wedding_hour: "14",
-                wedding_minute: "00",
-                venue_name: "",
-                venue_address: "",
-                photo_section_image_url: "",
-                photo_section_image_path: "",
-                photo_section_location: "",
-                photo_section_overlay_position: "bottom",
-                photo_section_overlay_color: "#ffffff",
-                photo_section_locale: "en",
-                highlight_shape: "circle",
-                highlight_color: "#e0e0e0",
-                highlight_text_color: "black",
-                gallery_type: "thumbnail",
-                rsvp: "off",
-                comments: "off",
-                kko_img: "",
-                kko_title: "",
-                kko_date: "",
-                bgm_url: "",
-                bgm_type: "",
-                bgm_autoplay: false,
-            })
-            setHasLoadedSettings(false)
-            setKkoDefaultsApplied(false)
-            
             setIsAuthenticated(true)
             setCurrentUser(result.user)
+            
             // 로그인 사용자에 page_id가 할당되어 있으면 강제 적용 (비관리자용)
             const assigned =
                 (result.user && (result.user as any).page_id) || null
@@ -4301,6 +4267,7 @@ function AdminMainContent(props: any) {
                 assigned.trim().length > 0
             ) {
                 setAssignedPageId(assigned)
+                // currentPageId 설정 - useEffect가 자동으로 데이터 로드함
                 setCurrentPageId(assigned)
                 if (typeof window !== "undefined") {
                     try {
@@ -4320,9 +4287,8 @@ function AdminMainContent(props: any) {
                 }
             }
             setLoginForm({ username: "", password: "" })
-            loadAllPages()
-            loadContactList()
-            loadPageSettings()
+            // currentPageId가 설정되면 useEffect가 자동으로 데이터를 로드하므로 
+            // 여기서는 수동 호출하지 않음
         } else {
             setLoginError(result.error)
         }
@@ -5463,10 +5429,11 @@ function AdminMainContent(props: any) {
         if (isAuthenticated && currentPageId) {
             loadContactList()
             loadPageSettings()
+            loadExistingImages()
             // 페이지 변경 시 선택된 이미지 초기화
             setSelectedImages(new Set())
         }
-    }, [currentPageId])
+    }, [currentPageId, isAuthenticated])
 
     // 알림 메시지 자동 제거
     useEffect(() => {
