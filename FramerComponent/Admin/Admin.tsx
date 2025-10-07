@@ -3884,8 +3884,10 @@ function AdminMainContent(props: any) {
                         // 성함 섹션 저장 (페이지 설정 저장)
                         await savePageSettings({
                             groomName: pageSettings.groomName,
+                            groom_name_kr: pageSettings.groom_name_kr,
                             groom_name_en: pageSettings.groom_name_en,
                             brideName: pageSettings.brideName,
+                            bride_name_kr: pageSettings.bride_name_kr,
                             bride_name_en: pageSettings.bride_name_en,
                         })
                         break
@@ -3986,6 +3988,23 @@ function AdminMainContent(props: any) {
         setCurrentOpenSection(
             currentOpenSection === sectionName ? null : sectionName
         )
+
+        // 초대글 섹션을 최초로 열 때 page_settings에서 기본값 설정
+        if (sectionName === "invite" && currentOpenSection !== "invite") {
+            // inviteData에 값이 없고 page_settings에 값이 있으면 초기화
+            if (!inviteData.groomName && pageSettings.groom_name_kr) {
+                setInviteData(prev => ({
+                    ...prev,
+                    groomName: pageSettings.groom_name_kr
+                }))
+            }
+            if (!inviteData.brideName && pageSettings.bride_name_kr) {
+                setInviteData(prev => ({
+                    ...prev,
+                    brideName: pageSettings.bride_name_kr
+                }))
+            }
+        }
     }
 
     const initialContactData = {
