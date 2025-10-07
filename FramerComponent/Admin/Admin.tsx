@@ -3593,13 +3593,13 @@ function AdminMainContent(props: any) {
 
     const getKakaoShareNames = () => {
         const groom =
+            pageSettings.groom_name_kr ||
             pageSettings.groomName ||
-            (pageSettings as any)?.groom_name_kr ||
             inviteData.groomName ||
             ""
         const bride =
+            pageSettings.bride_name_kr ||
             pageSettings.brideName ||
-            (pageSettings as any)?.bride_name_kr ||
             inviteData.brideName ||
             ""
         return { groom, bride }
@@ -6098,8 +6098,8 @@ function AdminMainContent(props: any) {
                         fontSize: "16px",
                     }}
                 >
-                    {inviteData.groomName || "신랑"} ♥{" "}
-                    {inviteData.brideName || "신부"}
+                    {pageSettings.groom_name_kr || "신랑"} ♥{" "}
+                    {pageSettings.bride_name_kr || "신부"}
                 </span>
                 <button
                     onClick={handleLogout}
@@ -6218,6 +6218,24 @@ function AdminMainContent(props: any) {
                                         gap: theme.gap.sm,
                                     }}
                                 >
+                                    <FormField label="신랑 한글 성함">
+                                        <InputBase
+                                            type="text"
+                                            value={
+                                                pageSettings.groom_name_kr || ""
+                                            }
+                                            onChange={(e) =>
+                                                setPageSettings({
+                                                    ...pageSettings,
+                                                    groom_name_kr: (
+                                                        e.target as HTMLInputElement
+                                                    ).value,
+                                                })
+                                            }
+                                            placeholder="민준"
+                                        />
+                                    </FormField>
+
                                     <FormField label="신랑 영문 성함">
                                         <InputBase
                                             type="text"
@@ -6233,6 +6251,24 @@ function AdminMainContent(props: any) {
                                                 })
                                             }
                                             placeholder="MIN JUN"
+                                        />
+                                    </FormField>
+
+                                    <FormField label="신부 한글 성함">
+                                        <InputBase
+                                            type="text"
+                                            value={
+                                                pageSettings.bride_name_kr || ""
+                                            }
+                                            onChange={(e) =>
+                                                setPageSettings({
+                                                    ...pageSettings,
+                                                    bride_name_kr: (
+                                                        e.target as HTMLInputElement
+                                                    ).value,
+                                                })
+                                            }
+                                            placeholder="서윤"
                                         />
                                     </FormField>
 
@@ -7595,7 +7631,7 @@ function AdminMainContent(props: any) {
                                                     e.target.value
                                                 )
                                             }
-                                            placeholder="신랑 성함"
+                                            placeholder={pageSettings.groom_name_kr || "신랑 성함"}
                                             style={{
                                                 width: "100%",
                                                 border: "none",
@@ -7770,7 +7806,7 @@ function AdminMainContent(props: any) {
                                                     e.target.value
                                                 )
                                             }
-                                            placeholder="신부 성함"
+                                            placeholder={pageSettings.bride_name_kr || "신부 성함"}
                                             style={{
                                                 width: "100%",
                                                 border: "none",
@@ -10876,7 +10912,7 @@ function AdminMainContent(props: any) {
                                             kko_title: e.target.value,
                                         })
                                     }
-                                    placeholder="예: 민준 ♥ 서윤 결혼합니다"
+                                    placeholder={`예: ${pageSettings.groom_name_kr || "민준"} ♥ ${pageSettings.bride_name_kr || "서윤"} 결혼합니다`}
                                     disabled={settingsLoading}
                                 />
                             </FormField>
