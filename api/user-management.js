@@ -188,7 +188,7 @@ async function handlePutRequest(req, res) {
     })
   }
 
-  const { id, username: newUsername, name: newName, is_active, newPassword, page_id: newPageId, expiry_date } = req.body
+  const { id, username: newUsername, name: newName, is_active, newPassword, page_id: newPageId, expiry_date, role } = req.body
 
   if (!id) {
     return res.status(400).json({
@@ -203,6 +203,7 @@ async function handlePutRequest(req, res) {
   if (typeof is_active === 'boolean') updateData.is_active = is_active
   if (newPageId !== undefined) updateData.page_id = newPageId
   if (expiry_date !== undefined) updateData.expiry_date = expiry_date || null
+  if (role) updateData.role = role
   if (newPassword) {
     updateData.password = await bcrypt.hash(newPassword, 10)
   }
@@ -212,7 +213,7 @@ async function handlePutRequest(req, res) {
     .from('admin_users')
     .update(updateData)
     .eq('id', id)
-    .select('id, username, name, is_active, updated_at, page_id, approval_status, expiry_date')
+    .select('id, username, name, is_active, updated_at, page_id, approval_status, expiry_date, role')
     .single()
 
   if (error) {
@@ -494,7 +495,7 @@ async function handleTest(req, res, body) {
 
 // 회원가입/등록 처리
 async function handleRegister(req, res, body) {
-  const { username, password, name, page_id, wedding_date, groom_name_en, bride_name_en } = body
+  const { username, password, name, page_id, wedding_date, groom_name_en, bride_name_en, role } = body
 
   console.log('Processing register/signup request')
 
@@ -538,7 +539,7 @@ async function handleRegister(req, res, body) {
         password: passwordHash,
         name,
         is_active: false, // 승인 대기 상태
-        role: 'admin',
+        role: role || 'user', // 요청에서 받은 role 사용, 없으면 기본값 'user'
         approval_status: 'pending',
         page_id: page_id || null,
         wedding_date: wedding_date || null,
@@ -619,6 +620,14 @@ async function handleLogin(req, res, body) {
       })
     }
 
+    // role 검증 - admin만 로그인 가능
+    if (user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        error: '관리자 권한이 필요한 서비스입니다.'
+      })
+    }
+
     // 비밀번호 검증
     let isValidPassword = false
 
@@ -692,7 +701,7 @@ async function handleCreateUser(req, res, body) {
     })
   }
 
-  const { username, password, name, page_id } = body
+  const { username, password, name, page_id, role } = body
 
   if (!username || !password || !name) {
     return res.status(400).json({
@@ -712,7 +721,7 @@ async function handleCreateUser(req, res, body) {
         password: passwordHash,
         name,
         is_active: true,
-        role: 'admin',
+        role: role || 'admin', // 요청에서 받은 role 사용, 없으면 기본값 'admin'
         approval_status: 'approved',
         page_id: page_id || null
       }])
