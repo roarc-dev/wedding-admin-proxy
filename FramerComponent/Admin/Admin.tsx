@@ -3017,7 +3017,7 @@ function AdminMainContent(props: any) {
                         d.groom_mother_name ?? prev.groomMotherName,
                     groomName:
                         d.groom_name ||
-                        pageSettings.groomName ||
+                        (pageSettings as any).groom_name_kr ||
                         prev.groomName, // invite_cards.groom_name 우선 사용
                     brideFatherName:
                         d.bride_father_name ?? prev.brideFatherName,
@@ -3025,7 +3025,7 @@ function AdminMainContent(props: any) {
                         d.bride_mother_name ?? prev.brideMotherName,
                     brideName:
                         d.bride_name ||
-                        pageSettings.brideName ||
+                        (pageSettings as any).bride_name_kr ||
                         prev.brideName, // invite_cards.bride_name 우선 사용
                     showGroomFatherChrysanthemum:
                         !!d.show_groom_father_chrysanthemum,
@@ -3041,8 +3041,8 @@ function AdminMainContent(props: any) {
             } else {
                 setInviteData((prev) => ({
                     ...prev,
-                    groomName: pageSettings.groomName || prev.groomName, // invite_cards 데이터 없을 때 page_settings에서 가져옴
-                    brideName: pageSettings.brideName || prev.brideName, // invite_cards 데이터 없을 때 page_settings에서 가져옴
+                    groomName: (pageSettings as any).groom_name_kr || prev.groomName, // invite_cards 데이터 없을 때 page_settings에서 가져옴
+                    brideName: (pageSettings as any).bride_name_kr || prev.brideName, // invite_cards 데이터 없을 때 page_settings에서 가져옴
                 }))
             }
         } catch (_err) {
@@ -3126,9 +3126,9 @@ function AdminMainContent(props: any) {
 
     // 페이지 설정 관련 상태
     const [pageSettings, setPageSettings] = useState({
-        groomName: "",
+        groom_name_kr: "",
         groom_name_en: "",
-        brideName: "",
+        bride_name_kr: "",
         bride_name_en: "",
         wedding_date: "",
         wedding_hour: "14",
@@ -3232,9 +3232,9 @@ function AdminMainContent(props: any) {
 
     const buildNameSectionProps = () => ({
         groomName:
-            pageSettings.groom_name_en || pageSettings.groomName || "GROOM",
+            pageSettings.groom_name_en || (pageSettings as any).groom_name_kr || "GROOM",
         brideName:
-            pageSettings.bride_name_en || pageSettings.brideName || "BRIDE",
+            pageSettings.bride_name_en || (pageSettings as any).bride_name_kr || "BRIDE",
     })
 
     const [photoSectionPreviewUrl, setPhotoSectionPreviewUrl] = React.useState<
@@ -3283,12 +3283,10 @@ function AdminMainContent(props: any) {
 
     const getKakaoShareNames = () => {
         const groom =
-            pageSettings.groomName ||
             (pageSettings as any)?.groom_name_kr ||
             inviteData.groomName ||
             "신랑"
         const bride =
-            pageSettings.brideName ||
             (pageSettings as any)?.bride_name_kr ||
             inviteData.brideName ||
             "신부"
@@ -3367,8 +3365,8 @@ function AdminMainContent(props: any) {
         kkoDefaultsApplied,
         pageSettings.kko_title,
         pageSettings.kko_date,
-        pageSettings.groomName,
-        pageSettings.brideName,
+        (pageSettings as any).groom_name_kr,
+        (pageSettings as any).bride_name_kr,
         pageSettings.wedding_date,
         pageSettings.wedding_hour,
         pageSettings.wedding_minute,
@@ -3569,9 +3567,9 @@ function AdminMainContent(props: any) {
                     case "name":
                         // 성함 섹션 저장 (페이지 설정 저장)
                         await savePageSettings({
-                            groomName: pageSettings.groomName,
+                            groom_name_kr: (pageSettings as any).groom_name_kr,
                             groom_name_en: pageSettings.groom_name_en,
-                            brideName: pageSettings.brideName,
+                            bride_name_kr: (pageSettings as any).bride_name_kr,
                             bride_name_en: pageSettings.bride_name_en,
                         })
                         break
@@ -4307,9 +4305,9 @@ function AdminMainContent(props: any) {
         
         // 페이지 설정 초기화 (캐시 문제 해결)
         setPageSettings({
-            groomName: "",
+            groom_name_kr: "",
             groom_name_en: "",
-            brideName: "",
+            bride_name_kr: "",
             bride_name_en: "",
             wedding_date: "",
             wedding_hour: "14",
@@ -4409,9 +4407,9 @@ function AdminMainContent(props: any) {
     }
 
     const allowedSettingKeys = [
-        "groomName",
+        "groom_name_kr",
         "groom_name_en",
-        "brideName",
+        "bride_name_kr",
         "bride_name_en",
         "wedding_date",
         "wedding_hour",
