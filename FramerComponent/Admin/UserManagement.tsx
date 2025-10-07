@@ -140,6 +140,7 @@ interface CreateUserData {
     password: string
     name: string
     page_id?: string
+    role?: string
 }
 
 async function createUser(userData: CreateUserData): Promise<any> {
@@ -156,6 +157,7 @@ async function createUser(userData: CreateUserData): Promise<any> {
                 password: userData.password,
                 name: userData.name,
                 page_id: userData.page_id,
+                role: userData.role,
             }),
         })
 
@@ -181,6 +183,7 @@ interface UpdateUserData {
     page_id?: string
     newPassword?: string
     expiry_date?: string | null
+    role?: string
 }
 
 async function updateUser(userData: UpdateUserData): Promise<any> {
@@ -271,6 +274,43 @@ async function approveUser(
     }
 }
 
+// page_settings 업데이트 함수 (승인 시 웨딩 정보 복사)
+async function updatePageSettingsWithWeddingInfo(
+    pageId: string,
+    weddingDate?: string,
+    groomNameEn?: string,
+    brideNameEn?: string
+): Promise<any> {
+    try {
+        const response = await fetch(`${PROXY_BASE_URL}/api/page-settings?approval=true&pageId=${pageId}`, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${getAuthToken()}`,
+            },
+            body: JSON.stringify({
+                settings: {
+                    wedding_date: weddingDate,
+                    groom_name_en: groomNameEn,
+                    bride_name_en: brideNameEn,
+                },
+            }),
+        })
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        }
+
+        return await response.json()
+    } catch (error) {
+        console.error("Update page settings error:", error)
+        return {
+            success: false,
+            error: "페이지 설정 업데이트 중 오류가 발생했습니다",
+        }
+    }
+}
+
 interface User {
     id: string
     username: string
@@ -281,6 +321,10 @@ interface User {
     approval_status: "pending" | "approved" | "rejected"
     page_id?: string
     expiry_date?: string | null
+    wedding_date?: string | null
+    groom_name_en?: string | null
+    bride_name_en?: string | null
+    role?: string
 }
 
 export default function UserManagement(props: { style?: React.CSSProperties }) {
@@ -319,12 +363,17 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
         page_id: "",
         type: "papillon" as PageType,
         expiry_date: "",
+        role: "user",
     })
 
     // 탭 상태
     const [activeTab, setActiveTab] = useState<
         "all" | "pending" | "active" | "expired"
     >("all")
+
+    // 페이지네이션 상태
+    const [currentPage, setCurrentPage] = useState<number>(1)
+    const itemsPerPage = 10
 
     // 세션 확인
     useEffect(() => {
@@ -340,6 +389,11 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
             }
         }
     }, [])
+
+    // 탭 변경 시 페이지 초기화
+    useEffect(() => {
+        setCurrentPage(1)
+    }, [activeTab])
 
     // 로그인
     const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -394,6 +448,7 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
             page_id: "",
             type: "papillon",
             expiry_date: "",
+            role: "user",
         })
         setEditingUser(null)
         setShowAddModal(true)
@@ -410,6 +465,7 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
             page_id: user.page_id || "",
             type: "papillon",
             expiry_date: user.expiry_date || "",
+            role: user.role || "user",
         })
         setEditingUser(user)
         setShowAddModal(true)
@@ -435,6 +491,21 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
             )
 
             if (result.success) {
+                // 승인 시 page_settings에 웨딩 정보 복사
+                if (status === "approved" && pageIdInput && approvingUser) {
+                    const pageSettingsResult = await updatePageSettingsWithWeddingInfo(
+                        pageIdInput,
+                        approvingUser.wedding_date || undefined,
+                        approvingUser.groom_name_en || undefined,
+                        approvingUser.bride_name_en || undefined
+                    )
+
+                    if (!pageSettingsResult.success) {
+                        console.warn("Page settings update failed:", pageSettingsResult.error)
+                        // 페이지 설정 업데이트 실패해도 승인은 성공으로 처리
+                    }
+                }
+
                 setSuccess(result.message)
                 setShowApprovalModal(false)
                 setApprovingUser(null)
@@ -464,6 +535,7 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
                     is_active: userForm.is_active,
                     page_id: userForm.page_id,
                     expiry_date: userForm.expiry_date || null,
+                    role: userForm.role,
                 }
                 if (userForm.newPassword) {
                     updateData.newPassword = userForm.newPassword
@@ -485,6 +557,7 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
                     password: userForm.password,
                     name: userForm.name,
                     page_id: userForm.page_id,
+                    role: userForm.role,
                 })
             }
 
@@ -604,6 +677,19 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
     }
 
     const filteredUsers = getFilteredUsers()
+
+    // 페이지네이션 계산
+    const totalPages = Math.ceil(filteredUsers.length / itemsPerPage)
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const endIndex = startIndex + itemsPerPage
+    const paginatedUsers = filteredUsers.slice(startIndex, endIndex)
+
+    // 페이지 변경 함수
+    const handlePageChange = (page: number) => {
+        setCurrentPage(page)
+        // 페이지 변경 시 스크롤을 맨 위로
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
 
     // 만료된 사용자 일괄 삭제
     const handleBulkDeleteExpired = async () => {
@@ -1124,7 +1210,7 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
                     >
                         로딩 중...
                     </div>
-                ) : filteredUsers.length === 0 ? (
+                ) : paginatedUsers.length === 0 ? (
                     <div
                         style={{
                             textAlign: "center",
@@ -1142,7 +1228,7 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
                     </div>
                 ) : (
                     <div style={{ padding: "20px" }}>
-                        {filteredUsers.map((user, index) => {
+                        {paginatedUsers.map((user, index) => {
                             // 만료 상태 계산
                             const getExpiryStatus = (expiryDate?: string | null) => {
                                 if (!expiryDate) return null
@@ -1235,7 +1321,44 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
                                             ` | 마지막 로그인: ${new Date(user.last_login).toLocaleDateString()}`}
                                         {user.page_id &&
                                             ` | Page ID: ${user.page_id}`}
+                                        {user.role &&
+                                            ` | 권한: ${user.role === 'admin' ? '관리자' : '사용자'}`}
                                     </p>
+                                    {/* 웨딩 정보 표시 */}
+                                    {(user.wedding_date || user.groom_name_en || user.bride_name_en) && (
+                                        <div
+                                            style={{
+                                                marginTop: "8px",
+                                                padding: "8px",
+                                                backgroundColor: "#f0f9ff",
+                                                borderRadius: "4px",
+                                                border: "1px solid #bae6fd",
+                                            }}
+                                        >
+                                            <p
+                                                style={{
+                                                    fontSize: "12px",
+                                                    fontWeight: "600",
+                                                    color: "#0369a1",
+                                                    margin: "0 0 4px 0",
+                                                }}
+                                            >
+                                                💒 웨딩 정보:
+                                            </p>
+                                            {user.wedding_date && (
+                                                <p style={{ fontSize: "11px", color: "#0369a1", margin: "2px 0" }}>
+                                                    예식일: {new Date(user.wedding_date).toLocaleDateString()}
+                                                </p>
+                                            )}
+                                            {(user.groom_name_en || user.bride_name_en) && (
+                                                <p style={{ fontSize: "11px", color: "#0369a1", margin: "2px 0" }}>
+                                                    {user.groom_name_en && user.bride_name_en
+                                                        ? `${user.groom_name_en} & ${user.bride_name_en}`
+                                                        : user.groom_name_en || user.bride_name_en}
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
                                     {expiryStatus && (
                                         <p
                                             style={{
@@ -1311,6 +1434,113 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
                             </motion.div>
                             )
                         })}
+                    </div>
+                )}
+
+                {/* 페이지네이션 */}
+                {totalPages > 1 && (
+                    <div
+                        style={{
+                            display: "flex",
+                            justifyContent: "center",
+                            alignItems: "center",
+                            gap: "8px",
+                            padding: "20px",
+                            borderTop: "1px solid #e5e7eb",
+                        }}
+                    >
+                        {/* 이전 페이지 버튼 */}
+                        <motion.button
+                            onClick={() => handlePageChange(currentPage - 1)}
+                            disabled={currentPage === 1}
+                            style={{
+                                padding: "8px 12px",
+                                backgroundColor: currentPage === 1 ? "#f3f4f6" : "#ffffff",
+                                color: currentPage === 1 ? "#9ca3af" : "#374151",
+                                border: "1px solid #d1d5db",
+                                borderRadius: "6px",
+                                fontSize: "14px",
+                                cursor: currentPage === 1 ? "not-allowed" : "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px",
+                            }}
+                            whileHover={currentPage !== 1 ? { scale: 1.05 } : {}}
+                            whileTap={currentPage !== 1 ? { scale: 0.95 } : {}}
+                        >
+                            ← 이전
+                        </motion.button>
+
+                        {/* 페이지 번호들 */}
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                            // 현재 페이지 주변만 표시 (최대 5개)
+                            const showPage = 
+                                page === 1 || 
+                                page === totalPages || 
+                                Math.abs(page - currentPage) <= 2
+
+                            if (!showPage) {
+                                // 연속된 페이지 사이의 생략 표시
+                                if (page === currentPage - 3 || page === currentPage + 3) {
+                                    return (
+                                        <span
+                                            key={page}
+                                            style={{
+                                                padding: "8px 4px",
+                                                color: "#9ca3af",
+                                                fontSize: "14px",
+                                            }}
+                                        >
+                                            ...
+                                        </span>
+                                    )
+                                }
+                                return null
+                            }
+
+                            return (
+                                <motion.button
+                                    key={page}
+                                    onClick={() => handlePageChange(page)}
+                                    style={{
+                                        padding: "8px 12px",
+                                        backgroundColor: currentPage === page ? "#1a237e" : "#ffffff",
+                                        color: currentPage === page ? "#ffffff" : "#374151",
+                                        border: "1px solid #d1d5db",
+                                        borderRadius: "6px",
+                                        fontSize: "14px",
+                                        cursor: "pointer",
+                                        minWidth: "40px",
+                                    }}
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                >
+                                    {page}
+                                </motion.button>
+                            )
+                        })}
+
+                        {/* 다음 페이지 버튼 */}
+                        <motion.button
+                            onClick={() => handlePageChange(currentPage + 1)}
+                            disabled={currentPage === totalPages}
+                            style={{
+                                padding: "8px 12px",
+                                backgroundColor: currentPage === totalPages ? "#f3f4f6" : "#ffffff",
+                                color: currentPage === totalPages ? "#9ca3af" : "#374151",
+                                border: "1px solid #d1d5db",
+                                borderRadius: "6px",
+                                fontSize: "14px",
+                                cursor: currentPage === totalPages ? "not-allowed" : "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px",
+                            }}
+                            whileHover={currentPage !== totalPages ? { scale: 1.05 } : {}}
+                            whileTap={currentPage !== totalPages ? { scale: 0.95 } : {}}
+                        >
+                            다음 →
+                        </motion.button>
                     </div>
                 )}
             </div>
@@ -1406,6 +1636,43 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
                                         }))
                                     }
                                 />
+
+                                {/* Role 선택 */}
+                                <div>
+                                    <label
+                                        style={{
+                                            display: "block",
+                                            fontSize: "14px",
+                                            fontWeight: "500",
+                                            color: "#374151",
+                                            marginBottom: "5px",
+                                        }}
+                                    >
+                                        권한
+                                    </label>
+                                    <select
+                                        value={userForm.role}
+                                        onChange={(e) =>
+                                            setUserForm((prev) => ({
+                                                ...prev,
+                                                role: e.target.value,
+                                            }))
+                                        }
+                                        style={{
+                                            width: "100%",
+                                            padding: "10px",
+                                            border: "1px solid #d1d5db",
+                                            borderRadius: "6px",
+                                            fontSize: "14px",
+                                            outline: "none",
+                                            boxSizing: "border-box",
+                                            background: "white",
+                                        }}
+                                    >
+                                        <option value="user">사용자</option>
+                                        <option value="admin">관리자</option>
+                                    </select>
+                                </div>
 
                                 {/* Type 선택 (동적 타입 관리) */}
                                 <div>
@@ -1666,6 +1933,55 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
                                 >
                                     승인 시 개인 웨딩 페이지 ID를 발급해주세요.
                                 </p>
+                                
+                                {/* 웨딩 정보 미리보기 */}
+                                {(approvingUser.wedding_date || approvingUser.groom_name_en || approvingUser.bride_name_en) && (
+                                    <div
+                                        style={{
+                                            marginTop: "15px",
+                                            padding: "12px",
+                                            backgroundColor: "#f8f9fa",
+                                            borderRadius: "6px",
+                                            border: "1px solid #e5e7eb",
+                                        }}
+                                    >
+                                        <p
+                                            style={{
+                                                fontSize: "13px",
+                                                fontWeight: "600",
+                                                color: "#374151",
+                                                margin: "0 0 8px 0",
+                                            }}
+                                        >
+                                            📋 입력된 웨딩 정보:
+                                        </p>
+                                        {approvingUser.wedding_date && (
+                                            <p style={{ fontSize: "12px", color: "#6b7280", margin: "2px 0" }}>
+                                                예식일자: {new Date(approvingUser.wedding_date).toLocaleDateString()}
+                                            </p>
+                                        )}
+                                        {approvingUser.groom_name_en && (
+                                            <p style={{ fontSize: "12px", color: "#6b7280", margin: "2px 0" }}>
+                                                신랑 영문명: {approvingUser.groom_name_en}
+                                            </p>
+                                        )}
+                                        {approvingUser.bride_name_en && (
+                                            <p style={{ fontSize: "12px", color: "#6b7280", margin: "2px 0" }}>
+                                                신부 영문명: {approvingUser.bride_name_en}
+                                            </p>
+                                        )}
+                                        <p
+                                            style={{
+                                                fontSize: "11px",
+                                                color: "#9ca3af",
+                                                margin: "8px 0 0 0",
+                                                fontStyle: "italic",
+                                            }}
+                                        >
+                                            승인 시 위 정보가 페이지 설정에 자동 반영됩니다.
+                                        </p>
+                                    </div>
+                                )}
                             </div>
 
                             <div style={{ marginBottom: "25px" }}>
