@@ -2269,11 +2269,15 @@ async function getAllPages(): Promise<any> {
 
 async function getImagesByPageId(pageId: string): Promise<any> {
     try {
+        // 캐시 방지를 위한 타임스탬프 추가
+        const timestamp = new Date().getTime()
         const response = await fetch(
-            `${PROXY_BASE_URL}/api/images?action=getByPageId&pageId=${pageId}`,
+            `${PROXY_BASE_URL}/api/images?action=getByPageId&pageId=${pageId}&t=${timestamp}`,
             {
                 headers: {
                     Authorization: `Bearer ${getAuthToken()}`,
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
                 },
             }
         )
@@ -2342,14 +2346,18 @@ async function updateImageOrder(
 // 연락처 관련 함수들
 async function getAllContacts(pageId: string | null = null): Promise<any> {
     try {
-        let url = `${PROXY_BASE_URL}/api/contacts`
+        // 캐시 방지를 위한 타임스탬프 추가
+        const timestamp = new Date().getTime()
+        let url = `${PROXY_BASE_URL}/api/contacts?t=${timestamp}`
         if (pageId) {
-            url += `?pageId=${pageId}`
+            url += `&pageId=${pageId}`
         }
 
         const response = await fetch(url, {
             headers: {
                 Authorization: `Bearer ${getAuthToken()}`,
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
             },
         })
 
@@ -3278,18 +3286,17 @@ function AdminMainContent(props: any) {
             pageSettings.groomName ||
             (pageSettings as any)?.groom_name_kr ||
             inviteData.groomName ||
-            ""
+            "신랑"
         const bride =
             pageSettings.brideName ||
             (pageSettings as any)?.bride_name_kr ||
             inviteData.brideName ||
-            ""
+            "신부"
         return { groom, bride }
     }
 
     const buildKakaoDefaultTitle = () => {
         const { groom, bride } = getKakaoShareNames()
-        if (!groom || !bride) return ""
         return `${groom} ♥ ${bride} 결혼합니다`
     }
 
@@ -4247,6 +4254,42 @@ function AdminMainContent(props: any) {
                     console.warn("localStorage 저장 실패:", error)
                 }
             }
+            
+            // 로그인 전 기존 데이터 완전 초기화 (캐시 문제 방지)
+            setExistingImages([])
+            setContactList([])
+            setPageSettings({
+                groomName: "",
+                groom_name_en: "",
+                brideName: "",
+                bride_name_en: "",
+                wedding_date: "",
+                wedding_hour: "14",
+                wedding_minute: "00",
+                venue_name: "",
+                venue_address: "",
+                photo_section_image_url: "",
+                photo_section_image_path: "",
+                photo_section_location: "",
+                photo_section_overlay_position: "bottom",
+                photo_section_overlay_color: "#ffffff",
+                photo_section_locale: "en",
+                highlight_shape: "circle",
+                highlight_color: "#e0e0e0",
+                highlight_text_color: "black",
+                gallery_type: "thumbnail",
+                rsvp: "off",
+                comments: "off",
+                kko_img: "",
+                kko_title: "",
+                kko_date: "",
+                bgm_url: "",
+                bgm_type: "",
+                bgm_autoplay: false,
+            })
+            setHasLoadedSettings(false)
+            setKkoDefaultsApplied(false)
+            
             setIsAuthenticated(true)
             setCurrentUser(result.user)
             // 로그인 사용자에 page_id가 할당되어 있으면 강제 적용 (비관리자용)
@@ -4295,6 +4338,40 @@ function AdminMainContent(props: any) {
         // 페이지 리스트 사용 안함
         setExistingImages([])
         setContactList([])
+        
+        // 페이지 설정 초기화 (캐시 문제 해결)
+        setPageSettings({
+            groomName: "",
+            groom_name_en: "",
+            brideName: "",
+            bride_name_en: "",
+            wedding_date: "",
+            wedding_hour: "14",
+            wedding_minute: "00",
+            venue_name: "",
+            venue_address: "",
+            photo_section_image_url: "",
+            photo_section_image_path: "",
+            photo_section_location: "",
+            photo_section_overlay_position: "bottom",
+            photo_section_overlay_color: "#ffffff",
+            photo_section_locale: "en",
+            highlight_shape: "circle",
+            highlight_color: "#e0e0e0",
+            highlight_text_color: "black",
+            gallery_type: "thumbnail",
+            rsvp: "off",
+            comments: "off",
+            kko_img: "",
+            kko_title: "",
+            kko_date: "",
+            bgm_url: "",
+            bgm_type: "",
+            bgm_autoplay: false,
+        })
+        setHasLoadedSettings(false)
+        setKkoDefaultsApplied(false)
+        
         if (typeof window !== "undefined") {
             try {
                 localStorage.removeItem("assigned_page_id")
@@ -4340,11 +4417,15 @@ function AdminMainContent(props: any) {
 
         setSettingsLoading(true)
         try {
+            // 캐시 방지를 위한 타임스탬프 추가
+            const timestamp = new Date().getTime()
             const response = await fetch(
-                `${PROXY_BASE_URL}/api/page-settings?pageId=${currentPageId}`,
+                `${PROXY_BASE_URL}/api/page-settings?pageId=${currentPageId}&t=${timestamp}`,
                 {
                     headers: {
                         Authorization: `Bearer ${getAuthToken()}`,
+                        "Cache-Control": "no-cache, no-store, must-revalidate",
+                        "Pragma": "no-cache",
                     },
                 }
             )
