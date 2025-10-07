@@ -239,7 +239,7 @@ async function handleDeleteRequest(req, res) {
     })
   }
 
-  const { id } = req.body
+  const { id, deleteAllData } = req.body
 
   if (!id) {
     return res.status(400).json({
@@ -255,23 +255,187 @@ async function handleDeleteRequest(req, res) {
     })
   }
 
-  const { error } = await supabase
-    .from('admin_users')
-    .delete()
-    .eq('id', id)
+  try {
+    // 완전 삭제 옵션이 활성화된 경우
+    if (deleteAllData) {
+      // 1. 사용자 정보 조회 (page_id 가져오기)
+      const { data: user, error: userError } = await supabase
+        .from('admin_users')
+        .select('page_id')
+        .eq('id', id)
+        .single()
 
-  if (error) {
-    console.error('사용자 삭제 오류:', error)
+      if (userError || !user) {
+        return res.status(404).json({
+          success: false,
+          error: '사용자를 찾을 수 없습니다'
+        })
+      }
+
+      const pageId = user.page_id
+
+      if (pageId) {
+        console.log(`[DELETE] 페이지 ID "${pageId}"의 모든 데이터를 삭제합니다...`)
+
+        // 2. images 테이블에서 이미지 URL 조회 및 삭제
+        const { data: images, error: imagesError } = await supabase
+          .from('images')
+          .select('url, public_url')
+          .eq('page_id', pageId)
+
+        if (!imagesError && images && images.length > 0) {
+          console.log(`[DELETE] ${images.length}개의 이미지를 삭제합니다...`)
+          
+          // 이미지 파일 삭제 (images API 활용)
+          for (const image of images) {
+            try {
+              // images API의 handleDeleteImage와 동일한 로직 사용
+              const imageUrl = image.url || image.public_url || ''
+              
+              // URL에서 키 추출
+              let keyToDelete = imageUrl
+              if (/^https?:\/\//.test(keyToDelete)) {
+                try {
+                  const u = new URL(keyToDelete)
+                  keyToDelete = u.pathname.replace(/^\/+/, '')
+                } catch {
+                  const noProto = keyToDelete.replace(/^https?:\/\//, '')
+                  keyToDelete = noProto.split('/').slice(1).join('/')
+                }
+              }
+              keyToDelete = keyToDelete.split('?')[0].replace(/^\/+/, '')
+
+              // R2 키 판별
+              const isR2Key = /^(files|photos|audio|images|gallery)\//.test(keyToDelete)
+
+              if (isR2Key) {
+                // R2에서 삭제
+                const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3')
+                const r2Client = new S3Client({
+                  region: 'auto',
+                  endpoint: process.env.R2_ENDPOINT,
+                  forcePathStyle: true,
+                  credentials: {
+                    accessKeyId: process.env.R2_ACCESS_KEY_ID,
+                    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+                  },
+                })
+                await r2Client.send(new DeleteObjectCommand({
+                  Bucket: process.env.R2_BUCKET,
+                  Key: keyToDelete,
+                }))
+                console.log(`[DELETE] R2 이미지 삭제 완료: ${keyToDelete}`)
+              } else if (imageUrl.includes('supabase.co/storage')) {
+                // Supabase Storage에서 삭제
+                const urlParts = imageUrl.split('/storage/v1/object/public/')
+                if (urlParts.length > 1) {
+                  const [bucket, ...pathParts] = urlParts[1].split('/')
+                  const filePath = pathParts.join('/')
+                  await supabase.storage.from(bucket).remove([filePath])
+                  console.log(`[DELETE] Supabase Storage 이미지 삭제 완료: ${filePath}`)
+                }
+              }
+            } catch (imgError) {
+              console.error(`[DELETE] 이미지 삭제 실패 (${image.url}):`, imgError)
+              // 개별 이미지 삭제 실패는 무시하고 계속 진행
+            }
+          }
+
+          // images 테이블 레코드 삭제
+          await supabase
+            .from('images')
+            .delete()
+            .eq('page_id', pageId)
+          console.log(`[DELETE] images 테이블 레코드 삭제 완료`)
+        }
+
+        // 3. page_settings 삭제
+        const { error: pageSettingsError } = await supabase
+          .from('page_settings')
+          .delete()
+          .eq('page_id', pageId)
+        if (!pageSettingsError) {
+          console.log(`[DELETE] page_settings 삭제 완료`)
+        }
+
+        // 4. wedding_contacts 삭제
+        const { error: contactsError } = await supabase
+          .from('wedding_contacts')
+          .delete()
+          .eq('page_id', pageId)
+        if (!contactsError) {
+          console.log(`[DELETE] wedding_contacts 삭제 완료`)
+        }
+
+        // 5. transport_info 삭제
+        const { error: transportError } = await supabase
+          .from('transport_info')
+          .delete()
+          .eq('page_id', pageId)
+        if (!transportError) {
+          console.log(`[DELETE] transport_info 삭제 완료`)
+        }
+
+        // 6. info_items 삭제
+        const { error: infoItemsError } = await supabase
+          .from('info_items')
+          .delete()
+          .eq('page_id', pageId)
+        if (!infoItemsError) {
+          console.log(`[DELETE] info_items 삭제 완료`)
+        }
+
+        // 7. rsvp 삭제
+        const { error: rsvpError } = await supabase
+          .from('rsvp')
+          .delete()
+          .eq('page_id', pageId)
+        if (!rsvpError) {
+          console.log(`[DELETE] rsvp 삭제 완료`)
+        }
+
+        // 8. comments 삭제
+        const { error: commentsError } = await supabase
+          .from('comments')
+          .delete()
+          .eq('page_id', pageId)
+        if (!commentsError) {
+          console.log(`[DELETE] comments 삭제 완료`)
+        }
+
+        console.log(`[DELETE] 페이지 ID "${pageId}"의 모든 데이터 삭제 완료`)
+      }
+    }
+
+    // 마지막으로 사용자 계정 삭제
+    const { error } = await supabase
+      .from('admin_users')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      console.error('사용자 삭제 오류:', error)
+      return res.status(500).json({
+        success: false,
+        error: '사용자 삭제 중 오류가 발생했습니다'
+      })
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: deleteAllData 
+        ? '사용자 계정 및 모든 관련 데이터가 성공적으로 삭제되었습니다' 
+        : '사용자가 성공적으로 삭제되었습니다'
+    })
+
+  } catch (error) {
+    console.error('사용자 삭제 예외:', error)
     return res.status(500).json({
       success: false,
-      error: '사용자 삭제 중 오류가 발생했습니다'
+      error: '사용자 삭제 중 오류가 발생했습니다',
+      details: error.message
     })
   }
-
-  return res.status(200).json({
-    success: true,
-    message: '사용자가 성공적으로 삭제되었습니다'
-  })
 }
 
 // 테스트 액션
