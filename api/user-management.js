@@ -367,40 +367,59 @@ async function handleDeleteRequest(req, res) {
           console.log(`[DELETE] wedding_contacts 삭제 완료`)
         }
 
-        // 5. transport_info 삭제
+        // 5. transport_infos 삭제 (복수형)
         const { error: transportError } = await supabase
-          .from('transport_info')
+          .from('transport_infos')
           .delete()
           .eq('page_id', pageId)
         if (!transportError) {
-          console.log(`[DELETE] transport_info 삭제 완료`)
+          console.log(`[DELETE] transport_infos 삭제 완료`)
+        } else {
+          console.warn(`[DELETE] transport_infos 삭제 실패:`, transportError)
         }
 
-        // 6. info_items 삭제
-        const { error: infoItemsError } = await supabase
-          .from('info_items')
+        // 6. info_item 삭제 (단수형)
+        const { error: infoItemError } = await supabase
+          .from('info_item')
           .delete()
           .eq('page_id', pageId)
-        if (!infoItemsError) {
-          console.log(`[DELETE] info_items 삭제 완료`)
+        if (!infoItemError) {
+          console.log(`[DELETE] info_item 삭제 완료`)
+        } else {
+          console.warn(`[DELETE] info_item 삭제 실패:`, infoItemError)
         }
 
-        // 7. rsvp 삭제
+        // 7. rsvp_responses 삭제
         const { error: rsvpError } = await supabase
-          .from('rsvp')
+          .from('rsvp_responses')
           .delete()
           .eq('page_id', pageId)
         if (!rsvpError) {
-          console.log(`[DELETE] rsvp 삭제 완료`)
+          console.log(`[DELETE] rsvp_responses 삭제 완료`)
+        } else {
+          console.warn(`[DELETE] rsvp_responses 삭제 실패:`, rsvpError)
         }
 
-        // 8. comments 삭제
+        // 8. comments_framer 삭제
         const { error: commentsError } = await supabase
-          .from('comments')
+          .from('comments_framer')
           .delete()
           .eq('page_id', pageId)
         if (!commentsError) {
-          console.log(`[DELETE] comments 삭제 완료`)
+          console.log(`[DELETE] comments_framer 삭제 완료`)
+        } else {
+          console.warn(`[DELETE] comments_framer 삭제 실패:`, commentsError)
+        }
+
+        // 9. invite_cards 삭제
+        const { error: inviteError } = await supabase
+          .from('invite_cards')
+          .delete()
+          .eq('page_id', pageId)
+        if (!inviteError) {
+          console.log(`[DELETE] invite_cards 삭제 완료`)
+        } else {
+          console.warn(`[DELETE] invite_cards 삭제 실패:`, inviteError)
         }
 
         console.log(`[DELETE] 페이지 ID "${pageId}"의 모든 데이터 삭제 완료`)
