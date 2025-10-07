@@ -1,5 +1,4 @@
 import { Override } from "framer"
-import { useState, useEffect } from "react"
 
 // URL에서 page_id 추출: ?page_id=... 또는 경로 마지막 세그먼트
 function getPageIdFromUrl(): string | null {
@@ -29,17 +28,13 @@ function getPageIdFromUrl(): string | null {
 }
 
 // 에디터/프리뷰에서 테스트용 기본값
-const FALLBACK_PAGE_ID = "testpage123"
+const FALLBACK_PAGE_ID = "default"
 
-export function SetPageIdFromUrl(): Override {
-    const [pageId, setPageId] = useState<string>(FALLBACK_PAGE_ID)
-
-    useEffect(() => {
-        const extractedPageId = getPageIdFromUrl()
-        if (extractedPageId) {
-            setPageId(extractedPageId)
-        }
-    }, [])
+// Framer Code Override는 함수가 아닌 객체를 반환해야 함
+export const SetPageIdFromUrl: Override = () => {
+    const pageId = getPageIdFromUrl() || FALLBACK_PAGE_ID
+    
+    console.log("PageID extracted:", pageId)
 
     // 모든 하위 컴포넌트에 pageId 전달
     return {
