@@ -494,14 +494,14 @@ async function handleTest(req, res, body) {
 
 // 회원가입/등록 처리
 async function handleRegister(req, res, body) {
-  const { username, password, name, page_id, groomName, brideName } = body
+  const { username, password, name, page_id, wedding_date, groom_name_en, bride_name_en } = body
 
   console.log('Processing register/signup request')
 
-  if (!username || !password || !name || !groomName || !brideName) {
+  if (!username || !password || !name || !groom_name_en || !bride_name_en) {
     return res.status(400).json({
       success: false,
-      error: '사용자명, 비밀번호, 이름, 신랑 성함, 신부 성함을 모두 입력하세요'
+      error: '사용자명, 비밀번호, 이름, 신랑 영문 이름, 신부 영문 이름을 모두 입력하세요'
     })
   }
 
@@ -540,9 +540,12 @@ async function handleRegister(req, res, body) {
         is_active: false, // 승인 대기 상태
         role: 'admin',
         approval_status: 'pending',
-        page_id: page_id || null
+        page_id: page_id || null,
+        wedding_date: wedding_date || null,
+        groom_name_en: groom_name_en,
+        bride_name_en: bride_name_en
       }])
-      .select('id, username, name, is_active, role, approval_status, page_id')
+      .select('id, username, name, is_active, role, approval_status, page_id, wedding_date, groom_name_en, bride_name_en')
       .single()
 
     if (error) {
