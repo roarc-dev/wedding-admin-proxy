@@ -1,30 +1,9 @@
-const { createClient } = require('@supabase/supabase-js');
-const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
-
-// Supabase 클라이언트 초기화
-const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_KEY
-);
-
-// Cloudflare R2 클라이언트 초기화
-const r2Client = new S3Client({
-    region: 'auto',
-    endpoint: process.env.R2_ENDPOINT,
-    credentials: {
-        accessKeyId: process.env.R2_ACCESS_KEY_ID,
-        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
-    },
-});
-
-// RSVP HTML 페이지 생성 함수
-function generateRSVPHTML(pageId) {
-    return `<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RSVP 결과 - ${pageId}</title>
+    <title>RSVP 결과 - test123</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -171,7 +150,7 @@ function generateRSVPHTML(pageId) {
 
                     if (!response.ok) {
                         const errorText = await response.text();
-                        throw new Error(\`HTTP \${response.status}: \${errorText}\`);
+                        throw new Error(`HTTP ${response.status}: ${errorText}`);
                     }
 
                     const result = await response.json();
@@ -185,7 +164,7 @@ function generateRSVPHTML(pageId) {
                     }
                 } catch (error) {
                     console.error("데이터 로드 에러:", error);
-                    setError(\`데이터 로드 실패: \${error.message}\`);
+                    setError(`데이터 로드 실패: ${error.message}`);
                 } finally {
                     setIsLoading(false);
                 }
@@ -441,112 +420,9 @@ function generateRSVPHTML(pageId) {
 
         // 컴포넌트 렌더링
         ReactDOM.render(
-            React.createElement(RSVPAttendeeList, { pageId: "${pageId}" }),
+            React.createElement(RSVPAttendeeList, { pageId: "test123" }),
             document.getElementById('root')
         );
     </script>
 </body>
-</html>`;
-}
-
-// 메인 핸들러 함수
-module.exports = async function handler(req, res) {
-    // CORS 헤더 설정
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
-    }
-
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
-    }
-
-    try {
-        const { action, pageId, showOnlyAttending, ...rsvpData } = req.body;
-
-        // RSVP 데이터 조회
-        if (action === 'getByPageId') {
-            if (!pageId) {
-                return res.status(400).json({ success: false, error: '페이지 ID가 필요합니다' });
-            }
-
-            let query = supabase.from('rsvp_responses').select('*').eq('page_id', pageId);
-
-            if (showOnlyAttending) {
-                query = query.eq('relation_type', '참석');
-            }
-
-            const { data, error } = await query.order('created_at', { ascending: false });
-
-            if (error) {
-                console.error('Supabase query error:', error);
-                return res.status(500).json({
-                    success: false,
-                    error: '데이터 조회 중 오류가 발생했습니다'
-                });
-            }
-
-            return res.status(200).json({
-                success: true,
-                data: data || []
-            });
-        }
-
-        // RSVP 응답 저장
-        if (action === 'submit') {
-            const { data, error } = await supabase
-                .from('rsvp_responses')
-                .insert([rsvpData]);
-
-            if (error) {
-                console.error('Supabase insert error:', error);
-                return res.status(500).json({
-                    success: false,
-                    error: 'RSVP 응답 저장 중 오류가 발생했습니다'
-                });
-            }
-
-            return res.status(200).json({
-                success: true,
-                message: 'RSVP 응답이 성공적으로 저장되었습니다'
-            });
-        }
-
-        // HTML 페이지 생성
-        if (action === 'generateHTML') {
-            if (!pageId) {
-                return res.status(400).json({ error: 'pageId is required' });
-            }
-
-            const htmlContent = generateRSVPHTML(pageId);
-            const publicUrl = `https://mcard.roarc.kr/rsvp/${pageId}`;
-
-            console.log(`RSVP page generated for pageId: ${pageId}`);
-            console.log(`Public URL: ${publicUrl}`);
-
-            return res.status(200).json({
-                success: true,
-                message: 'RSVP page generated successfully',
-                url: publicUrl,
-                pageId: pageId,
-                html: htmlContent
-            });
-        }
-
-        return res.status(400).json({
-            success: false,
-            error: 'Invalid action'
-        });
-
-    } catch (error) {
-        console.error('RSVP handler error:', error);
-        return res.status(500).json({
-            success: false,
-            error: '서버 오류가 발생했습니다',
-            details: error.message
-        });
-    }
-};
+</html>
