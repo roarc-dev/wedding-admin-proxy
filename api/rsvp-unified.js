@@ -28,6 +28,20 @@ function generateRSVPHTML(pageId) {
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script>
+        // typography.js 동적 로드
+        (function() {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.roarc.kr/fonts/typography.js?v=27c65dba30928cbbce6839678016d9ac';
+            script.onload = function() {
+                if (window.typography && window.typography.font) {
+                    document.documentElement.style.setProperty('--font-body', window.typography.font.body);
+                    document.documentElement.style.setProperty('--font-heading', window.typography.font.heading);
+                }
+            };
+            document.head.appendChild(script);
+        })();
+    </script>
     <style>
         @import url('https://cdn.roarc.kr/fonts/typography.css');
         
@@ -50,6 +64,7 @@ function generateRSVPHTML(pageId) {
         
         .content-wrapper {
             width: 100%;
+            max-width: 430px;
             height: fit-content;
             margin-top: 40px;
             margin-bottom: 40px;
@@ -64,6 +79,8 @@ function generateRSVPHTML(pageId) {
             align-items: center;
             gap: 20px;
             margin-bottom: 0px;
+            width: 100%;
+            max-width: 430px;
         }
         
         .rsvp-title {
@@ -84,6 +101,7 @@ function generateRSVPHTML(pageId) {
         
         #root {
             width: 100%;
+            max-width: 430px;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -240,7 +258,8 @@ function generateRSVPHTML(pageId) {
             }, [pageId, showOnlyAttending]);
 
             const containerStyle = {
-                maxWidth: "1200px",
+                maxWidth: "430px",
+                width: "100%",
                 margin: "0 auto",
                 padding: "24px",
                 backgroundColor: backgroundColor,
@@ -324,7 +343,7 @@ function generateRSVPHTML(pageId) {
             return (
                 <div style={containerStyle}>
                     {/* 탭 네비게이션 */}
-                    <div style={{ width: "100%", display: "flex", justifyContent: "flex-start", alignItems: "center" }}>
+                    <div style={{ width: "100%", maxWidth: "430px", display: "flex", justifyContent: "flex-start", alignItems: "center" }}>
                         <button
                             onClick={() => setActiveTab("statistics")}
                             style={{
