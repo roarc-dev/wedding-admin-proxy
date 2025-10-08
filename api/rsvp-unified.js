@@ -528,7 +528,7 @@ module.exports = async function handler(req, res) {
                 // Cloudflare R2에 HTML 파일 업로드 (RSVP 전용 버킷)
                 const uploadCommand = new PutObjectCommand({
                     Bucket: process.env.R2_BUCKET_NAME_RSVP || 'rsvp',
-                    Key: `${pageId}/index.html`,
+                    Key: `rsvp/${pageId}/index.html`,
                     Body: htmlContent,
                     ContentType: 'text/html; charset=utf-8',
                     CacheControl: 'public, max-age=3600', // 1시간 캐시
@@ -538,7 +538,7 @@ module.exports = async function handler(req, res) {
 
                 console.log(`RSVP page generated and uploaded for pageId: ${pageId}`);
                 console.log(`Bucket: ${process.env.R2_BUCKET_NAME_RSVP || 'rsvp'}`);
-                console.log(`Key: ${pageId}/index.html`);
+                console.log(`Key: rsvp/${pageId}/index.html`);
                 console.log(`Public URL: ${publicUrl}`);
 
                 return res.status(200).json({
