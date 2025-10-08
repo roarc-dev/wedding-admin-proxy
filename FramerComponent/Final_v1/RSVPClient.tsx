@@ -205,11 +205,14 @@ export default function RSVPClient(props: RSVPClientProps) {
         }
 
         try {
-            const url = `${PROXY_BASE_URL}/api/rsvp`
+            const url = `${PROXY_BASE_URL}/api/rsvp-unified`
             const response = await fetch(url, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(requestData),
+                body: JSON.stringify({
+                    action: "submit",
+                    ...requestData,
+                }),
             })
 
             if (!response.ok)
