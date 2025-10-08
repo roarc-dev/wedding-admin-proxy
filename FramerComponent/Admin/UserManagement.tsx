@@ -314,13 +314,14 @@ async function updatePageSettingsWithWeddingInfo(
 // RSVP HTML 페이지 생성 함수
 async function generateRSVPPage(pageId: string): Promise<any> {
     try {
-        const response = await fetch(`${PROXY_BASE_URL}/api/generate-rsvp-page`, {
+        const response = await fetch(`${PROXY_BASE_URL}/api/rsvp-unified`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${getAuthToken()}`,
             },
             body: JSON.stringify({
+                action: "generateHTML",
                 pageId: pageId,
             }),
         })

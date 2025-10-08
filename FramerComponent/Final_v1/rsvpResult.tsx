@@ -85,7 +85,7 @@ export default function RSVPAttendeeList(props: RSVPProps) {
         setError("")
 
         try {
-            const url = `${PROXY_BASE_URL}/api/rsvp`
+            const url = `${PROXY_BASE_URL}/api/rsvp-unified`
 
             const requestBody = {
                 action: "getByPageId",
