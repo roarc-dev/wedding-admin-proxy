@@ -46,6 +46,7 @@ async function signupUser(userData: SignupUserData): Promise<any> {
                 groom_name_en: userData.groom_name_en,
                 bride_name_en: userData.bride_name_en,
                 page_id: userData.page_id,
+                role: "user", // SignUp으로 생성되는 계정은 user role로 고정
             }),
         })
 
@@ -85,6 +86,8 @@ export default function UserSignup(props: { style?: React.CSSProperties }) {
         username?: boolean
         password?: boolean
         confirmPassword?: boolean
+        groom_name_en?: boolean
+        bride_name_en?: boolean
     }>({})
 
     // 비밀번호 확인 검증
@@ -104,6 +107,8 @@ export default function UserSignup(props: { style?: React.CSSProperties }) {
         if (!signupForm.username.trim()) errors.username = true
         if (!signupForm.password.trim()) errors.password = true
         if (!signupForm.confirmPassword.trim()) errors.confirmPassword = true
+        if (!signupForm.groom_name_en.trim()) errors.groom_name_en = true
+        if (!signupForm.bride_name_en.trim()) errors.bride_name_en = true
         
         setValidationErrors(errors)
         return Object.keys(errors).length === 0
@@ -125,7 +130,7 @@ export default function UserSignup(props: { style?: React.CSSProperties }) {
 
         // 필수 필드 검증
         if (!validateRequiredFields()) {
-            setError("모든 필수 필드를 입력해주세요")
+            setError("모든 칸을 입력해주세요.")
             setIsSigningUp(false)
             return
         }
@@ -216,8 +221,8 @@ export default function UserSignup(props: { style?: React.CSSProperties }) {
             <div style={{ height: "16px", width: "100%" }} />
 
             {/* Form Container */}
-            <div
-                style={{
+                    <div
+                        style={{
                     display: "flex",
                     flexDirection: "column",
                     gap: "24px",
@@ -240,7 +245,8 @@ export default function UserSignup(props: { style?: React.CSSProperties }) {
                                 color: "#aeaeae",
                                 lineHeight: "20px",
                                 fontFamily: "Pretendard, sans-serif",
-                                marginBottom: "20px",
+                                marginTop: "160px",
+                                marginBottom: "160px",
                                 textAlign: "center",
                                 width: "100%",
                             }}
@@ -271,6 +277,11 @@ export default function UserSignup(props: { style?: React.CSSProperties }) {
                                 }}
                             >
                                 이름
+                                {validationErrors.name && (
+                                    <span style={{ color: "#ef4444", marginLeft: "8px", fontSize: "12px" }}>
+                                        이 칸을 작성하세요
+                                    </span>
+                                )}
                             </label>
                             <input
                                 type="text"
@@ -283,7 +294,7 @@ export default function UserSignup(props: { style?: React.CSSProperties }) {
                                     // 입력 시 검증 오류 해제
                                     if (validationErrors.name) {
                                         setValidationErrors(prev => ({ ...prev, name: false }))
-                                    }
+                                }
                                 }}
                                 placeholder="네이버 스마트스토어 구매자 성함"
                                 style={{
@@ -297,7 +308,6 @@ export default function UserSignup(props: { style?: React.CSSProperties }) {
                                     fontFamily: theme.font.body,
                                     color: signupForm.name ? "#000000" : "#aeaeae",
                                 }}
-                                required
                             />
                         </div>
 
@@ -314,6 +324,11 @@ export default function UserSignup(props: { style?: React.CSSProperties }) {
                                 }}
                             >
                                 아이디
+                                {validationErrors.username && (
+                                    <span style={{ color: "#ef4444", marginLeft: "8px", fontSize: "12px" }}>
+                                        이 칸을 작성하세요
+                                    </span>
+                                )}
                             </label>
                             <input
                                 type="text"
@@ -326,7 +341,7 @@ export default function UserSignup(props: { style?: React.CSSProperties }) {
                                     // 입력 시 검증 오류 해제
                                     if (validationErrors.username) {
                                         setValidationErrors(prev => ({ ...prev, username: false }))
-                                    }
+                                }
                                 }}
                                 placeholder="네이버 스마트스토어 구매자 ID"
                                 style={{
@@ -340,7 +355,6 @@ export default function UserSignup(props: { style?: React.CSSProperties }) {
                                     fontFamily: theme.font.body,
                                     color: signupForm.username ? "#000000" : "#aeaeae",
                                 }}
-                                required
                             />
                         </div>
 
@@ -357,6 +371,11 @@ export default function UserSignup(props: { style?: React.CSSProperties }) {
                                 }}
                             >
                                 비밀번호
+                                {validationErrors.password && (
+                                    <span style={{ color: "#ef4444", marginLeft: "8px", fontSize: "12px" }}>
+                                        이 칸을 작성하세요
+                                    </span>
+                                )}
                             </label>
                             <input
                                 type="password"
@@ -372,7 +391,7 @@ export default function UserSignup(props: { style?: React.CSSProperties }) {
                                     // 입력 시 검증 오류 해제
                                     if (validationErrors.password) {
                                         setValidationErrors(prev => ({ ...prev, password: false }))
-                                    }
+                                }
                                 }}
                                 placeholder="6자 이상 입력해주세요"
                                 style={{
@@ -386,7 +405,6 @@ export default function UserSignup(props: { style?: React.CSSProperties }) {
                                     fontFamily: theme.font.body,
                                     color: signupForm.password ? "#000000" : "#aeaeae",
                                 }}
-                                required
                             />
                         </div>
 
@@ -406,6 +424,11 @@ export default function UserSignup(props: { style?: React.CSSProperties }) {
                                 {passwordMismatch && (
                                     <span style={{ color: "#ef4444", marginLeft: "8px", fontSize: "12px" }}>
                                         비밀번호를 확인해주세요
+                                    </span>
+                                )}
+                                {validationErrors.confirmPassword && (
+                                    <span style={{ color: "#ef4444", marginLeft: "8px", fontSize: "12px" }}>
+                                        이 칸을 작성하세요
                                     </span>
                                 )}
                             </label>
@@ -437,7 +460,6 @@ export default function UserSignup(props: { style?: React.CSSProperties }) {
                                     fontFamily: theme.font.body,
                                     color: signupForm.confirmPassword ? "#000000" : "#aeaeae",
                                 }}
-                                required
                             />
                         </div>
 
@@ -507,21 +529,29 @@ export default function UserSignup(props: { style?: React.CSSProperties }) {
                                 }}
                             >
                                 신랑 영문 이름
+                                {validationErrors.groom_name_en && (
+                                    <span style={{ color: "#ef4444", marginLeft: "8px", fontSize: "12px" }}>
+                                        이 칸을 작성하세요
+                                    </span>
+                                )}
                             </label>
                             <input
                                 type="text"
                                 value={signupForm.groom_name_en}
-                                onChange={(e) =>
+                                onChange={(e) => {
                                     setSignupForm((prev) => ({
                                         ...prev,
                                         groom_name_en: e.target.value,
                                     }))
-                                }
+                                    if (validationErrors.groom_name_en) {
+                                        setValidationErrors(prev => ({ ...prev, groom_name_en: false }))
+                                    }
+                                }}
                                 placeholder="MIN JUN (*성 제외)"
                                 style={{
                                     width: "100%",
                                     padding: "16px",
-                                    border: "1px solid #e5e6e8",
+                                    border: `1px solid ${validationErrors.groom_name_en ? "#ef4444" : "#e5e6e8"}`,
                                     borderRadius: "2px",
                                     boxSizing: "border-box",
                                     fontSize: "14px",
@@ -545,21 +575,29 @@ export default function UserSignup(props: { style?: React.CSSProperties }) {
                                 }}
                             >
                                 신부 영문 이름
+                                {validationErrors.bride_name_en && (
+                                    <span style={{ color: "#ef4444", marginLeft: "8px", fontSize: "12px" }}>
+                                        이 칸을 작성하세요
+                                    </span>
+                                )}
                             </label>
                             <input
                                 type="text"
                                 value={signupForm.bride_name_en}
-                                onChange={(e) =>
+                                onChange={(e) => {
                                     setSignupForm((prev) => ({
                                         ...prev,
                                         bride_name_en: e.target.value,
                                     }))
-                                }
+                                    if (validationErrors.bride_name_en) {
+                                        setValidationErrors(prev => ({ ...prev, bride_name_en: false }))
+                                    }
+                                }}
                                 placeholder="SEO YUN (*성 제외)"
                                 style={{
                                     width: "100%",
                                     padding: "16px",
-                                    border: "1px solid #e5e6e8",
+                                    border: `1px solid ${validationErrors.bride_name_en ? "#ef4444" : "#e5e6e8"}`,
                                     borderRadius: "2px",
                                     boxSizing: "border-box",
                                     fontSize: "14px",
@@ -588,12 +626,9 @@ export default function UserSignup(props: { style?: React.CSSProperties }) {
                             <div
                                 style={{
                                     padding: "12px",
-                                    backgroundColor: "#fef2f2",
                                     color: "#dc2626",
-                                    borderRadius: "8px",
                                     marginBottom: "20px",
                                     textAlign: "center",
-                                    border: "1px solid #fecaca",
                                     width: "100%",
                                 }}
                             >
@@ -605,19 +640,19 @@ export default function UserSignup(props: { style?: React.CSSProperties }) {
                         <motion.button
                             type="submit"
                             disabled={isSigningUp}
-                                style={{
-                                    width: "100%",
+                            style={{
+                                width: "100%",
                                     height: "50px",
                                     backgroundColor: isSigningUp ? "#9ca3af" : "#000000",
                                     color: "#e6e6e6",
-                                    border: "none",
+                                border: "none",
                                     borderRadius: "0px",
                                     fontSize: "14px",
-                                    fontWeight: "600",
-                                    cursor: isSigningUp ? "not-allowed" : "pointer",
+                                fontWeight: "600",
+                                cursor: isSigningUp ? "not-allowed" : "pointer",
                                     fontFamily: theme.font.body,
                                     marginBottom: "24px",
-                                }}
+                            }}
                             whileHover={!isSigningUp ? { scale: 1.02 } : {}}
                             whileTap={!isSigningUp ? { scale: 0.98 } : {}}
                         >
@@ -626,30 +661,6 @@ export default function UserSignup(props: { style?: React.CSSProperties }) {
                     </form>
                 )}
 
-                {success && (
-                    <div style={{ textAlign: "center", marginTop: "20px", width: "100%" }}>
-                        <motion.button
-                            onClick={() => {
-                                setSuccess("")
-                                setError("")
-                            }}
-                            style={{
-                                padding: "10px 20px",
-                                backgroundColor: "#6b7280",
-                                color: "white",
-                                border: "none",
-                                borderRadius: "6px",
-                                fontSize: "14px",
-                                cursor: "pointer",
-                                fontFamily: theme.font.body,
-                            }}
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                        >
-                            다른 계정 만들기
-                        </motion.button>
-                    </div>
-                )}
             </div>
 
             {/* Gap */}
@@ -670,7 +681,7 @@ export default function UserSignup(props: { style?: React.CSSProperties }) {
                 }}
             >
                 <div
-                    style={{
+                            style={{
                         overflow: "hidden",
                         display: "inline-flex",
                         flexDirection: "column",

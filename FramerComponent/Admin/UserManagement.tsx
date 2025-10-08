@@ -311,6 +311,34 @@ async function updatePageSettingsWithWeddingInfo(
     }
 }
 
+// RSVP HTML 페이지 생성 함수
+async function generateRSVPPage(pageId: string): Promise<any> {
+    try {
+        const response = await fetch(`${PROXY_BASE_URL}/api/generate-rsvp-page`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${getAuthToken()}`,
+            },
+            body: JSON.stringify({
+                pageId: pageId,
+            }),
+        })
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        }
+
+        return await response.json()
+    } catch (error) {
+        console.error("Generate RSVP page error:", error)
+        return {
+            success: false,
+            error: "RSVP 페이지 생성 중 오류가 발생했습니다",
+        }
+    }
+}
+
 interface User {
     id: string
     username: string
@@ -503,6 +531,15 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
                     if (!pageSettingsResult.success) {
                         console.warn("Page settings update failed:", pageSettingsResult.error)
                         // 페이지 설정 업데이트 실패해도 승인은 성공으로 처리
+                    }
+
+                    // RSVP HTML 페이지 생성
+                    const rsvpPageResult = await generateRSVPPage(pageIdInput)
+                    if (rsvpPageResult.success) {
+                        console.log("RSVP page generated successfully:", rsvpPageResult.url)
+                    } else {
+                        console.warn("RSVP page generation failed:", rsvpPageResult.error)
+                        // RSVP 페이지 생성 실패해도 승인은 성공으로 처리
                     }
                 }
 
