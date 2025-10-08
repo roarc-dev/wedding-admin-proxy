@@ -537,6 +537,8 @@ module.exports = async function handler(req, res) {
                 await rsvpR2Client.send(uploadCommand);
 
                 console.log(`RSVP page generated and uploaded for pageId: ${pageId}`);
+                console.log(`Bucket: ${process.env.R2_BUCKET_NAME_RSVP || 'rsvp'}`);
+                console.log(`Key: rsvp/${pageId}/index.html`);
                 console.log(`Public URL: ${publicUrl}`);
 
                 return res.status(200).json({
