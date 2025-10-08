@@ -515,53 +515,89 @@ module.exports = async function handler(req, res) {
             });
         }
 
-        // HTML 페이지 생성
-        if (action === 'generateHTML') {
-            if (!pageId) {
-                return res.status(400).json({ error: 'pageId is required' });
-            }
+               // HTML 페이지 생성
+               if (action === 'generateHTML') {
+                   if (!pageId) {
+                       return res.status(400).json({ error: 'pageId is required' });
+                   }
 
-            const htmlContent = generateRSVPHTML(pageId);
-            const publicUrl = `https://admin.roarc.kr/rsvp/${pageId}`;
+                   const htmlContent = generateRSVPHTML(pageId);
+                   const publicUrl = `https://admin.roarc.kr/rsvp/${pageId}`;
 
-            try {
-                // Cloudflare R2에 HTML 파일 업로드 (RSVP 전용 버킷)
-                const uploadCommand = new PutObjectCommand({
-                    Bucket: process.env.R2_BUCKET_NAME_RSVP || 'rsvp',
-                    Key: `rsvp/${pageId}/index.html`,
-                    Body: htmlContent,
-                    ContentType: 'text/html; charset=utf-8',
-                    CacheControl: 'public, max-age=3600', // 1시간 캐시
-                });
+                   try {
+                       // Cloudflare R2에 HTML 파일 업로드 (RSVP 전용 버킷)
+                       const uploadCommand = new PutObjectCommand({
+                           Bucket: process.env.R2_BUCKET_NAME_RSVP || 'rsvp',
+                           Key: `rsvp/${pageId}/index.html`,
+                           Body: htmlContent,
+                           ContentType: 'text/html; charset=utf-8',
+                           CacheControl: 'public, max-age=3600', // 1시간 캐시
+                       });
 
-                await rsvpR2Client.send(uploadCommand);
+                       await rsvpR2Client.send(uploadCommand);
 
-                console.log(`RSVP page generated and uploaded for pageId: ${pageId}`);
-                console.log(`Bucket: ${process.env.R2_BUCKET_NAME_RSVP || 'rsvp'}`);
-                console.log(`Key: rsvp/${pageId}/index.html`);
-                console.log(`Public URL: ${publicUrl}`);
+                       console.log(`RSVP page generated and uploaded for pageId: ${pageId}`);
+                       console.log(`Bucket: ${process.env.R2_BUCKET_NAME_RSVP || 'rsvp'}`);
+                       console.log(`Key: rsvp/${pageId}/index.html`);
+                       console.log(`Public URL: ${publicUrl}`);
 
-                return res.status(200).json({
-                    success: true,
-                    message: 'RSVP page generated and uploaded successfully',
-                    url: publicUrl,
-                    pageId: pageId,
-                    html: htmlContent
-                });
-            } catch (uploadError) {
-                console.error('R2 upload error:', uploadError);
-                return res.status(500).json({
-                    success: false,
-                    error: 'RSVP 페이지 업로드 중 오류가 발생했습니다',
-                    details: uploadError.message
-                });
-            }
-        }
+                       return res.status(200).json({
+                           success: true,
+                           message: 'RSVP page generated and uploaded successfully',
+                           url: publicUrl,
+                           pageId: pageId,
+                           html: htmlContent
+                       });
+                   } catch (uploadError) {
+                       console.error('R2 upload error:', uploadError);
+                       return res.status(500).json({
+                           success: false,
+                           error: 'RSVP 페이지 업로드 중 오류가 발생했습니다',
+                           details: uploadError.message
+                       });
+                   }
+               }
 
-        return res.status(400).json({
-            success: false,
-            error: 'Invalid action'
-        });
+               // HTML 페이지 삭제
+               if (action === 'deleteHTML') {
+                   if (!pageId) {
+                       return res.status(400).json({ error: 'pageId is required' });
+                   }
+
+                   try {
+                       const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
+                       
+                       // Cloudflare R2에서 HTML 파일 삭제 (RSVP 전용 버킷)
+                       const deleteCommand = new DeleteObjectCommand({
+                           Bucket: process.env.R2_BUCKET_NAME_RSVP || 'rsvp',
+                           Key: `rsvp/${pageId}/index.html`,
+                       });
+
+                       await rsvpR2Client.send(deleteCommand);
+
+                       console.log(`RSVP page deleted for pageId: ${pageId}`);
+                       console.log(`Bucket: ${process.env.R2_BUCKET_NAME_RSVP || 'rsvp'}`);
+                       console.log(`Key: rsvp/${pageId}/index.html`);
+
+                       return res.status(200).json({
+                           success: true,
+                           message: 'RSVP page deleted successfully',
+                           pageId: pageId
+                       });
+                   } catch (deleteError) {
+                       console.error('R2 delete error:', deleteError);
+                       return res.status(500).json({
+                           success: false,
+                           error: 'RSVP 페이지 삭제 중 오류가 발생했습니다',
+                           details: deleteError.message
+                       });
+                   }
+               }
+
+               return res.status(400).json({
+                   success: false,
+                   error: 'Invalid action'
+               });
 
     } catch (error) {
         console.error('RSVP handler error:', error);

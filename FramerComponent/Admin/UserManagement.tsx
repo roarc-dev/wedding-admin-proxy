@@ -340,6 +340,35 @@ async function generateRSVPPage(pageId: string): Promise<any> {
     }
 }
 
+// RSVP HTML 페이지 삭제 함수
+async function deleteRSVPPage(pageId: string): Promise<any> {
+    try {
+        const response = await fetch(`${PROXY_BASE_URL}/api/rsvp-unified`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${getAuthToken()}`,
+            },
+            body: JSON.stringify({
+                action: "deleteHTML",
+                pageId: pageId,
+            }),
+        })
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        }
+
+        return await response.json()
+    } catch (error) {
+        console.error("Delete RSVP page error:", error)
+        return {
+            success: false,
+            error: "RSVP 페이지 삭제 중 오류가 발생했습니다",
+        }
+    }
+}
+
 interface User {
     id: string
     username: string
@@ -625,7 +654,8 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
                 `⚠️ 확인을 누르면 모든 데이터가 삭제됩니다:\n` +
                 `- 사용자 계정\n` +
                 `- Page ID: ${user.page_id || "없음"}\n` +
-                `- 페이지 설정, 연락처, 이미지, 댓글, RSVP 등 모든 데이터\n\n` +
+                `- 페이지 설정, 연락처, 이미지, 댓글, RSVP 등 모든 데이터\n` +
+                `- RSVP 결과 페이지 (${user.page_id ? `https://admin.roarc.kr/rsvp/${user.page_id}/` : "없음"})\n\n` +
                 `취소를 누르면 계정만 삭제됩니다.`
         )
 
@@ -640,6 +670,17 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
 
         setLoading(true)
         try {
+            // 모든 데이터 삭제 시 RSVP 페이지도 삭제
+            if (deleteAllData && user.page_id) {
+                const rsvpDeleteResult = await deleteRSVPPage(user.page_id)
+                if (rsvpDeleteResult.success) {
+                    console.log("RSVP page deleted successfully:", user.page_id)
+                } else {
+                    console.warn("RSVP page deletion failed:", rsvpDeleteResult.error)
+                    // RSVP 페이지 삭제 실패해도 사용자 삭제는 계속 진행
+                }
+            }
+
             const result = await deleteUser(user.id, deleteAllData)
 
             if (result.success) {
@@ -740,7 +781,7 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
             !confirm(
                 `만료된 사용자 ${expiredUsers.length}명을 모두 삭제하시겠습니까?\n\n` +
                     `⚠️ 다음 사용자들의 모든 데이터가 삭제됩니다:\n` +
-                    expiredUsers.map((u) => `- ${u.name} (${u.username})`).join("\n") +
+                    expiredUsers.map((u) => `- ${u.name} (${u.username})${u.page_id ? ` - RSVP 페이지 포함` : ""}`).join("\n") +
                     `\n\n이 작업은 되돌릴 수 없습니다.`
             )
         )
@@ -748,6 +789,18 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
 
         setLoading(true)
         try {
+            // RSVP 페이지 삭제 먼저 처리
+            const rsvpDeletePromises = expiredUsers
+                .filter(user => user.page_id)
+                .map(user => deleteRSVPPage(user.page_id!))
+
+            if (rsvpDeletePromises.length > 0) {
+                const rsvpResults = await Promise.all(rsvpDeletePromises)
+                const rsvpSuccessCount = rsvpResults.filter(r => r.success).length
+                console.log(`RSVP pages deleted: ${rsvpSuccessCount}/${rsvpDeletePromises.length}`)
+            }
+
+            // 사용자 삭제 처리
             const deletePromises = expiredUsers.map((user) =>
                 deleteUser(user.id, true)
             )
