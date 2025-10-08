@@ -7,13 +7,13 @@ const supabase = createClient(
     process.env.SUPABASE_SERVICE_KEY
 );
 
-// Cloudflare R2 클라이언트 초기화
-const r2Client = new S3Client({
+// Cloudflare R2 클라이언트 초기화 (RSVP 전용)
+const rsvpR2Client = new S3Client({
     region: 'auto',
-    endpoint: process.env.R2_ENDPOINT,
+    endpoint: process.env.R2_ENDPOINT_RSVP,
     credentials: {
-        accessKeyId: process.env.R2_ACCESS_KEY_ID,
-        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+        accessKeyId: process.env.R2_ACCESS_KEY_ID_RSVP,
+        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY_RSVP,
     },
 });
 
@@ -525,16 +525,16 @@ module.exports = async function handler(req, res) {
             const publicUrl = `https://admin.roarc.kr/rsvp/${pageId}`;
 
             try {
-                // Cloudflare R2에 HTML 파일 업로드
+                // Cloudflare R2에 HTML 파일 업로드 (RSVP 전용 버킷)
                 const uploadCommand = new PutObjectCommand({
-                    Bucket: process.env.R2_BUCKET_NAME,
+                    Bucket: process.env.R2_BUCKET_NAME_RSVP,
                     Key: `rsvp/${pageId}/index.html`,
                     Body: htmlContent,
                     ContentType: 'text/html; charset=utf-8',
                     CacheControl: 'public, max-age=3600', // 1시간 캐시
                 });
 
-                await r2Client.send(uploadCommand);
+                await rsvpR2Client.send(uploadCommand);
 
                 console.log(`RSVP page generated and uploaded for pageId: ${pageId}`);
                 console.log(`Public URL: ${publicUrl}`);
