@@ -10,10 +10,10 @@ const supabase = createClient(
 // Cloudflare R2 클라이언트 초기화 (RSVP 전용)
 const rsvpR2Client = new S3Client({
     region: 'auto',
-    endpoint: process.env.R2_ENDPOINT_RSVP,
+    endpoint: process.env.R2_ENDPOINT_RSVP || process.env.R2_ENDPOINT,
     credentials: {
-        accessKeyId: process.env.R2_ACCESS_KEY_ID_RSVP,
-        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY_RSVP,
+        accessKeyId: process.env.R2_ACCESS_KEY_ID_RSVP || process.env.R2_ACCESS_KEY_ID,
+        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY_RSVP || process.env.R2_SECRET_ACCESS_KEY,
     },
 });
 
@@ -526,8 +526,9 @@ module.exports = async function handler(req, res) {
 
             try {
                 // Cloudflare R2에 HTML 파일 업로드 (RSVP 전용 버킷)
+                const bucketName = process.env.R2_BUCKET_NAME_RSVP || process.env.R2_BUCKET_NAME;
                 const uploadCommand = new PutObjectCommand({
-                    Bucket: process.env.R2_BUCKET_NAME_RSVP,
+                    Bucket: bucketName,
                     Key: `rsvp/${pageId}/index.html`,
                     Body: htmlContent,
                     ContentType: 'text/html; charset=utf-8',
