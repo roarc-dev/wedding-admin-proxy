@@ -1,10 +1,21 @@
 const { createClient } = require('@supabase/supabase-js');
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 
 // Supabase 클라이언트 초기화
 const supabase = createClient(
     process.env.SUPABASE_URL,
     process.env.SUPABASE_SERVICE_KEY
 );
+
+// Cloudflare R2 클라이언트 초기화
+const r2Client = new S3Client({
+    region: 'auto',
+    endpoint: process.env.R2_ENDPOINT,
+    credentials: {
+        accessKeyId: process.env.R2_ACCESS_KEY_ID,
+        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+    },
+});
 
 // RSVP HTML 페이지 생성 함수
 function generateRSVPHTML(pageId) {
@@ -513,16 +524,36 @@ module.exports = async function handler(req, res) {
             const htmlContent = generateRSVPHTML(pageId);
             const publicUrl = `https://mcard.roarc.kr/rsvp/${pageId}`;
 
-            console.log(`RSVP page generated for pageId: ${pageId}`);
-            console.log(`Public URL: ${publicUrl}`);
+            try {
+                // Cloudflare R2에 HTML 파일 업로드
+                const uploadCommand = new PutObjectCommand({
+                    Bucket: process.env.R2_BUCKET_NAME,
+                    Key: `rsvp/${pageId}/index.html`,
+                    Body: htmlContent,
+                    ContentType: 'text/html; charset=utf-8',
+                    CacheControl: 'public, max-age=3600', // 1시간 캐시
+                });
 
-            return res.status(200).json({
-                success: true,
-                message: 'RSVP page generated successfully',
-                url: publicUrl,
-                pageId: pageId,
-                html: htmlContent
-            });
+                await r2Client.send(uploadCommand);
+
+                console.log(`RSVP page generated and uploaded for pageId: ${pageId}`);
+                console.log(`Public URL: ${publicUrl}`);
+
+                return res.status(200).json({
+                    success: true,
+                    message: 'RSVP page generated and uploaded successfully',
+                    url: publicUrl,
+                    pageId: pageId,
+                    html: htmlContent
+                });
+            } catch (uploadError) {
+                console.error('R2 upload error:', uploadError);
+                return res.status(500).json({
+                    success: false,
+                    error: 'RSVP 페이지 업로드 중 오류가 발생했습니다',
+                    details: uploadError.message
+                });
+            }
         }
 
         return res.status(400).json({
