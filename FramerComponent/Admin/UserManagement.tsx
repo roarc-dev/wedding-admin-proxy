@@ -532,7 +532,7 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
     // 사용자 승인 모달 열기
     const handleShowApprovalModal = (user: User) => {
         setApprovingUser(user)
-        setPageIdInput("")
+        setPageIdInput(user.page_id || "")
         setShowApprovalModal(true)
     }
 
@@ -550,26 +550,33 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
 
             if (result.success) {
                 // 승인 시 page_settings에 웨딩 정보 복사
-                if (status === "approved" && pageIdInput && approvingUser) {
-                    const pageSettingsResult = await updatePageSettingsWithWeddingInfo(
-                        pageIdInput,
-                        approvingUser.wedding_date || undefined,
-                        approvingUser.groom_name_en || undefined,
-                        approvingUser.bride_name_en || undefined
-                    )
+                if (status === "approved" && approvingUser) {
+                    // Page ID 우선순위: 입력된 pageIdInput > 사용자의 page_id
+                    const finalPageId = pageIdInput.trim() || approvingUser.page_id
+                    
+                    if (finalPageId) {
+                        const pageSettingsResult = await updatePageSettingsWithWeddingInfo(
+                            finalPageId,
+                            approvingUser.wedding_date || undefined,
+                            approvingUser.groom_name_en || undefined,
+                            approvingUser.bride_name_en || undefined
+                        )
 
-                    if (!pageSettingsResult.success) {
-                        console.warn("Page settings update failed:", pageSettingsResult.error)
-                        // 페이지 설정 업데이트 실패해도 승인은 성공으로 처리
-                    }
+                        if (!pageSettingsResult.success) {
+                            console.warn("Page settings update failed:", pageSettingsResult.error)
+                            // 페이지 설정 업데이트 실패해도 승인은 성공으로 처리
+                        }
 
-                    // RSVP HTML 페이지 생성
-                    const rsvpPageResult = await generateRSVPPage(pageIdInput)
-                    if (rsvpPageResult.success) {
-                        console.log("RSVP page generated successfully:", rsvpPageResult.url)
+                        // RSVP HTML 페이지 생성
+                        const rsvpPageResult = await generateRSVPPage(finalPageId)
+                        if (rsvpPageResult.success) {
+                            console.log("RSVP page generated successfully:", rsvpPageResult.url)
+                        } else {
+                            console.warn("RSVP page generation failed:", rsvpPageResult.error)
+                            // RSVP 페이지 생성 실패해도 승인은 성공으로 처리
+                        }
                     } else {
-                        console.warn("RSVP page generation failed:", rsvpPageResult.error)
-                        // RSVP 페이지 생성 실패해도 승인은 성공으로 처리
+                        console.warn("No page ID available for RSVP page generation")
                     }
                 }
 
@@ -2077,7 +2084,7 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
 
                             <div style={{ marginBottom: "25px" }}>
                                 <InputField
-                                    label="Page ID (선택사항)"
+                                    label="Page ID"
                                     type="text"
                                     value={pageIdInput}
                                     onChange={(value: string) =>
@@ -2091,7 +2098,7 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
                                         margin: "5px 0 0 0",
                                     }}
                                 >
-                                    예: wedding-kim-lee-2024
+                                    회원가입 시 생성된 Page ID가 자동 입력됩니다. 필요시 수정 가능합니다.
                                 </p>
                             </div>
 
