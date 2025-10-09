@@ -588,7 +588,7 @@ async function handleGeneralLogin(req, res, body) {
   try {
     const { data: user, error } = await supabase
       .from('admin_users')
-      .select('id, username, name, password, is_active, approval_status, role, page_id')
+      .select('id, username, name, password, is_active, approval_status, role, page_id, wedding_date')
       .eq('username', username)
       .single()
 
@@ -655,6 +655,8 @@ async function handleGeneralLogin(req, res, body) {
       username: user.username,
       name: user.name,
       role: user.role,
+      page_id: user.page_id,
+      wedding_date: user.wedding_date,
       expires: Date.now() + (24 * 60 * 60 * 1000) // 24시간
     }
 
@@ -668,7 +670,8 @@ async function handleGeneralLogin(req, res, body) {
         username: user.username,
         name: user.name,
         role: user.role,
-        page_id: user.page_id
+        page_id: user.page_id,
+        wedding_date: user.wedding_date
       }
     })
 
