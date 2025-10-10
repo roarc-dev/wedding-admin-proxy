@@ -1,293 +1,54 @@
-import React, {
-    useState,
-    useEffect,
-    useCallback,
-    useRef,
-    SetStateAction,
-} from "react"
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import ReactDOM from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { addPropertyControls, ControlType } from "framer"
 // @ts-ignore
 import typography from "https://cdn.roarc.kr/fonts/typography.js?v=27c65dba30928cbbce6839678016d9ac"
 
-// ======= Focal Point 모달 컴포넌트 =======
-function FocalPointModal({
-    isOpen,
-    imageSrc,
-    currentFocalPoint,
-    onFocalPointComplete,
-    onClose,
-}: {
-    isOpen: boolean
-    imageSrc: string
-    currentFocalPoint: { x: number; y: number }
-    onFocalPointComplete: (focalPoint: { x: number; y: number }) => void
-    onClose: () => void
-}) {
-    const canvasRef = useRef<HTMLCanvasElement>(null)
-    const imageRef = useRef<HTMLImageElement>(null)
-    const [focalPoint, setFocalPoint] = useState(currentFocalPoint)
-    const [imageLoaded, setImageLoaded] = useState(false)
-    const [isDragging, setIsDragging] = useState(false)
+// 연락처용 토글 컴포넌트
+interface ContactToggleProps {
+    isOn: boolean
+    onChange: (isOn: boolean) => void
+}
 
-    // 이미지 로드
-    useEffect(() => {
-        if (!isOpen || !imageSrc) return
-        
-        const img = new Image()
-        img.crossOrigin = 'anonymous'
-        img.onload = () => {
-            if (imageRef.current) {
-                imageRef.current.src = imageSrc
-                setImageLoaded(true)
-            }
-        }
-        img.src = imageSrc
-    }, [isOpen, imageSrc])
-
-    // 캔버스 그리기
-    const drawCanvas = useCallback(() => {
-        const canvas = canvasRef.current
-        const img = imageRef.current
-        if (!canvas || !img || !imageLoaded) return
-
-        const ctx = canvas.getContext('2d')
-        if (!ctx) return
-
-        const rect = canvas.getBoundingClientRect()
-        canvas.width = rect.width
-        canvas.height = rect.height
-
-        // 이미지 비율에 맞게 캔버스에 맞춰 그리기
-        const imageAspect = img.width / img.height
-        const canvasAspect = rect.width / rect.height
-        
-        let drawWidth, drawHeight, drawX, drawY
-        
-        if (imageAspect > canvasAspect) {
-            // 이미지가 더 넓음 - 너비에 맞춤
-            drawWidth = rect.width
-            drawHeight = rect.width / imageAspect
-            drawX = 0
-            drawY = (rect.height - drawHeight) / 2
-        } else {
-            // 이미지가 더 높음 - 높이에 맞춤
-            drawHeight = rect.height
-            drawWidth = rect.height * imageAspect
-            drawX = (rect.width - drawWidth) / 2
-            drawY = 0
-        }
-
-        // 이미지 그리기
-        ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight)
-
-        // Focal Point 표시 (십자 모양)
-        const centerX = focalPoint.x
-        const centerY = focalPoint.y
-        
-        // 십자 선 그리기
-        ctx.strokeStyle = '#ff0000'
-        ctx.lineWidth = 2
-        ctx.beginPath()
-        // 수평선
-        ctx.moveTo(Math.max(0, centerX - 20), centerY)
-        ctx.lineTo(Math.min(rect.width, centerX + 20), centerY)
-        // 수직선
-        ctx.moveTo(centerX, Math.max(0, centerY - 20))
-        ctx.lineTo(centerX, Math.min(rect.height, centerY + 20))
-        ctx.stroke()
-
-        // 중앙점 원 그리기
-        ctx.fillStyle = '#ff0000'
-        ctx.beginPath()
-        ctx.arc(centerX, centerY, 4, 0, 2 * Math.PI)
-        ctx.fill()
-        
-        // 외곽 원 (가시성 향상)
-        ctx.strokeStyle = '#ffffff'
-        ctx.lineWidth = 2
-        ctx.beginPath()
-        ctx.arc(centerX, centerY, 6, 0, 2 * Math.PI)
-        ctx.stroke()
-    }, [focalPoint, imageLoaded])
-
-    useEffect(() => {
-        drawCanvas()
-    }, [drawCanvas])
-
-    // 마우스 이벤트 처리
-    const handleMouseDown = (e: React.MouseEvent) => {
-        const canvas = canvasRef.current
-        if (!canvas) return
-
-        const rect = canvas.getBoundingClientRect()
-        const x = e.clientX - rect.left
-        const y = e.clientY - rect.top
-
-        // Focal Point 주변 영역인지 확인 (20px 반경)
-        const distance = Math.sqrt((x - focalPoint.x) ** 2 + (y - focalPoint.y) ** 2)
-        if (distance <= 20) {
-            setIsDragging(true)
-        }
-    }
-
-    const handleMouseMove = (e: React.MouseEvent) => {
-        if (!isDragging) return
-
-        const canvas = canvasRef.current
-        if (!canvas) return
-
-        const rect = canvas.getBoundingClientRect()
-        const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width))
-        const y = Math.max(0, Math.min(e.clientY - rect.top, rect.height))
-
-        setFocalPoint({ x, y })
-    }
-
-    const handleMouseUp = () => {
-        setIsDragging(false)
-    }
-
-    // Focal Point 적용
-    const handleApply = () => {
-        onFocalPointComplete(focalPoint)
-        onClose()
-    }
-
-    if (!isOpen) return null
-
+const ContactToggleButton: React.FC<ContactToggleProps> = ({
+    isOn,
+    onChange,
+}) => {
     return (
         <div
-            style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                zIndex: 9999,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-            }}
+            style={{ width: "100%", height: "100%", position: "relative" }}
+            onClick={() => onChange(!isOn)}
         >
             <div
                 style={{
-                    backgroundColor: 'white',
-                    borderRadius: '8px',
-                    padding: '20px',
-                    maxWidth: '90vw',
-                    maxHeight: '90vh',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '16px',
+                    width: 22,
+                    height: 13.75,
+                    left: 0,
+                    top: 0,
+                    position: "absolute",
+                    background: isOn ? "#3F3F3F" : "#C3C3C3",
+                    borderRadius: 18,
+                    cursor: "pointer",
+                    transition: "background-color 0.2s ease",
                 }}
-            >
-                <div
-                    style={{
-                        fontSize: '18px',
-                        fontWeight: 'bold',
-                        textAlign: 'center',
-                        marginBottom: '10px',
-                    }}
-                >
-                    Focal Point 설정
-                </div>
-                
-                <div
-                    style={{
-                        fontSize: '14px',
-                        color: '#666',
-                        textAlign: 'center',
-                        marginBottom: '10px',
-                    }}
-                >
-                    이미지에서 중심이 될 지점을 클릭하여 설정하세요
-                </div>
-                
-                <div
-                    style={{
-                        width: '400px',
-                        height: '300px',
-                        position: 'relative',
-                        backgroundColor: '#f0f0f0',
-                        border: '1px solid #ddd',
-                        borderRadius: '4px',
-                    }}
-                >
-                    <canvas
-                        ref={canvasRef}
-                        style={{
-                            width: '100%',
-                            height: '100%',
-                            cursor: isDragging ? 'grabbing' : 'crosshair',
-                        }}
-                        onMouseDown={handleMouseDown}
-                        onMouseMove={handleMouseMove}
-                        onMouseUp={handleMouseUp}
-                        onMouseLeave={handleMouseUp}
-                        onClick={(e) => {
-                            if (!isDragging) {
-                                const canvas = canvasRef.current
-                                if (!canvas) return
-
-                                const rect = canvas.getBoundingClientRect()
-                                const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width))
-                                const y = Math.max(0, Math.min(e.clientY - rect.top, rect.height))
-                                setFocalPoint({ x, y })
-                            }
-                        }}
-                    />
-                    <img
-                        ref={imageRef}
-                        style={{ display: 'none' }}
-                        alt="Focal Point 설정할 이미지"
-                    />
-                </div>
-
-                <div
-                    style={{
-                        display: 'flex',
-                        gap: '10px',
-                        justifyContent: 'center',
-                    }}
-                >
-                    <button
-                        onClick={onClose}
-                        style={{
-                            padding: '10px 20px',
-                            backgroundColor: '#6c757d',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                        }}
-                    >
-                        취소
-                    </button>
-                    <button
-                        onClick={handleApply}
-                        disabled={!imageLoaded}
-                        style={{
-                            padding: '10px 20px',
-                            backgroundColor: !imageLoaded ? '#ccc' : '#007bff',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: !imageLoaded ? 'not-allowed' : 'pointer',
-                        }}
-                    >
-                        적용
-                    </button>
-                </div>
-            </div>
+            />
+            <div
+                style={{
+                    width: 8.25,
+                    height: 8.25,
+                    left: isOn ? 11 : 2.75,
+                    top: 2.75,
+                    position: "absolute",
+                    background: "white",
+                    borderRadius: 9999,
+                    transition: "left 0.2s ease",
+                }}
+            />
         </div>
     )
 }
 
-// ======= Gallery Minis (single-file, inline styles) =======
 // Key generation utilities for R2
 function slugifyName(name: string): string {
     const idx = name.lastIndexOf(".")
@@ -315,7 +76,6 @@ function makeGalleryKey(pageId: string, file: File): string {
     return `${baseFolder}/${pageId}/${Date.now()}-${name}`
 }
 
-// Legacy Supabase transform function (for fallback display only)
 function toTransformedUrl(
     publicUrl: string,
     opts: {
@@ -342,11 +102,6 @@ function toTransformedUrl(
     } catch {
         return publicUrl
     }
-}
-type UiRadioItem = {
-    value: string
-    label: React.ReactNode
-    preview?: React.ReactNode
 }
 function UiRadio({
     checked,
@@ -391,56 +146,6 @@ function UiRadio({
         </div>
     )
 }
-function UiRadioGroup({
-    value,
-    onChange,
-    items,
-    label,
-}: {
-    value: string
-    onChange: (v: string) => void
-    items: UiRadioItem[]
-    label?: React.ReactNode
-}) {
-    return (
-        <div>
-            {label && <Label>{label}</Label>}
-            <Row gap={4} wrap>
-                {items.map((it) => (
-                    <Card
-                        key={String(it.value)}
-                        style={{
-                            padding: theme.space(3),
-                            minWidth: 280,
-                            flex: 1,
-                        }}
-                    >
-                        <Row align="center" gap={2}>
-                            <UiRadio
-                                checked={value === it.value}
-                                onChange={() => onChange(it.value)}
-                            />
-                            <div
-                                style={{
-                                    ...theme.typography.label,
-                                    fontSize: theme.text.sm,
-                                    color: theme.color.text,
-                                }}
-                            >
-                                {it.label}
-                            </div>
-                        </Row>
-                        {it.preview && (
-                            <div style={{ marginTop: theme.space(3) }}>
-                                {it.preview}
-                            </div>
-                        )}
-                    </Card>
-                ))}
-            </Row>
-        </div>
-    )
-}
 function UiGrid({
     children,
     columns = 2,
@@ -455,25 +160,6 @@ function UiGrid({
             }}
         >
             {children}
-        </div>
-    )
-}
-function UiIndexPill({ index }: { index: number }) {
-    return (
-        <div
-            style={{
-                width: 28,
-                height: 28,
-                borderRadius: theme.radius.pill,
-                background: "#fff",
-                border: `1px solid ${theme.color.border}`,
-                display: "grid",
-                placeItems: "center",
-                ...theme.typography.label,
-                fontSize: theme.text.sm,
-            }}
-        >
-            {index}
         </div>
     )
 }
@@ -514,7 +200,6 @@ function UiPhotoTile({
                 })
             }
             // R2 URL인 경우 원본 이미지 사용 (변환 불가)
-            // Note: 큰 이미지의 경우 로딩이 느릴 수 있음
             return src
         } catch {
             // URL 파싱 실패 시 원본 사용
@@ -615,7 +300,6 @@ function UiPhotoTile({
             style={{
                 position: "relative",
                 backgroundColor: "white",
-                // 드롭다운이 타일 밖으로 펼쳐지도록 overflow를 visible로 변경
                 overflow: "visible",
                 flexDirection: "column",
                 justifyContent: "flex-start",
@@ -634,7 +318,9 @@ function UiPhotoTile({
                     alignItems: "flex-start",
                     gap: 10,
                     display: "flex",
+                    cursor: isReplacing ? "not-allowed" : "pointer",
                 }}
+                onClick={!isReplacing ? handleReplaceClick : undefined}
             >
                 {thumbSrc && (
                     <img
@@ -716,28 +402,27 @@ function UiPhotoTile({
                             display: "inline-flex",
                         }}
                     >
-                        <div data-svg-wrapper>
+                        <div
+                            data-svg-wrapper
+                            style={{
+                                width: "28px",
+                                height: "28px",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                opacity: isReplacing ? 0.5 : 1,
+                                pointerEvents: "none", // 클릭 이벤트를 부모로 전달
+                            }}
+                        >
                             <svg
-                                width="28"
-                                height="28"
-                                viewBox="0 0 28 28"
+                                width="24"
+                                height="26"
+                                viewBox="0 0 12 13"
                                 fill="none"
                                 xmlns="http://www.w3.org/2000/svg"
-                                style={{
-                                    cursor: isReplacing
-                                        ? "not-allowed"
-                                        : "pointer",
-                                    opacity: isReplacing ? 0.5 : 1,
-                                }}
-                                onClick={
-                                    !isReplacing
-                                        ? handleReplaceClick
-                                        : undefined
-                                }
                             >
-                                <rect width="28" height="28" fill="#0C0C0F" />
                                 <path
-                                    d="M10.3001 18.7953H7V15.396L15.8939 6.23457C16.0397 6.08438 16.2375 6 16.4438 6C16.65 6 16.8478 6.08438 16.9937 6.23457L19.194 8.50028C19.2663 8.57469 19.3237 8.66305 19.3628 8.76031C19.402 8.85757 19.4221 8.96182 19.4221 9.06711C19.4221 9.17239 19.402 9.27665 19.3628 9.37391C19.3237 9.47117 19.2663 9.55953 19.194 9.63394L10.3001 18.7953ZM7 20.3977H21V22H7V20.3977Z"
+                                    d="M4.414 7.89H3V6.626L6.797 2.672C6.874 6.036 7.03 2.572 7.19 2.572C7.35 2.572 7.506 2.636 7.651 2.672L8.225 3.643C8.257 3.687 8.282 3.737 8.298 3.791C8.315 3.845 8.323 3.901 8.323 3.958C8.323 4.015 8.315 4.071 8.298 4.125C8.282 4.179 8.257 4.229 8.225 4.273L4.414 7.89ZM3 8.74H9V9.5H3V8.74Z"
                                     fill="white"
                                 />
                             </svg>
@@ -752,10 +437,7 @@ function UiPhotoTile({
             <div
                 style={{
                     width: "100%",
-                    paddingLeft: 6,
-                    paddingRight: 6,
-                    paddingTop: 8,
-                    paddingBottom: 8,
+                    padding: 6,
                     flexDirection: "column",
                     justifyContent: "flex-start",
                     alignItems: "flex-start",
@@ -781,7 +463,7 @@ function UiPhotoTile({
                         }}
                     >
                         {name.length > 20
-                            ? `${name.substring(0, 17)}...`
+                            ? `${name.substring(0, 14)}...`
                             : name}
                     </div>
                 </div>
@@ -806,7 +488,6 @@ function UiPhotoTile({
                         <CustomOrderDropdown
                             value={index}
                             onChange={(newPosition) => {
-                                // AdminOld.tsx 방식으로 직접 함수 호출
                                 try {
                                     const moveImageToPosition = (window as any)
                                         .moveImageToPosition
@@ -1005,8 +686,8 @@ const theme: any = {
         radius: 0, // 기존 디자인 유지
     },
     formSpace: {
-        fieldGroupGap: 24, // FormField 묶음 간 간격
-        fieldLabelGap: 8, // 라벨과 입력 사이 간격
+        fieldGroupGap: 6, // FormField 묶음 간 간격
+        fieldLabelGap: 6, // 라벨과 입력 사이 간격
     },
 } as const
 
@@ -1096,20 +777,24 @@ const InputBase = React.forwardRef<HTMLInputElement, InputBaseProps>(
                 ref={ref}
                 {...props}
                 style={{
-                    width: "100%",
-                    height: 40,
-                    padding: "10px 12px",
+                    width: "calc(100% * 1.1429)",
+                    height: "calc(40px * 1.1429)",
+                    padding: "calc(10px * 1.1429) calc(12px * 1.1429)",
+                    paddingLeft: "calc(12px * 0.875)", // scale로 인한 좌측 여백 보정
                     borderStyle: "solid",
                     borderWidth: theme.border.width, // ✅ 1로 통일 (토큰)
                     borderColor: invalid
                         ? theme.color.danger
                         : theme.color.border,
-                    borderRadius: theme.border.radius,
+                    borderRadius: `calc(${theme.border.radius}px * 1.1429)`,
                     outline: "none",
                     background: theme.color.surface,
                     color: theme.color.text,
                     fontFamily: theme.font.body,
-                    fontSize: 14,
+                    fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
+                    transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                    transformOrigin: "left center",
+                    marginBottom: "calc(40px - 40px * 0.875)", // 하단 여백 제거
                     ...style,
                 }}
             />
@@ -1376,6 +1061,7 @@ function Section({
     children,
     style,
     sectionKey,
+    toggleButton,
 }: React.PropsWithChildren<{
     title: string
     right?: React.ReactNode
@@ -1383,24 +1069,10 @@ function Section({
     onToggle?: () => void
     style?: React.CSSProperties
     sectionKey?: string
+    toggleButton?: React.ReactNode
 }>) {
     const headerRef = React.useRef<HTMLDivElement>(null)
-    
-    // 섹션이 열릴 때 스크롤 조정
-    React.useEffect(() => {
-        if (isOpen && sectionKey && headerRef.current) {
-            // 상단 고정 헤더 높이를 고려한 오프셋 (대략 80px)
-            const headerOffset = 80
-            const elementPosition = headerRef.current.getBoundingClientRect().top
-            const offsetPosition = elementPosition + window.pageYOffset - headerOffset
-            
-            window.scrollTo({
-                top: offsetPosition,
-                behavior: 'smooth'
-            })
-        }
-    }, [isOpen, sectionKey])
-    
+
     return (
         <div
             style={mergeStyles({
@@ -1446,48 +1118,60 @@ function Section({
                             fontSize: "16px",
                             fontFamily: theme.font.body,
                             wordWrap: "break-word",
+                            flex: "1 1 0",
                         }}
                     >
                         {title}
                     </div>
 
-                    {/* 토글 버튼 - Roarc 화살표 아이콘 */}
-                    {onToggle && (
-                        <div
-                            style={{
-                                width: "32px",
-                                height: "32px",
-                                padding: "13px 9px",
-                                flexDirection: "column",
-                                justifyContent: "center",
-                                alignItems: "center",
-                                gap: "10px",
-                                display: "inline-flex",
-                            }}
-                        >
-                            {/* 화살표 아이콘 - SVG */}
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="14"
-                                height="8"
-                                viewBox="0 0 14 8"
-                                fill="none"
+                    {/* 우측 영역 - 토글 버튼과 화살표 */}
+                    <div
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "12px",
+                        }}
+                    >
+                        {/* 토글 버튼 */}
+                        {toggleButton && (
+                            <div style={{ flexShrink: 0 }}>{toggleButton}</div>
+                        )}
+
+                        {/* 토글 버튼 - Roarc 화살표 아이콘 */}
+                        {onToggle && (
+                            <div
                                 style={{
-                                    transform: `rotate(${isOpen ? 0 : 180}deg)`,
-                                    transition: "transform 0.2s ease",
+                                    width: "32px",
+                                    height: "32px",
+                                    display: "flex",
+                                    justifyContent: "center",
+                                    alignItems: "center",
                                 }}
                             >
-                                <path
-                                    d="M13 1.25L7 6.75L1 1.25"
-                                    stroke="#757575"
-                                    strokeWidth="1.5"
-                                />
-                            </svg>
-                        </div>
-                    )}
+                                {/* 화살표 아이콘 - SVG */}
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="18"
+                                    height="9"
+                                    viewBox="0 0 24 12"
+                                    fill="none"
+                                    style={{
+                                        transform: `rotate(${isOpen ? 0 : 180}deg)`,
+                                        transformOrigin: "center",
+                                    }}
+                                >
+                                    <path
+                                        d="M22 2L12 10L2 2"
+                                        stroke="#757575"
+                                        strokeWidth="2"
+                                    />
+                                </svg>
+                            </div>
+                        )}
 
-                    {/* 우측 추가 요소 */}
-                    {right && <div style={{ marginLeft: "auto" }}>{right}</div>}
+                        {/* 우측 추가 요소 */}
+                        {right && <div>{right}</div>}
+                    </div>
                 </div>
             </div>
 
@@ -1502,6 +1186,50 @@ function Section({
                     {children}
                 </div>
             )}
+        </div>
+    )
+}
+
+// Toggle Button Component
+function ToggleButton({
+    isOn,
+    onToggle,
+    disabled = false,
+}: {
+    isOn: boolean
+    onToggle: () => void
+    disabled?: boolean
+}) {
+    return (
+        <div
+            style={{
+                width: 32,
+                height: 20,
+                position: "relative",
+                background: disabled ? "#c3c3c3" : isOn ? "#3F3F3F" : "#c3c3c3",
+                borderRadius: 18,
+                cursor: disabled ? "not-allowed" : "pointer",
+                transition: "background-color 0.2s ease",
+            }}
+            onClick={(e) => {
+                e.stopPropagation() // 이벤트 버블링 방지
+                if (!disabled) {
+                    onToggle()
+                }
+            }}
+        >
+            <div
+                style={{
+                    width: 12,
+                    height: 12,
+                    left: isOn ? 16 : 4,
+                    top: 4,
+                    position: "absolute",
+                    background: "white",
+                    borderRadius: 9999,
+                    transition: "left 0.2s ease",
+                }}
+            />
         </div>
     )
 }
@@ -1596,7 +1324,52 @@ function SaveBar({
     )
 }
 
-// ======= Field / Select / Switch Primitives (Single-file, inline styles) =======
+// Transport 스타일의 공용 섹션 저장 버튼
+function SaveSectionButton({
+    onSave,
+    saving,
+    label = "저장",
+}: {
+    onSave: () => Promise<void> | void
+    saving?: boolean
+    label?: string
+}) {
+    const [internalSaving, setInternalSaving] = useState(false)
+    const isSaving = saving || internalSaving
+
+    const handleSave = async () => {
+        setInternalSaving(true)
+        try {
+            await onSave()
+        } finally {
+            setInternalSaving(false)
+        }
+    }
+
+    return (
+        <button
+            onClick={handleSave}
+            disabled={isSaving}
+            style={{
+                width: "100%",
+                height: 44,
+                background: isSaving ? "#9ca3af" : "#111827",
+                color: "white",
+                border: "none",
+                borderRadius: 2,
+                fontSize: 14,
+                ...theme.font.bodyBold,
+                cursor: isSaving ? "not-allowed" : "pointer",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+            }}
+        >
+            {isSaving ? "저장 중..." : label}
+        </button>
+    )
+}
+
 type FieldProps = {
     label?: React.ReactNode
     hint?: React.ReactNode
@@ -1851,15 +1624,23 @@ function AccordionSection({
     isOpen,
     onToggle,
     children,
+    toggleButton,
 }: {
     title: string
     sectionKey: string
     isOpen: boolean
     onToggle: () => void
     children: React.ReactNode
+    toggleButton?: React.ReactNode
 }) {
     return (
-        <Section title={title} isOpen={isOpen} onToggle={onToggle} sectionKey={sectionKey}>
+        <Section
+            title={title}
+            isOpen={isOpen}
+            onToggle={onToggle}
+            sectionKey={sectionKey}
+            toggleButton={toggleButton}
+        >
             {children}
         </Section>
     )
@@ -2299,48 +2080,66 @@ function InlineCalendarPreview({
                                     <>
                                         {isHighlighted(d) &&
                                             (highlightShape === "heart" ? (
-                                                <svg
-                                                    xmlns="http://www.w3.org/2000/svg"
-                                                    width={theme.space(6)}
-                                                    height={theme.space(5.25)}
-                                                    viewBox="0 0 16 14"
-                                                    fill="none"
+                                                <motion.div
                                                     style={{
                                                         position: "absolute",
-                                                        top: "50%",
-                                                        left: "50%",
-                                                        transform:
-                                                            "translate(-50%, -40%)",
                                                         zIndex: 0,
                                                     }}
+                                                    animate={{
+                                                        scale: [1, 1.2, 1],
+                                                        opacity: [1, 0.8, 1],
+                                                    }}
+                                                    transition={{
+                                                        duration: 2,
+                                                        repeat: Infinity,
+                                                        ease: "easeInOut",
+                                                    }}
                                                 >
-                                                    <g clipPath="url(#clip0_calendar_preview)">
-                                                        <g
-                                                            style={{
-                                                                mixBlendMode:
-                                                                    "multiply" as const,
-                                                            }}
-                                                        >
-                                                            <path
-                                                                d="M8.21957 1.47997C8.08957 1.59997 7.99957 1.73997 7.87957 1.85997C7.75957 1.73997 7.66957 1.59997 7.53957 1.47997C3.08957 -2.76003 -2.51043 2.94997 1.21957 7.84997C2.91957 10.08 5.58957 11.84 7.86957 13.43C10.1596 11.83 12.8196 10.08 14.5196 7.84997C18.2596 2.94997 12.6596 -2.76003 8.19957 1.47997H8.21957Z"
-                                                                fill={
-                                                                    highlightColor
-                                                                }
-                                                            />
+                                                    <svg
+                                                        xmlns="http://www.w3.org/2000/svg"
+                                                        width={theme.space(6)}
+                                                        height={theme.space(
+                                                            5.25
+                                                        )}
+                                                        viewBox="0 0 16 14"
+                                                        fill="none"
+                                                        style={{
+                                                            position:
+                                                                "absolute",
+                                                            top: "50%",
+                                                            left: "50%",
+                                                            transform:
+                                                                "translate(-50%, -40%)",
+                                                        }}
+                                                    >
+                                                        <g clipPath="url(#clip0_calendar_preview)">
+                                                            <g
+                                                                style={{
+                                                                    mixBlendMode:
+                                                                        "multiply" as const,
+                                                                }}
+                                                            >
+                                                                <path
+                                                                    d="M8.21957 1.47997C8.08957 1.59997 7.99957 1.73997 7.87957 1.85997C7.75957 1.73997 7.66957 1.59997 7.53957 1.47997C3.08957 -2.76003 -2.51043 2.94997 1.21957 7.84997C2.91957 10.08 5.58957 11.84 7.86957 13.43C10.1596 11.83 12.8196 10.08 14.5196 7.84997C18.2596 2.94997 12.6596 -2.76003 8.19957 1.47997H8.21957Z"
+                                                                    fill={
+                                                                        highlightColor
+                                                                    }
+                                                                />
+                                                            </g>
                                                         </g>
-                                                    </g>
-                                                    <defs>
-                                                        <clipPath id="clip0_calendar_preview">
-                                                            <rect
-                                                                width="15.76"
-                                                                height="13.44"
-                                                                fill="white"
-                                                            />
-                                                        </clipPath>
-                                                    </defs>
-                                                </svg>
+                                                        <defs>
+                                                            <clipPath id="clip0_calendar_preview">
+                                                                <rect
+                                                                    width="15.76"
+                                                                    height="13.44"
+                                                                    fill="white"
+                                                                />
+                                                            </clipPath>
+                                                        </defs>
+                                                    </svg>
+                                                </motion.div>
                                             ) : (
-                                                <div
+                                                <motion.div
                                                     style={{
                                                         position: "absolute",
                                                         width: 31,
@@ -2349,6 +2148,15 @@ function InlineCalendarPreview({
                                                         backgroundColor:
                                                             highlightColor,
                                                         zIndex: 0,
+                                                    }}
+                                                    animate={{
+                                                        scale: [1, 1.2, 1],
+                                                        opacity: [1, 0.8, 1],
+                                                    }}
+                                                    transition={{
+                                                        duration: 2,
+                                                        repeat: Infinity,
+                                                        ease: "easeInOut",
                                                     }}
                                                 />
                                             ))}
@@ -2524,19 +2332,30 @@ async function authenticateAdmin(
     }
 }
 
-function generateSessionToken(user: { id: string; username: string }): string {
+function generateSessionToken(user: {
+    id: string
+    username: string
+    page_id?: string
+    wedding_date?: string
+}): string {
     return btoa(
         JSON.stringify({
             userId: user.id,
             username: user.username,
+            page_id: user.page_id,
+            wedding_date: user.wedding_date,
             expires: Date.now() + 24 * 60 * 60 * 1000,
         })
     )
 }
 
-function validateSessionToken(
-    token: string
-): { userId: string; username: string; expires: number } | null {
+function validateSessionToken(token: string): {
+    userId: string
+    username: string
+    expires: number
+    page_id?: string
+    wedding_date?: string
+} | null {
     try {
         const data = JSON.parse(atob(token))
         return Date.now() < data.expires ? data : null
@@ -2709,6 +2528,17 @@ interface PageInfo {
     page_id: string
     image_count: number
 }
+
+// 날짜 포맷 변환 함수 (YYYY-MM-DD -> YYMMDD)
+function formatDateForUrl(dateStr: string): string {
+    if (!dateStr) return ""
+    const parts = dateStr.split("-")
+    if (parts.length !== 3) return ""
+    const year = parts[0].slice(-2) // 뒤 2자리
+    const month = parts[1].padStart(2, "0")
+    const day = parts[2].padStart(2, "0")
+    return `${year}${month}${day}`
+}
 interface ImageInfo {
     id: string
     filename: string
@@ -2724,26 +2554,32 @@ interface ContactInfo {
     groom_phone: string
     groom_account: string
     groom_bank: string
+    groom_bank_name: string
     groom_father_name: string
     groom_father_phone: string
     groom_father_account: string
     groom_father_bank: string
+    groom_father_bank_name: string
     groom_mother_name: string
     groom_mother_phone: string
     groom_mother_account: string
     groom_mother_bank: string
+    groom_mother_bank_name: string
     bride_name: string
     bride_phone: string
     bride_account: string
     bride_bank: string
+    bride_bank_name: string
     bride_father_name: string
     bride_father_phone: string
     bride_father_account: string
     bride_father_bank: string
+    bride_father_bank_name: string
     bride_mother_name: string
     bride_mother_phone: string
     bride_mother_account: string
     bride_mother_bank: string
+    bride_mother_bank_name: string
     created_at?: string
     updated_at?: string
 }
@@ -3191,9 +3027,13 @@ const createInitialPageSettings = () => ({
     groomName: "",
     groom_name_kr: "",
     groom_name_en: "",
+    last_groom_name_kr: "",
+    last_groom_name_en: "",
     brideName: "",
     bride_name_kr: "",
     bride_name_en: "",
+    last_bride_name_kr: "",
+    last_bride_name_en: "",
     wedding_date: "",
     wedding_hour: "14",
     wedding_minute: "00",
@@ -3203,13 +3043,15 @@ const createInitialPageSettings = () => ({
     photo_section_image_path: "",
     photo_section_location: "",
     photo_section_overlay_position: "bottom",
-    photo_section_focal_point: { x: 0.5, y: 0.5 },
     photo_section_overlay_color: "#ffffff",
     photo_section_locale: "en",
     highlight_shape: "circle",
     highlight_color: "#e0e0e0",
     highlight_text_color: "black",
     gallery_type: "thumbnail",
+    info: "off",
+    account: "off",
+    bgm: "off",
     rsvp: "off",
     comments: "off",
     kko_img: "",
@@ -3218,13 +3060,23 @@ const createInitialPageSettings = () => ({
     bgm_url: "",
     bgm_type: "",
     bgm_autoplay: false,
+    bgm_vol: 3,
+    type: "papillon",
 })
 
 type PageSettingsState = ReturnType<typeof createInitialPageSettings>
 
 // 메인 Admin 컴포넌트 (내부 로직)
 function AdminMainContent(props: any) {
-    const { maxSizeKB = 1024, style, updateSaveState } = props
+    const {
+        maxSizeKB = 1024,
+        style,
+        updateSaveState,
+        showCopyPopup,
+        setShowCopyPopup,
+        currentUser,
+        setCurrentUser,
+    } = props
 
     // 갤러리 저장 액션바를 위한 지역 변수 선언
     let currentHasUnsavedChanges = false
@@ -3290,7 +3142,6 @@ function AdminMainContent(props: any) {
 
     // 공통 상태
     const [isAuthenticated, setIsAuthenticated] = useState(false)
-    const [currentUser, setCurrentUser] = useState<any>(null)
     const [loginForm, setLoginForm] = useState({ username: "", password: "" })
     const [loginError, setLoginError] = useState("")
     const [isLoggingIn, setIsLoggingIn] = useState(false)
@@ -3429,14 +3280,13 @@ function AdminMainContent(props: any) {
                     text ||
                     "초대장 저장 실패"
                 const code = result?.code ? ` (code: ${result.code})` : ""
-                setError(`청첩장 저장 중 오류: ${msg}${code}`)
+                console.error(`청첩장 저장 중 오류: ${msg}${code}`)
             } else {
-                setSuccess("청첩장 정보가 저장되었습니다.")
                 // 저장 후 재로드로 동기화
                 await loadInviteData()
             }
         } catch (_e) {
-            setError("청첩장 저장 중 오류가 발생했습니다.")
+            console.error("청첩장 저장 중 오류가 발생했습니다.")
         } finally {
             setInviteSaving(false)
         }
@@ -3453,14 +3303,128 @@ function AdminMainContent(props: any) {
         null
     )
     const [isEditingContact, setIsEditingContact] = useState(false)
+
+    // 연락처 섹션 토글 상태
+    const [contactToggles, setContactToggles] = useState({
+        groom: true,
+        groomFather: true,
+        groomMother: true,
+        bride: true,
+        brideFather: true,
+        brideMother: true,
+    })
+
+    // 계좌 안내 섹션 토글 상태
+    const [accountToggles, setAccountToggles] = useState({
+        groom: true,
+        groomFather: true,
+        groomMother: true,
+        bride: true,
+        brideFather: true,
+        brideMother: true,
+    })
+
+    // 연락처 토글 핸들러 함수
+    const handleContactToggleChange = (
+        section: keyof typeof contactToggles,
+        isOn: boolean
+    ): void => {
+        setContactToggles((prev) => ({ ...prev, [section]: isOn }))
+
+        // 토글이 꺼지면 해당 섹션의 데이터 삭제
+        if (!isOn && selectedContact) {
+            const fieldsToClear: { [key: string]: string } = {}
+
+            switch (section) {
+                case "groom":
+                    fieldsToClear.groom_name = ""
+                    fieldsToClear.groom_phone = ""
+                    break
+                case "groomFather":
+                    fieldsToClear.groom_father_name = ""
+                    fieldsToClear.groom_father_phone = ""
+                    break
+                case "groomMother":
+                    fieldsToClear.groom_mother_name = ""
+                    fieldsToClear.groom_mother_phone = ""
+                    break
+                case "bride":
+                    fieldsToClear.bride_name = ""
+                    fieldsToClear.bride_phone = ""
+                    break
+                case "brideFather":
+                    fieldsToClear.bride_father_name = ""
+                    fieldsToClear.bride_father_phone = ""
+                    break
+                case "brideMother":
+                    fieldsToClear.bride_mother_name = ""
+                    fieldsToClear.bride_mother_phone = ""
+                    break
+            }
+
+            setSelectedContact((prev) =>
+                prev ? { ...prev, ...fieldsToClear } : null
+            )
+        }
+    }
+
+    // 계좌 안내 토글 핸들러 함수
+    const handleAccountToggleChange = (
+        section: keyof typeof accountToggles,
+        isOn: boolean
+    ): void => {
+        setAccountToggles((prev) => ({ ...prev, [section]: isOn }))
+
+        // 토글이 꺼지면 해당 섹션의 계좌 데이터 삭제
+        if (!isOn && selectedContact) {
+            const fieldsToClear: { [key: string]: string } = {}
+
+            switch (section) {
+                case "groom":
+                    fieldsToClear.groom_name = ""
+                    fieldsToClear.groom_bank = ""
+                    fieldsToClear.groom_account = ""
+                    break
+                case "groomFather":
+                    fieldsToClear.groom_father_name = ""
+                    fieldsToClear.groom_father_bank = ""
+                    fieldsToClear.groom_father_account = ""
+                    break
+                case "groomMother":
+                    fieldsToClear.groom_mother_name = ""
+                    fieldsToClear.groom_mother_bank = ""
+                    fieldsToClear.groom_mother_account = ""
+                    break
+                case "bride":
+                    fieldsToClear.bride_name = ""
+                    fieldsToClear.bride_bank = ""
+                    fieldsToClear.bride_account = ""
+                    break
+                case "brideFather":
+                    fieldsToClear.bride_father_name = ""
+                    fieldsToClear.bride_father_bank = ""
+                    fieldsToClear.bride_father_account = ""
+                    break
+                case "brideMother":
+                    fieldsToClear.bride_mother_name = ""
+                    fieldsToClear.bride_mother_bank = ""
+                    fieldsToClear.bride_mother_account = ""
+                    break
+            }
+
+            setSelectedContact((prev) =>
+                prev ? { ...prev, ...fieldsToClear } : null
+            )
+        }
+    }
     const [loading, setLoading] = useState(false)
-    const [error, setError] = useState<string | null>(null)
-    const [success, setSuccess] = useState<string | null>(null)
 
     // 페이지 설정 관련 상태
     const [pageSettings, setPageSettings] = useState<PageSettingsState>(
         createInitialPageSettings
     )
+    const [originalPageSettings, setOriginalPageSettings] =
+        useState<PageSettingsState>(createInitialPageSettings)
     const [settingsLoading, setSettingsLoading] = useState(false)
     const [hasLoadedSettings, setHasLoadedSettings] = useState(false)
     const [compressProgress, setCompressProgress] = useState<number | null>(
@@ -3469,9 +3433,14 @@ function AdminMainContent(props: any) {
     const audioRef = React.useRef<HTMLAudioElement | null>(null)
     const [selectedBgmId, setSelectedBgmId] = useState<string | null>(null)
     const [playingBgmId, setPlayingBgmId] = useState<string | null>(null)
+    const [previewBgmId, setPreviewBgmId] = useState<string | null>(null) // 미리듣기용 상태
+    const [uploadedFileName, setUploadedFileName] = useState<string | null>(
+        null
+    ) // 업로드된 파일명
     const kakaoImageInputRef = useRef<HTMLInputElement | null>(null)
     const [kakaoUploadLoading, setKakaoUploadLoading] = useState(false)
     const [kkoDefaultsApplied, setKkoDefaultsApplied] = useState(false)
+    const addressLayerCleanupRef = React.useRef<(() => void) | null>(null)
 
     React.useEffect(() => {
         const match = FREE_BGM_LIST.find((b) => b.url === pageSettings.bgm_url)
@@ -3492,6 +3461,14 @@ function AdminMainContent(props: any) {
         setKkoDefaultsApplied(false)
         setHasLoadedSettings(false)
     }, [currentPageId])
+    React.useEffect(() => {
+        return () => {
+            if (typeof window !== "undefined") {
+                addressLayerCleanupRef.current?.()
+                addressLayerCleanupRef.current = null
+            }
+        }
+    }, [])
     // 미리보기용 포맷터 및 프롭 빌더
     const formatPhotoDisplayDateTime = (): string => {
         const locale =
@@ -3549,11 +3526,6 @@ function AdminMainContent(props: any) {
     >(null)
     const [photoSectionImageVersion, setPhotoSectionImageVersion] =
         React.useState<number>(0)
-    
-    // Focal Point 관련 상태
-    const [focalPointModalOpen, setFocalPointModalOpen] = useState(false)
-    const [focalPointImageSrc, setFocalPointImageSrc] = useState<string>("")
-    const [focalPoint, setFocalPoint] = useState({ x: 0.5, y: 0.5 }) // 정규화된 좌표 (0-1)
 
     const addPhotoVersionParam = (url?: string): string | undefined => {
         if (!url) return url
@@ -3571,11 +3543,36 @@ function AdminMainContent(props: any) {
             derivedPublicUrl ||
             pageSettings.photo_section_image_url ||
             constructedUrl
+
         // objectURL 최우선, 그 다음 파생 URL, 그 외는 버전 파라미터 부여
         if (photoSectionPreviewUrl) return photoSectionPreviewUrl
         if (derivedPublicUrl) return derivedPublicUrl
         return addPhotoVersionParam(serverUrl)
     }
+
+    // 갤러리 방식과 동일한 썸네일 최적화
+    const photoSectionThumbSrc = React.useMemo(() => {
+        const src = getPhotoSectionDisplayUrl()
+        if (!src) return src
+
+        try {
+            const u = new URL(src)
+            // Supabase URL인 경우 썸네일 변환 시도
+            if (u.pathname.includes("/storage/v1/object/public/")) {
+                return toTransformedUrl(src, {
+                    width: 160,
+                    quality: 75,
+                    format: "jpg",
+                    resize: "cover",
+                })
+            }
+            // R2 URL인 경우 원본 이미지 사용 (변환 불가)
+            return src
+        } catch {
+            // URL 파싱 실패 시 원본 사용
+            return src
+        }
+    }, [getPhotoSectionDisplayUrl])
 
     const buildPhotoSectionProps = () => {
         return {
@@ -3593,7 +3590,7 @@ function AdminMainContent(props: any) {
         }
     }
 
-    const getKakaoShareNames = () => {
+    const getKakaoShareNames = useCallback(() => {
         const groom =
             pageSettings.groom_name_kr ||
             pageSettings.groomName ||
@@ -3605,15 +3602,22 @@ function AdminMainContent(props: any) {
             inviteData.brideName ||
             ""
         return { groom, bride }
-    }
+    }, [
+        pageSettings.groom_name_kr,
+        pageSettings.groomName,
+        pageSettings.bride_name_kr,
+        pageSettings.brideName,
+        inviteData.groomName,
+        inviteData.brideName,
+    ])
 
-    const buildKakaoDefaultTitle = () => {
+    const buildKakaoDefaultTitle = useCallback(() => {
         const { groom, bride } = getKakaoShareNames()
         if (!groom || !bride) return ""
         return `${groom} ♥ ${bride} 결혼합니다`
-    }
+    }, [getKakaoShareNames])
 
-    const buildKakaoDefaultDate = () => {
+    const buildKakaoDefaultDate = useCallback(() => {
         const dateStr = pageSettings.wedding_date
         if (!dateStr) return ""
         const parts = dateStr.split("-")
@@ -3641,7 +3645,11 @@ function AdminMainContent(props: any) {
 
         const timeText = hourText ? ` ${hourText}${minuteText}` : ""
         return `${year}년 ${month}월 ${day}일${timeText}`.trim()
-    }
+    }, [
+        pageSettings.wedding_date,
+        pageSettings.wedding_hour,
+        pageSettings.wedding_minute,
+    ])
 
     useEffect(() => {
         if (!currentPageId || kkoDefaultsApplied || !hasLoadedSettings) return
@@ -3873,6 +3881,147 @@ function AdminMainContent(props: any) {
 
     const dotNeededLocal = (a?: string, b?: string) => !!(a && b)
 
+    const formatDateForUrl = (dateString: string) => {
+        const date = new Date(dateString)
+        const year = String(date.getFullYear()).slice(-2) // 뒤 2자리만 (2025 -> 25)
+        const month = String(date.getMonth() + 1).padStart(2, "0")
+        const day = String(date.getDate()).padStart(2, "0")
+        return `${year}${month}${day}`
+    }
+
+    const handleCopyLink = async () => {
+        if (currentUser?.wedding_date && currentUser?.page_id) {
+            const formattedDate = formatDateForUrl(currentUser.wedding_date)
+            const invitationUrl = `https://mcard.roarc.kr/${formattedDate}/${currentUser.page_id}`
+
+            try {
+                await navigator.clipboard.writeText(invitationUrl)
+                setShowCopyPopup(true)
+                setTimeout(() => {
+                    setShowCopyPopup(false)
+                }, 2000)
+            } catch (error) {
+                console.error("클립보드 복사 실패:", error)
+                // 폴백: 텍스트 영역을 사용한 복사
+                const textArea = document.createElement("textarea")
+                textArea.value = invitationUrl
+                document.body.appendChild(textArea)
+                textArea.select()
+                document.execCommand("copy")
+                document.body.removeChild(textArea)
+
+                setShowCopyPopup(true)
+                setTimeout(() => {
+                    setShowCopyPopup(false)
+                }, 2000)
+            }
+        } else {
+            alert(
+                "사용자 정보가 불완전합니다. wedding_date와 page_id가 필요합니다."
+            )
+        }
+    }
+
+    // 섹션별 저장 함수들
+    const saveNameSection = async () => {
+        await savePageSettings({
+            groomName: pageSettings.groomName,
+            groom_name_kr: pageSettings.groom_name_kr,
+            groom_name_en: pageSettings.groom_name_en,
+            brideName: pageSettings.brideName,
+            bride_name_kr: pageSettings.bride_name_kr,
+            bride_name_en: pageSettings.bride_name_en,
+        })
+    }
+
+    const savePhotoSection = async () => {
+        await savePageSettings({
+            photo_section_image_path: pageSettings.photo_section_image_path,
+            photo_section_image_url: pageSettings.photo_section_image_url,
+            wedding_date: pageSettings.wedding_date,
+            wedding_hour: pageSettings.wedding_hour,
+            wedding_minute: pageSettings.wedding_minute,
+            venue_name: pageSettings.venue_name,
+            venue_address: pageSettings.venue_address,
+            photo_section_overlay_position:
+                pageSettings.photo_section_overlay_position,
+            photo_section_overlay_color:
+                pageSettings.photo_section_overlay_color,
+            photo_section_locale: pageSettings.photo_section_locale,
+            highlight_shape: pageSettings.highlight_shape,
+            highlight_color: pageSettings.highlight_color,
+            highlight_text_color: pageSettings.highlight_text_color,
+        })
+    }
+
+    const saveInviteSection = async () => {
+        await saveInviteData()
+    }
+
+    const saveTransportSection = async () => {
+        await savePageSettings({
+            venue_name: pageSettings.venue_name,
+            venue_address: pageSettings.venue_address,
+        })
+    }
+
+    const saveCalendarSection = async () => {
+        await savePageSettings({
+            wedding_date: pageSettings.wedding_date,
+            wedding_hour: pageSettings.wedding_hour,
+            wedding_minute: pageSettings.wedding_minute,
+            highlight_shape: pageSettings.highlight_shape,
+            highlight_color: pageSettings.highlight_color,
+            highlight_text_color: pageSettings.highlight_text_color,
+        })
+    }
+
+    const saveContactsSection = async () => {
+        await handleSaveContactInline()
+    }
+
+    const saveAccountSection = async () => {
+        await handleSaveContactInline()
+    }
+
+    const saveBgmSection = async () => {
+        await savePageSettings({
+            bgm_url: pageSettings.bgm_url,
+            bgm_type: pageSettings.bgm_type,
+            bgm_autoplay: pageSettings.bgm_autoplay,
+        })
+    }
+
+    const saveRsvpSection = async () => {
+        await savePageSettings({
+            rsvp: pageSettings.rsvp,
+        })
+    }
+
+    const saveCommentsSection = async () => {
+        await savePageSettings({
+            comments: pageSettings.comments,
+        })
+    }
+
+    const saveKakaoShareSection = async () => {
+        await savePageSettings({
+            kko_img: pageSettings.kko_img,
+            kko_title: pageSettings.kko_title,
+            kko_date: pageSettings.kko_date,
+        })
+    }
+
+    const saveInfoSection = async () => {
+        // 안내사항 섹션은 별도 API를 사용하므로 InfoTab의 save 함수를 호출
+        // 이 함수는 InfoTab 컴포넌트 내부에서 정의되어야 함
+    }
+
+    const saveTransportSectionInfo = async () => {
+        // 교통안내 섹션은 별도 API를 사용하므로 TransportTab의 save 함수를 호출
+        // 이 함수는 TransportTab 컴포넌트 내부에서 정의되어야 함
+    }
+
     // 아코디언 토글 함수 (한 번에 하나의 섹션만 열림)
     const toggleSection = async (sectionName: string) => {
         // 현재 열려있는 섹션이 있다면 데이터를 저장
@@ -3884,12 +4033,10 @@ function AdminMainContent(props: any) {
                         // 성함 섹션 저장 (페이지 설정 저장)
                         await savePageSettings({
                             groomName: pageSettings.groomName,
-                            groom_name_kr: pageSettings.groom_name_kr,
                             groom_name_en: pageSettings.groom_name_en,
                             brideName: pageSettings.brideName,
-                            bride_name_kr: pageSettings.bride_name_kr,
                             bride_name_en: pageSettings.bride_name_en,
-                        })
+                        }, { silent: false })
                         break
                     case "photo":
                         // 메인 사진 섹션 저장 (페이지 설정 저장)
@@ -3913,7 +4060,7 @@ function AdminMainContent(props: any) {
                             highlight_color: pageSettings.highlight_color,
                             highlight_text_color:
                                 pageSettings.highlight_text_color,
-                        })
+                        }, { silent: false })
                         break
                     case "invite":
                         // 초대글 섹션 저장
@@ -3924,7 +4071,7 @@ function AdminMainContent(props: any) {
                         await savePageSettings({
                             venue_name: pageSettings.venue_name,
                             venue_address: pageSettings.venue_address,
-                        })
+                        }, { silent: false })
                         break
                     case "calendar":
                         // 캘린더 섹션 저장 (페이지 설정 저장)
@@ -3936,15 +4083,52 @@ function AdminMainContent(props: any) {
                             highlight_color: pageSettings.highlight_color,
                             highlight_text_color:
                                 pageSettings.highlight_text_color,
-                        })
+                        }, { silent: false })
                         break
                     case "contacts":
                         // 연락처 섹션 저장
                         await handleSaveContactInline()
                         break
                     case "account":
-                        // 계좌안내 섹션 저장
-                        await handleSaveContactInline()
+                        // 계좌안내 섹션 저장 (계좌 정보만)
+                        const accountData = {
+                            page_id: currentPageId,
+                            groom_account: selectedContact?.groom_account || "",
+                            groom_bank: selectedContact?.groom_bank || "",
+                            groom_bank_name: selectedContact?.groom_bank_name || "",
+                            groom_father_account: selectedContact?.groom_father_account || "",
+                            groom_father_bank: selectedContact?.groom_father_bank || "",
+                            groom_father_bank_name: selectedContact?.groom_father_bank_name || "",
+                            groom_mother_account: selectedContact?.groom_mother_account || "",
+                            groom_mother_bank: selectedContact?.groom_mother_bank || "",
+                            groom_mother_bank_name: selectedContact?.groom_mother_bank_name || "",
+                            bride_account: selectedContact?.bride_account || "",
+                            bride_bank: selectedContact?.bride_bank || "",
+                            bride_bank_name: selectedContact?.bride_bank_name || "",
+                            bride_father_account: selectedContact?.bride_father_account || "",
+                            bride_father_bank: selectedContact?.bride_father_bank || "",
+                            bride_father_bank_name: selectedContact?.bride_father_bank_name || "",
+                            bride_mother_account: selectedContact?.bride_mother_account || "",
+                            bride_mother_bank: selectedContact?.bride_mother_bank || "",
+                            bride_mother_bank_name: selectedContact?.bride_mother_bank_name || "",
+                        }
+                        const result = await saveContact(accountData)
+                        if (result.success) {
+                            const saved = result.data
+                            setSelectedContact(saved)
+                            setContactList((prev) => {
+                                const others = prev.filter(
+                                    (c) => c.page_id !== currentPageId
+                                )
+                                return [...others, saved]
+                            })
+                        }
+                        break
+                    case "info":
+                        // 안내 사항 섹션 저장
+                        await savePageSettings({
+                            info: pageSettings.info,
+                        }, { silent: false })
                         break
                     case "bgm":
                         // 배경음악 섹션 저장
@@ -3952,19 +4136,19 @@ function AdminMainContent(props: any) {
                             bgm_url: pageSettings.bgm_url,
                             bgm_type: pageSettings.bgm_type,
                             bgm_autoplay: pageSettings.bgm_autoplay,
-                        })
+                        }, { silent: false })
                         break
                     case "rsvp":
                         // RSVP 섹션 저장
                         await savePageSettings({
                             rsvp: pageSettings.rsvp,
-                        })
+                        }, { silent: false })
                         break
                     case "comments":
                         // 방명록 섹션 저장
                         await savePageSettings({
                             comments: pageSettings.comments,
-                        })
+                        }, { silent: false })
                         break
                     case "kakaoShare":
                         // 카카오톡 공유 섹션 저장
@@ -3972,15 +4156,13 @@ function AdminMainContent(props: any) {
                             kko_img: pageSettings.kko_img,
                             kko_title: pageSettings.kko_title,
                             kko_date: pageSettings.kko_date,
-                        })
+                        }, { silent: false })
                         break
                 }
             } catch (error) {
                 console.error(`섹션 ${currentOpenSection} 저장 실패:`, error)
-                // 저장 실패 시에도 섹션을 변경 (사용자에게 알림)
-                alert(
-                    `이전 섹션(${currentOpenSection}) 저장에 실패했습니다. 계속 진행하시겠습니까?`
-                )
+                // 저장 실패 시에도 섹션을 변경 (변경사항이 없으면 조용히 넘어감)
+                // alert 제거 - savePageSettings에서 이미 변경사항 없으면 조용히 넘어가도록 처리됨
             }
         }
 
@@ -3993,15 +4175,15 @@ function AdminMainContent(props: any) {
         if (sectionName === "invite" && currentOpenSection !== "invite") {
             // inviteData에 값이 없고 page_settings에 값이 있으면 초기화
             if (!inviteData.groomName && pageSettings.groom_name_kr) {
-                setInviteData(prev => ({
+                setInviteData((prev) => ({
                     ...prev,
-                    groomName: pageSettings.groom_name_kr
+                    groomName: pageSettings.groom_name_kr,
                 }))
             }
             if (!inviteData.brideName && pageSettings.bride_name_kr) {
-                setInviteData(prev => ({
+                setInviteData((prev) => ({
                     ...prev,
-                    brideName: pageSettings.bride_name_kr
+                    brideName: pageSettings.bride_name_kr,
                 }))
             }
         }
@@ -4013,26 +4195,32 @@ function AdminMainContent(props: any) {
         groom_phone: "",
         groom_account: "",
         groom_bank: "",
+        groom_bank_name: "",
         groom_father_name: "",
         groom_father_phone: "",
         groom_father_account: "",
         groom_father_bank: "",
+        groom_father_bank_name: "",
         groom_mother_name: "",
         groom_mother_phone: "",
         groom_mother_account: "",
         groom_mother_bank: "",
+        groom_mother_bank_name: "",
         bride_name: "",
         bride_phone: "",
         bride_account: "",
         bride_bank: "",
+        bride_bank_name: "",
         bride_father_name: "",
         bride_father_phone: "",
         bride_father_account: "",
         bride_father_bank: "",
+        bride_father_bank_name: "",
         bride_mother_name: "",
         bride_mother_phone: "",
         bride_mother_account: "",
         bride_mother_bank: "",
+        bride_mother_bank_name: "",
     }
 
     // 임시 테스트 함수 (디버깅용)
@@ -4558,8 +4746,6 @@ function AdminMainContent(props: any) {
         setSelectedContact(null)
         setIsEditingContact(false)
         setLoading(false)
-        setError(null)
-        setSuccess(null)
         setPageSettings(createInitialPageSettings())
         setSettingsLoading(false)
         setHasLoadedSettings(false)
@@ -4593,7 +4779,11 @@ function AdminMainContent(props: any) {
                 const tokenData = validateSessionToken(token)
                 if (tokenData) {
                     setIsAuthenticated(true)
-                    setCurrentUser({ username: tokenData.username })
+                    setCurrentUser({
+                        username: tokenData.username,
+                        page_id: tokenData.page_id,
+                        wedding_date: tokenData.wedding_date,
+                    })
                     // 저장된 사전 할당 페이지 ID 적용 (관리자가 미리 설정한 경우)
                     const storedAssigned =
                         localStorage.getItem("assigned_page_id")
@@ -4725,7 +4915,7 @@ function AdminMainContent(props: any) {
             const contacts = await getAllContacts(targetPageId)
             setContactList(contacts)
         } catch (err) {
-            setError("연락처 목록을 불러오는데 실패했습니다.")
+            console.error("연락처 목록을 불러오는데 실패했습니다.")
         } finally {
             setLoading(false)
         }
@@ -4749,7 +4939,25 @@ function AdminMainContent(props: any) {
             const result = await response.json()
             if (result.success) {
                 setPageSettings(result.data)
+                setOriginalPageSettings(result.data)
                 setHasLoadedSettings(true)
+
+                // 커스텀 BGM이 업로드되어 있다면 파일명 표시
+                if (result.data.bgm_type === "custom" && result.data.bgm_url) {
+                    // URL에서 파일명 추출
+                    try {
+                        const url = new URL(result.data.bgm_url)
+                        const pathParts = url.pathname.split("/")
+                        const fileName = pathParts[pathParts.length - 1]
+                        // 타임스탬프와 페이지ID 제거하여 원본 파일명 추출
+                        const originalFileName = fileName
+                            .replace(/^\d+-/, "")
+                            .replace(/^[^-]+-/, "")
+                        setUploadedFileName(originalFileName)
+                    } catch (error) {
+                        console.warn("파일명 추출 실패:", error)
+                    }
+                }
             }
         } catch (err) {
             console.error("페이지 설정 로드 실패:", err)
@@ -4762,9 +4970,13 @@ function AdminMainContent(props: any) {
         "groomName",
         "groom_name_kr",
         "groom_name_en",
+        "last_groom_name_kr",
+        "last_groom_name_en",
         "brideName",
         "bride_name_kr",
         "bride_name_en",
+        "last_bride_name_kr",
+        "last_bride_name_en",
         "wedding_date",
         "wedding_hour",
         "wedding_minute",
@@ -4774,7 +4986,6 @@ function AdminMainContent(props: any) {
         "photo_section_image_path",
         "photo_section_location",
         "photo_section_overlay_position",
-        "photo_section_focal_point",
         "photo_section_overlay_color",
         "photo_section_locale",
         "highlight_shape",
@@ -4789,15 +5000,17 @@ function AdminMainContent(props: any) {
         "bgm_url",
         "bgm_type",
         "bgm_autoplay",
+        "bgm_vol",
     ] as const
 
     type AllowedSettingKey = (typeof allowedSettingKeys)[number]
 
     function sanitizeSettingsForSave(
         input: any
-    ): Record<AllowedSettingKey, any> {
+    ): Record<string, any> {
         const out: Record<string, any> = {}
-        for (const key of allowedSettingKeys) {
+        // 입력된 모든 키를 허용하되, allowedSettingKeys에 있는 키만 우선적으로 처리
+        for (const key in input) {
             if (Object.prototype.hasOwnProperty.call(input, key)) {
                 out[key] = input[key]
             }
@@ -4807,22 +5020,37 @@ function AdminMainContent(props: any) {
                 out["wedding_date"] = null
             }
         }
-        return out as Record<AllowedSettingKey, any>
+        return out
     }
 
-    const savePageSettings = async (overrideSettings?: any) => {
+    const savePageSettings = async (
+        overrideSettings?: any,
+        options?: { silent?: boolean }
+    ) => {
         if (!currentPageId) return
+
+        // 초기 로드 전에는 부분 저장 시 해당 키만 저장하여 공백 병합 방지
+        const shouldPartialOnly = !!overrideSettings && !hasLoadedSettings
+        const base = shouldPartialOnly
+            ? overrideSettings
+            : overrideSettings
+              ? { ...pageSettings, ...overrideSettings }
+              : pageSettings
+        const settingsToSave = sanitizeSettingsForSave(base)
+        
+        // overrideSettings가 있으면 강제 저장 (사용자가 명시적으로 저장 버튼을 눌렀을 때)
+        // overrideSettings가 없고 변경사항이 없으면 조용히 넘어감
+        if (!overrideSettings && Object.keys(settingsToSave).length === 0) {
+            console.log("No changes to save, skipping")
+            return
+        }
 
         setSettingsLoading(true)
         try {
-            // 초기 로드 전에는 부분 저장 시 해당 키만 저장하여 공백 병합 방지
-            const shouldPartialOnly = !!overrideSettings && !hasLoadedSettings
-            const base = shouldPartialOnly
-                ? overrideSettings
-                : overrideSettings
-                  ? { ...pageSettings, ...overrideSettings }
-                  : pageSettings
-            const settingsToSave = sanitizeSettingsForSave(base)
+            // 자동 저장 토스트 노출 (silent가 아닌 경우에만)
+            if (!options?.silent) {
+                broadcastAutoSaveToast()
+            }
             console.log("Saving page settings:", {
                 currentPageId,
                 settings: settingsToSave,
@@ -4855,27 +5083,22 @@ function AdminMainContent(props: any) {
             console.log("Save response result:", result)
 
             if (result.success) {
-                setSuccess("설정이 저장되었습니다.")
-                // 저장 후 다시 로드해서 동기화
-                setTimeout(() => loadPageSettings(), 500)
+                // 저장 성공 - 재로드하지 않음 (사용자 입력 유지)
                 return result
             } else {
-                setError(
-                    `설정 저장에 실패했습니다: ${result.error || "알 수 없는 오류"}`
-                )
                 throw new Error(result.error || "설정 저장 실패")
             }
         } catch (err) {
             console.error("Save page settings error:", err)
             const message = err instanceof Error ? err.message : String(err)
-            setError(`설정 저장 중 오류가 발생했습니다: ${message}`)
+            console.error(`설정 저장 중 오류가 발생했습니다: ${message}`)
             throw err
         } finally {
             setSettingsLoading(false)
         }
     }
 
-    // 포토섹션 메인 이미지 업로드 (Focal Point 기능 포함)
+    // 포토섹션 메인 이미지 업로드
     const handlePhotoSectionImageUpload = async (
         event: React.ChangeEvent<HTMLInputElement>
     ) => {
@@ -4884,7 +5107,7 @@ function AdminMainContent(props: any) {
 
         setSettingsLoading(true)
         try {
-            // 로컬 미리보기 즉시 반영
+            // 로컬 미리보기 즉시 반영 (갤러리 방식과 동일)
             try {
                 const nextUrl = URL.createObjectURL(file)
                 if (photoSectionPreviewUrl)
@@ -4895,6 +5118,7 @@ function AdminMainContent(props: any) {
             // 0. 기존 이미지가 있다면 먼저 삭제
             const existingImagePath = pageSettings.photo_section_image_path
             const existingImageUrl = pageSettings.photo_section_image_url
+
             if (existingImagePath || existingImageUrl) {
                 try {
                     // 경로에서 파일명 추출 (path 방식이 우선)
@@ -4937,9 +5161,15 @@ function AdminMainContent(props: any) {
                                 }),
                             }
                         )
-                        if (!response.ok) {
-                            const t = await response.text()
-                            console.warn("기존 포토섹션 이미지 삭제 실패:", t)
+
+                        if (response.ok) {
+                            console.log("기존 포토섹션 이미지 삭제 성공")
+                        } else {
+                            const errorText = await response.text()
+                            console.warn(
+                                "기존 포토섹션 이미지 삭제 실패:",
+                                errorText
+                            )
                         }
                     }
                 } catch (deleteError) {
@@ -4980,86 +5210,38 @@ function AdminMainContent(props: any) {
                 throw e
             }
 
-            // Focal Point를 정중앙으로 초기화
-            const initialFocalPoint = { x: 0.5, y: 0.5 }
-
-            // 로컬 상태 선반영
+            // 낙관적 반영: 업로드 완료 즉시 UI에 반영 (갤러리 방식과 동일)
             setPageSettings((prev: any) => ({
                 ...prev,
                 photo_section_image_path: imagePath,
                 photo_section_image_url: imageUrl,
-                photo_section_focal_point: initialFocalPoint,
             }))
-            setFocalPoint(initialFocalPoint)
-            // CDN 캐시 무효화를 위한 버전 업데이트
+
+            // 로컬 미리보기 정리 (서버 이미지로 전환)
+            if (photoSectionPreviewUrl) {
+                URL.revokeObjectURL(photoSectionPreviewUrl)
+                setPhotoSectionPreviewUrl(null)
+            }
+
+            // 버전 업데이트로 리렌더링 강제
             setPhotoSectionImageVersion((v) => v + 1)
 
-            // 즉시 서버 저장: R2 public URL과 Focal Point를 컬럼에 기록
+            // 즉시 서버 저장: R2 public URL을 컬럼에 기록
             await savePageSettings({
                 photo_section_image_path: imagePath,
                 photo_section_image_url: imageUrl,
-                photo_section_focal_point: initialFocalPoint,
             })
 
-            setSuccess("메인 사진이 업로드되었습니다.")
+            console.log("메인 사진이 업로드되었습니다.")
         } catch (error: unknown) {
             console.error("Photo section image upload error:", error)
             const message =
                 error instanceof Error ? error.message : String(error)
-            setError("메인 사진 업로드 중 오류가 발생했습니다: " + message)
+            console.error("메인 사진 업로드 중 오류가 발생했습니다: " + message)
         } finally {
             setSettingsLoading(false)
             // 파일 입력 초기화
-            event.target.value = ''
-        }
-    }
-
-    // Focal Point 수정 핸들러
-    const handleFocalPointEdit = () => {
-        if (!pageSettings.photo_section_image_url) {
-            setError("먼저 메인 사진을 업로드해주세요.")
-            return
-        }
-        
-        // 현재 Focal Point를 정규화된 좌표로 변환
-        const currentFocalPoint = pageSettings.photo_section_focal_point || { x: 0.5, y: 0.5 }
-        
-        // 모달 열기
-        setFocalPointImageSrc(pageSettings.photo_section_image_url)
-        setFocalPointModalOpen(true)
-    }
-
-    // Focal Point 완료 핸들러
-    const handleFocalPointComplete = async (newFocalPoint: { x: number; y: number }) => {
-        if (!currentPageId) return
-
-        setSettingsLoading(true)
-        try {
-            // 정규화된 좌표로 변환 (0-1 범위)
-            const normalizedFocalPoint = {
-                x: newFocalPoint.x / 400, // 캔버스 너비 400px 기준
-                y: newFocalPoint.y / 300  // 캔버스 높이 300px 기준
-            }
-
-            // 로컬 상태 업데이트
-            setPageSettings((prev: any) => ({
-                ...prev,
-                photo_section_focal_point: normalizedFocalPoint,
-            }))
-            setFocalPoint(normalizedFocalPoint)
-
-            // 서버에 저장
-            await savePageSettings({
-                photo_section_focal_point: normalizedFocalPoint,
-            })
-
-            setSuccess("Focal Point가 설정되었습니다.")
-        } catch (error: unknown) {
-            console.error("Focal Point 설정 오류:", error)
-            const message = error instanceof Error ? error.message : String(error)
-            setError("Focal Point 설정 중 오류가 발생했습니다: " + message)
-        } finally {
-            setSettingsLoading(false)
+            event.target.value = ""
         }
     }
 
@@ -5324,7 +5506,6 @@ function AdminMainContent(props: any) {
             }
 
             // ETag 추출 → 버전 파라미터로 사용
-            // Note: ETag 헤더는 따옴표가 포함될 수 있어 제거 처리
             let etag =
                 uploadResponse.headers.get("ETag") ||
                 uploadResponse.headers.get("etag") ||
@@ -5374,17 +5555,26 @@ function AdminMainContent(props: any) {
             "audio/mpeg",
             "audio/mp3",
             "audio/m4a",
-            "audio/mp4",
+            "audio/aac",
+            "audio/wav",
         ]
         if (
             !allowedAudioTypes.includes(file.type) &&
-            !file.name.toLowerCase().match(/\.(mp3|m4a|mp4)$/)
+            !file.name.toLowerCase().match(/\.(mp3|m4a|aac|wav)$/)
         ) {
-            alert("MP3, M4A 파일만 업로드 가능합니다.")
+            alert("mp3, m4a, aac, wav 파일만 사용 가능합니다.")
             return
         }
 
         setSettingsLoading(true)
+
+        // 직접 업로드 시 미리듣기 상태 초기화
+        setPreviewBgmId(null)
+        setPlayingBgmId(null)
+        if (audioRef.current) {
+            audioRef.current.pause()
+            audioRef.current.currentTime = 0
+        }
 
         try {
             console.log(
@@ -5470,21 +5660,21 @@ function AdminMainContent(props: any) {
             console.log(`[BGM] 페이지 설정 저장 결과:`, saveResult)
 
             setPageSettings(updatedSettings)
+            setUploadedFileName(file.name) // 업로드된 파일명 저장
             console.log(`[BGM] 로컬 상태 업데이트 완료`)
 
-            setSuccess("음원이 성공적으로 업로드되었습니다!")
-            setTimeout(() => setSuccess(null), 3000)
+            console.log("음원이 성공적으로 업로드되었습니다!")
         } catch (error: unknown) {
             console.error("음원 업로드 실패:", error)
             const message =
                 error instanceof Error ? error.message : String(error)
-            setError(`음원 업로드에 실패했습니다: ${message}`)
+            console.error(`음원 업로드에 실패했습니다: ${message}`)
         } finally {
             setSettingsLoading(false)
         }
     }
 
-    // 무료 음원 선택 핸들러
+    // 무료 음원 선택 핸들러 (미리듣기만)
     const handleFreeBgmSelect = async (bgmId: string) => {
         const selectedBgm = FREE_BGM_LIST.find((bgm) => bgm.id === bgmId)
         if (!selectedBgm) {
@@ -5492,14 +5682,21 @@ function AdminMainContent(props: any) {
             return
         }
 
-        // 즉시 재생 + 로컬 상태만 반영 (서버 저장은 최종 저장 버튼에서 수행)
-        setSelectedBgmId(bgmId)
+        // 이미 선택된 음원을 다시 클릭하면 미리듣기 중지
+        if (previewBgmId === bgmId) {
+            setPreviewBgmId(null)
+            setPlayingBgmId(null)
+            if (audioRef.current) {
+                audioRef.current.pause()
+                audioRef.current.currentTime = 0
+            }
+            return
+        }
+
+        // 미리듣기만 재생 (저장하지 않음)
+        setPreviewBgmId(bgmId)
         setPlayingBgmId(bgmId)
-        setPageSettings((prev) => ({
-            ...prev,
-            bgm_url: selectedBgm.url,
-            bgm_type: "free",
-        }))
+        setUploadedFileName(null) // 무료 음원 선택 시 업로드된 파일명 초기화
 
         try {
             if (audioRef.current) {
@@ -5526,7 +5723,7 @@ function AdminMainContent(props: any) {
             console.error("자동재생 설정 실패:", error)
             const message =
                 error instanceof Error ? error.message : String(error)
-            setError(`자동재생 설정에 실패했습니다: ${message}`)
+            console.error(`자동재생 설정에 실패했습니다: ${message}`)
         } finally {
             setSettingsLoading(false)
         }
@@ -5640,22 +5837,20 @@ function AdminMainContent(props: any) {
             const result = await deleteContact(id)
 
             if (result.success) {
-                setSuccess("연락처가 성공적으로 삭제되었습니다!")
-                // 3초 후 성공 메시지 자동 제거
-                setTimeout(() => setSuccess(null), 3000)
+                console.log("연락처가 성공적으로 삭제되었습니다!")
             } else {
                 // 실패 시 원래 상태로 복원
                 if (contactToDelete) {
                     setContactList((prev) => [...prev, contactToDelete])
                 }
-                setError("삭제에 실패했습니다: " + result.error)
+                console.error("삭제에 실패했습니다: " + result.error)
             }
         } catch (err) {
             // 실패 시 원래 상태로 복원
             if (contactToDelete) {
                 setContactList((prev) => [...prev, contactToDelete])
             }
-            setError("삭제에 실패했습니다.")
+            console.error("삭제에 실패했습니다.")
         } finally {
             setLoading(false)
         }
@@ -5664,11 +5859,11 @@ function AdminMainContent(props: any) {
         if (!selectedContact) return
 
         if (!selectedContact.page_id.trim()) {
-            setError("페이지 ID는 필수입니다.")
+            console.warn("페이지 ID는 필수입니다.")
             return
         }
         if (selectedContact.page_id !== currentPageId) {
-            setError("현재 선택된 페이지와 연락처의 페이지 ID가 다릅니다.")
+            console.warn("현재 선택된 페이지와 연락처의 페이지 ID가 다릅니다.")
             return
         }
 
@@ -5718,16 +5913,13 @@ function AdminMainContent(props: any) {
                     )
                 }
 
-                setSuccess(
+                console.log(
                     isUpdate
                         ? "연락처가 성공적으로 수정되었습니다!"
                         : "연락처가 성공적으로 추가되었습니다!"
                 )
                 setIsEditingContact(false)
                 setSelectedContact(null)
-
-                // 3초 후 성공 메시지 자동 제거
-                setTimeout(() => setSuccess(null), 3000)
             } else {
                 // 실패 시 원래 상태로 복원
                 if (isUpdate) {
@@ -5748,7 +5940,7 @@ function AdminMainContent(props: any) {
                     )
                 }
 
-                setError(`저장에 실패했습니다: ${result.error}`)
+                console.error(`저장에 실패했습니다: ${result.error}`)
             }
         } catch (err) {
             // 실패 시 원래 상태로 복원
@@ -5769,7 +5961,7 @@ function AdminMainContent(props: any) {
                 )
             }
 
-            setError(
+            console.error(
                 `저장에 실패했습니다: ${err instanceof Error ? err.message : "알 수 없는 오류"}`
             )
         } finally {
@@ -5813,6 +6005,7 @@ function AdminMainContent(props: any) {
         const payload = { ...base, page_id: currentPageId }
 
         try {
+            broadcastAutoSaveToast()
             setLoading(true)
             const result = await saveContact(payload)
             if (result.success) {
@@ -5825,13 +6018,12 @@ function AdminMainContent(props: any) {
                     )
                     return [...others, saved]
                 })
-                setSuccess("연락처가 저장되었습니다.")
-                setTimeout(() => setSuccess(null), 3000)
+                console.log("연락처가 저장되었습니다.")
             } else {
-                setError(result.error || "저장에 실패했습니다")
+                console.error(result.error || "저장에 실패했습니다")
             }
         } catch (err) {
-            setError(
+            console.error(
                 err instanceof Error
                     ? err.message
                     : "알 수 없는 오류가 발생했습니다"
@@ -5862,17 +6054,6 @@ function AdminMainContent(props: any) {
         }
     }, [currentPageId])
 
-    // 알림 메시지 자동 제거
-    useEffect(() => {
-        if (error || success) {
-            const timer = setTimeout(() => {
-                setError(null)
-                setSuccess(null)
-            }, 5000)
-            return () => clearTimeout(timer)
-        }
-    }, [error, success])
-
     // 로그인 화면
     if (!isAuthenticated) {
         return (
@@ -5882,12 +6063,15 @@ function AdminMainContent(props: any) {
                     width: "100%",
                     maxWidth: "430px",
                     minWidth: "375px",
-                    height: "100vh",
+                    height: "100%", // 부모 요소의 높이 사용
+                    minHeight:
+                        "calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom))", // 안전 영역 고려
                     backgroundColor: "#f5f5f5",
                     display: "flex",
                     justifyContent: "center",
                     alignItems: "center",
                     padding: "15px",
+                    position: "relative", // 키보드 대응을 위한 위치 설정
                     boxSizing: "border-box",
                 }}
             >
@@ -6037,51 +6221,16 @@ function AdminMainContent(props: any) {
                 width: "100%",
                 maxWidth: "430px",
                 minWidth: "375px",
-                height: "100vh",
+                height: "100%", // 부모 요소의 높이 사용
+                minHeight:
+                    "calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom))", // 안전 영역 고려
                 display: "flex",
                 flexDirection: "column",
                 backgroundColor: "#f5f5f5",
-                overflow: "auto",
+                overflow: "hidden", // 전체 스크롤 비활성화
+                position: "relative", // 키보드 대응을 위한 위치 설정
             }}
         >
-            {/* 성공/에러 메시지 표시 */}
-            <AnimatePresence>
-                {success && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        style={{
-                            padding: "12px 16px",
-                            backgroundColor: "#f5f5f5",
-                            color: "#000000",
-                            fontSize: "14px",
-                            textAlign: "center",
-                            borderBottom: "1px solid #e0e0e0",
-                        }}
-                    >
-                        {success}
-                    </motion.div>
-                )}
-                {error && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        style={{
-                            padding: "12px 16px",
-                            backgroundColor: "#f5f5f5",
-                            color: "#666666",
-                            fontSize: "14px",
-                            textAlign: "center",
-                            borderBottom: "1px solid #e0e0e0",
-                        }}
-                    >
-                        {error}
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
             {/* 헤더 */}
             <div
                 style={{
@@ -6100,44 +6249,87 @@ function AdminMainContent(props: any) {
                     zIndex: 1000,
                 }}
             >
-                <button
+                {/* 왼쪽 영역 */}
+                <div
                     style={{
-                        padding: "6px 8px",
-                        backgroundColor: "black",
-                        color: "white",
-                        border: "none",
-                        fontSize: "10px",
-                        fontFamily: theme.font.body,
-                        cursor: "pointer",
+                        flex: 1,
+                        display: "flex",
+                        justifyContent: "flex-start",
+                        alignItems: "center",
+                        gap: "8px",
                     }}
                 >
-                    미리보기
-                </button>
+                    <button
+                        onClick={handleCopyLink}
+                        style={{
+                            padding: "6px 8px",
+                            backgroundColor: "#000",
+                            color: "white",
+                            border: "none",
+                            fontSize: "10px",
+                            fontFamily: theme.font.body,
+                            cursor: "pointer",
+                        }}
+                    >
+                        내 링크 복사
+                    </button>
+                    {showCopyPopup && (
+                        <span
+                            style={{
+                                fontSize: "12px",
+                                color: "#10b981",
+                                fontFamily: theme.font.body,
+                                fontWeight: 500,
+                            }}
+                        >
+                            복사 완료!
+                        </span>
+                    )}
+                </div>
 
-                <span
+                {/* 중앙 영역 */}
+                <div
                     style={{
-                        ...theme.typography.label,
-                        color: "black",
-                        fontSize: "16px",
+                        flex: 1,
+                        display: "flex",
+                        justifyContent: "center",
                     }}
                 >
-                    {pageSettings.groom_name_kr || "신랑"} ♥{" "}
-                    {pageSettings.bride_name_kr || "신부"}
-                </span>
-                <button
-                    onClick={handleLogout}
+                    <span
+                        style={{
+                            ...theme.typography.label,
+                            color: "black",
+                            fontSize: "16px",
+                        }}
+                    >
+                        {pageSettings.groom_name_kr || "신랑"} ♥{" "}
+                        {pageSettings.bride_name_kr || "신부"}
+                    </span>
+                </div>
+
+                {/* 오른쪽 영역 */}
+                <div
                     style={{
-                        padding: "6px 8px",
-                        backgroundColor: "white",
-                        color: "#7F7F7F",
-                        border: `1px solid ${theme.color.border}`,
-                        fontSize: "10px",
-                        fontFamily: theme.font.body,
-                        cursor: "pointer",
+                        flex: 1,
+                        display: "flex",
+                        justifyContent: "flex-end",
                     }}
                 >
-                    로그아웃
-                </button>
+                    <button
+                        onClick={handleLogout}
+                        style={{
+                            padding: "6px 8px",
+                            backgroundColor: "white",
+                            color: "#7F7F7F",
+                            border: `1px solid ${theme.color.border}`,
+                            fontSize: "10px",
+                            fontFamily: theme.font.body,
+                            cursor: "pointer",
+                        }}
+                    >
+                        로그아웃
+                    </button>
+                </div>
             </div>
             {/* 탭 버튼들 */}
             <div
@@ -6204,6 +6396,10 @@ function AdminMainContent(props: any) {
                         backgroundColor: "#E6E6E6",
                         flex: 1,
                         overflowY: "auto",
+                        WebkitOverflowScrolling: "touch", // iOS 부드러운 스크롤
+                        minHeight: 0, // flex 아이템이 축소될 수 있도록
+                        paddingBottom: "env(safe-area-inset-bottom)", // 하단 안전 영역
+                        position: "relative", // 키보드 대응
                     }}
                 >
                     {/* 성함 섹션 */}
@@ -6211,7 +6407,7 @@ function AdminMainContent(props: any) {
                         title="성함"
                         sectionKey="name"
                         isOpen={currentOpenSection === "name"}
-                        onToggle={() => toggleSection("name")}
+                        onToggle={async () => await toggleSection("name")}
                     >
                         <div
                             style={{
@@ -6238,92 +6434,419 @@ function AdminMainContent(props: any) {
                                     style={{
                                         flexDirection: "column",
                                         display: "flex",
-                                        gap: theme.gap.sm,
+                                        gap: 0,
                                     }}
                                 >
                                     <FormField label="신랑 한글 성함">
-                                        <InputBase
-                                            type="text"
-                                            value={
-                                                pageSettings.groom_name_kr || ""
-                                            }
-                                            onChange={(e) =>
-                                                setPageSettings({
-                                                    ...pageSettings,
-                                                    groom_name_kr: (
-                                                        e.target as HTMLInputElement
-                                                    ).value,
-                                                })
-                                            }
-                                            placeholder="민준"
-                                        />
+                                        <div
+                                            style={{
+                                                width: "calc(100% * 1.1429)",
+                                                transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                transformOrigin: "left center",
+                                                display: "flex",
+                                                gap: 6,
+                                                marginBottom: 12,
+                                            }}
+                                        >
+                                            <div
+                                                style={{
+                                                    width: "30%",
+                                                    height: "calc(40px*1.1429)",
+                                                    padding: 12,
+                                                    background: "white",
+                                                    border: `1px solid ${theme.color.border}`,
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                }}
+                                            >
+                                                <input
+                                                    type="text"
+                                                    value={
+                                                        pageSettings.last_groom_name_kr ||
+                                                        ""
+                                                    }
+                                                    onChange={(e) =>
+                                                        setPageSettings({
+                                                            ...pageSettings,
+                                                            last_groom_name_kr:
+                                                                (
+                                                                    e.target as HTMLInputElement
+                                                                ).value,
+                                                        })
+                                                    }
+                                                    placeholder="박"
+                                                    style={{
+                                                        width: "100%",
+                                                        border: "none",
+                                                        outline: "none",
+                                                        fontSize: 16,
+                                                        fontFamily:
+                                                            theme.font.body,
+                                                        color:
+                                                            pageSettings.last_groom_name_kr ||
+                                                            pageSettings.groom_name_kr
+                                                                ? "black"
+                                                                : "#ADADAD",
+                                                    }}
+                                                />
+                                            </div>
+                                            <div
+                                                style={{
+                                                    width: "70%",
+                                                    height: "calc(40px*1.1429)",
+                                                    padding: 12,
+                                                    background: "white",
+                                                    border: `1px solid ${theme.color.border}`,
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                }}
+                                            >
+                                                <input
+                                                    type="text"
+                                                    value={
+                                                        pageSettings.groom_name_kr ||
+                                                        ""
+                                                    }
+                                                    onChange={(e) =>
+                                                        setPageSettings({
+                                                            ...pageSettings,
+                                                            groom_name_kr: (
+                                                                e.target as HTMLInputElement
+                                                            ).value,
+                                                        })
+                                                    }
+                                                    placeholder="민준"
+                                                    style={{
+                                                        width: "100%",
+                                                        border: "none",
+                                                        outline: "none",
+                                                        fontSize: 16,
+                                                        fontFamily:
+                                                            theme.font.body,
+                                                        color:
+                                                            pageSettings.last_groom_name_kr ||
+                                                            pageSettings.groom_name_kr
+                                                                ? "black"
+                                                                : "#ADADAD",
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
                                     </FormField>
-
                                     <FormField label="신랑 영문 성함">
-                                        <InputBase
-                                            type="text"
-                                            value={
-                                                pageSettings.groom_name_en || ""
-                                            }
-                                            onChange={(e) =>
-                                                setPageSettings({
-                                                    ...pageSettings,
-                                                    groom_name_en: (
-                                                        e.target as HTMLInputElement
-                                                    ).value,
-                                                })
-                                            }
-                                            placeholder="MIN JUN"
-                                        />
+                                        <div
+                                            style={{
+                                                width: "calc(100% * 1.1429)",
+                                                transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                transformOrigin: "left center",
+                                                display: "flex",
+                                                gap: 6,
+                                                marginBottom: 24,
+                                            }}
+                                        >
+                                            <div
+                                                style={{
+                                                    width: "30%",
+                                                    height: "calc(40px*1.1429)",
+                                                    padding: 12,
+                                                    background: "white",
+                                                    border: `1px solid ${theme.color.border}`,
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                }}
+                                            >
+                                                <input
+                                                    type="text"
+                                                    value={
+                                                        pageSettings.last_groom_name_en ||
+                                                        ""
+                                                    }
+                                                    onChange={(e) =>
+                                                        setPageSettings({
+                                                            ...pageSettings,
+                                                            last_groom_name_en:
+                                                                (
+                                                                    e.target as HTMLInputElement
+                                                                ).value,
+                                                        })
+                                                    }
+                                                    placeholder="PARK"
+                                                    style={{
+                                                        width: "100%",
+                                                        border: "none",
+                                                        outline: "none",
+                                                        fontSize: 16,
+                                                        fontFamily:
+                                                            theme.font.body,
+                                                        color:
+                                                            pageSettings.last_groom_name_en ||
+                                                            pageSettings.groom_name_en
+                                                                ? "black"
+                                                                : "#ADADAD",
+                                                    }}
+                                                />
+                                            </div>
+                                            <div
+                                                style={{
+                                                    width: "70%",
+                                                    height: "calc(40px*1.1429)",
+                                                    padding: 12,
+                                                    background: "white",
+                                                    border: `1px solid ${theme.color.border}`,
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                }}
+                                            >
+                                                <input
+                                                    type="text"
+                                                    value={
+                                                        pageSettings.groom_name_en ||
+                                                        ""
+                                                    }
+                                                    onChange={(e) =>
+                                                        setPageSettings({
+                                                            ...pageSettings,
+                                                            groom_name_en: (
+                                                                e.target as HTMLInputElement
+                                                            ).value,
+                                                        })
+                                                    }
+                                                    placeholder="MIN JUN"
+                                                    style={{
+                                                        width: "100%",
+                                                        border: "none",
+                                                        outline: "none",
+                                                        fontSize: 16,
+                                                        fontFamily:
+                                                            theme.font.body,
+                                                        color:
+                                                            pageSettings.last_groom_name_en ||
+                                                            pageSettings.groom_name_en
+                                                                ? "black"
+                                                                : "#ADADAD",
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
                                     </FormField>
 
                                     <FormField label="신부 한글 성함">
-                                        <InputBase
-                                            type="text"
-                                            value={
-                                                pageSettings.bride_name_kr || ""
-                                            }
-                                            onChange={(e) =>
-                                                setPageSettings({
-                                                    ...pageSettings,
-                                                    bride_name_kr: (
-                                                        e.target as HTMLInputElement
-                                                    ).value,
-                                                })
-                                            }
-                                            placeholder="서윤"
-                                        />
+                                        <div
+                                            style={{
+                                                width: "calc(100% * 1.1429)",
+                                                transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                transformOrigin: "left center",
+                                                display: "flex",
+                                                gap: 6,
+                                                marginBottom: 12,
+                                            }}
+                                        >
+                                            <div
+                                                style={{
+                                                    width: "30%",
+                                                    height: "calc(40px*1.1429)",
+                                                    padding: 12,
+                                                    background: "white",
+                                                    border: `1px solid ${theme.color.border}`,
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                }}
+                                            >
+                                                <input
+                                                    type="text"
+                                                    value={
+                                                        pageSettings.last_bride_name_kr ||
+                                                        ""
+                                                    }
+                                                    onChange={(e) =>
+                                                        setPageSettings({
+                                                            ...pageSettings,
+                                                            last_bride_name_kr:
+                                                                (
+                                                                    e.target as HTMLInputElement
+                                                                ).value,
+                                                        })
+                                                    }
+                                                    placeholder="최"
+                                                    style={{
+                                                        width: "100%",
+                                                        border: "none",
+                                                        outline: "none",
+                                                        fontSize: 16,
+                                                        fontFamily:
+                                                            theme.font.body,
+                                                        color:
+                                                            pageSettings.last_bride_name_kr ||
+                                                            pageSettings.bride_name_kr
+                                                                ? "black"
+                                                                : "#ADADAD",
+                                                    }}
+                                                />
+                                            </div>
+                                            <div
+                                                style={{
+                                                    width: "70%",
+                                                    height: "calc(40px*1.1429)",
+                                                    padding: 12,
+                                                    background: "white",
+                                                    border: `1px solid ${theme.color.border}`,
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                }}
+                                            >
+                                                <input
+                                                    type="text"
+                                                    value={
+                                                        pageSettings.bride_name_kr ||
+                                                        ""
+                                                    }
+                                                    onChange={(e) =>
+                                                        setPageSettings({
+                                                            ...pageSettings,
+                                                            bride_name_kr: (
+                                                                e.target as HTMLInputElement
+                                                            ).value,
+                                                        })
+                                                    }
+                                                    placeholder="서윤"
+                                                    style={{
+                                                        width: "100%",
+                                                        border: "none",
+                                                        outline: "none",
+                                                        fontSize: 16,
+                                                        fontFamily:
+                                                            theme.font.body,
+                                                        color:
+                                                            pageSettings.last_bride_name_kr ||
+                                                            pageSettings.bride_name_kr
+                                                                ? "black"
+                                                                : "#ADADAD",
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
                                     </FormField>
 
                                     <FormField label="신부 영문 성함">
-                                        <InputBase
-                                            type="text"
-                                            value={
-                                                pageSettings.bride_name_en || ""
-                                            }
-                                            onChange={(e) =>
-                                                setPageSettings({
-                                                    ...pageSettings,
-                                                    bride_name_en: (
-                                                        e.target as HTMLInputElement
-                                                    ).value,
-                                                })
-                                            }
-                                            placeholder="SEO YUN"
-                                        />
+                                        <div
+                                            style={{
+                                                width: "calc(100% * 1.1429)",
+                                                transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                transformOrigin: "left center",
+                                                display: "flex",
+                                                gap: 6,
+                                            }}
+                                        >
+                                            <div
+                                                style={{
+                                                    width: "30%",
+                                                    height: "calc(40px*1.1429)",
+                                                    padding: 12,
+                                                    background: "white",
+                                                    border: `1px solid ${theme.color.border}`,
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                }}
+                                            >
+                                                <input
+                                                    type="text"
+                                                    value={
+                                                        pageSettings.last_bride_name_en ||
+                                                        ""
+                                                    }
+                                                    onChange={(e) =>
+                                                        setPageSettings({
+                                                            ...pageSettings,
+                                                            last_bride_name_en:
+                                                                (
+                                                                    e.target as HTMLInputElement
+                                                                ).value,
+                                                        })
+                                                    }
+                                                    placeholder="CHOI"
+                                                    style={{
+                                                        width: "100%",
+                                                        border: "none",
+                                                        outline: "none",
+                                                        fontSize: 16,
+                                                        fontFamily:
+                                                            theme.font.body,
+                                                        color:
+                                                            pageSettings.last_bride_name_en ||
+                                                            pageSettings.bride_name_en
+                                                                ? "black"
+                                                                : "#ADADAD",
+                                                    }}
+                                                />
+                                            </div>
+                                            <div
+                                                style={{
+                                                    width: "70%",
+                                                    height: "calc(40px*1.1429)",
+                                                    padding: 12,
+                                                    background: "white",
+                                                    border: `1px solid ${theme.color.border}`,
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                }}
+                                            >
+                                                <input
+                                                    type="text"
+                                                    value={
+                                                        pageSettings.bride_name_en ||
+                                                        ""
+                                                    }
+                                                    onChange={(e) =>
+                                                        setPageSettings({
+                                                            ...pageSettings,
+                                                            bride_name_en: (
+                                                                e.target as HTMLInputElement
+                                                            ).value,
+                                                        })
+                                                    }
+                                                    placeholder="SEO YUN"
+                                                    style={{
+                                                        width: "100%",
+                                                        border: "none",
+                                                        outline: "none",
+                                                        fontSize: 16,
+                                                        fontFamily:
+                                                            theme.font.body,
+                                                        color:
+                                                            pageSettings.last_bride_name_en ||
+                                                            pageSettings.bride_name_en
+                                                                ? "black"
+                                                                : "#ADADAD",
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
                                     </FormField>
-
-                                    {/* 저장 버튼 */}
-                                    <SaveBar
-                                        onSave={savePageSettings}
-                                        loading={settingsLoading}
-                                    />
                                 </div>
                                 {/* 오디오 프리뷰 요소 */}
                                 <audio
                                     ref={audioRef}
                                     style={{ display: "none" }}
                                 />
+                                <div style={{ width: "100%", marginTop: 12 }}>
+                                    <SaveSectionButton
+                                        onSave={async () => {
+                                            await savePageSettings(
+                                                {
+                                                    groom_name_kr: pageSettings.groom_name_kr,
+                                                    groom_name_en: pageSettings.groom_name_en,
+                                                    bride_name_kr: pageSettings.bride_name_kr,
+                                                    bride_name_en: pageSettings.bride_name_en,
+                                                    last_groom_name_kr: pageSettings.last_groom_name_kr,
+                                                    last_bride_name_kr: pageSettings.last_bride_name_kr,
+                                                    last_groom_name_en: pageSettings.last_groom_name_en,
+                                                    last_bride_name_en: pageSettings.last_bride_name_en,
+                                                },
+                                                { silent: true }
+                                            )
+                                        }}
+                                    />
+                                </div>
                             </div>
                         </div>
                     </AccordionSection>
@@ -6333,13 +6856,14 @@ function AdminMainContent(props: any) {
                         title="메인 사진"
                         sectionKey="photo"
                         isOpen={currentOpenSection === "photo"}
-                        onToggle={() => toggleSection("photo")}
+                        onToggle={async () => await toggleSection("photo")}
                     >
                         <div
                             style={{
                                 padding: "16px 16px",
                                 backgroundColor: "white",
                                 display: "flex",
+                                flexDirection: "column",
                                 justifyContent: "flex-start",
                                 alignItems: "flex-start",
                                 gap: "10px",
@@ -6353,61 +6877,6 @@ function AdminMainContent(props: any) {
                                     gap: theme.gap.sm,
                                 }}
                             >
-                                {/* 사진만 미리보기 */}
-                                <div
-                                    style={{
-                                        width: "100%",
-                                        background: "#FAFAFA",
-                                        border: `1px solid ${theme.color.border}`,
-                                        outlineOffset: "-0.25px",
-                                        borderRadius: theme.radius.sm,
-                                        overflow: "hidden",
-                                    }}
-                                >
-                                    <div
-                                        style={{
-                                            width: "100%",
-                                            height: 300,
-                                            display: "flex",
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                            background: "#f5f5f5",
-                                        }}
-                                    >
-                                        {getPhotoSectionDisplayUrl() ? (
-                                            <img
-                                                src={`${getPhotoSectionDisplayUrl()}?v=${photoSectionImageVersion}`}
-                                                alt="메인 사진 미리보기"
-                                                style={{
-                                                    width: "100%",
-                                                    height: "100%",
-                                                    objectFit: "cover",
-                                                }}
-                                            />
-                                        ) : (
-                                            <div
-                                                style={{
-                                                    color: "#999",
-                                                    fontSize: 14,
-                                                    fontFamily: theme.font.body,
-                                                }}
-                                            >
-                                                사진을 업로드해주세요
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                                <div
-                                    style={{
-                                        fontSize: 12,
-                                        fontFamily: theme.font.body,
-                                        color: "#7F7F7F",
-                                        textAlign: "center",
-                                    }}
-                                >
-                                    사진 미리보기
-                                </div>
-
                                 {/* 메인 사진 업로드 */}
                                 <div
                                     style={{
@@ -6419,6 +6888,133 @@ function AdminMainContent(props: any) {
                                     <span style={theme.typography.label}>
                                         메인 사진
                                     </span>
+
+                                    {/* 사진 썸네일 미리보기 */}
+                                    <div
+                                        style={{
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            gap: theme.gap.sm,
+                                            alignItems: "center",
+                                            cursor: "pointer",
+                                        }}
+                                        onClick={() =>
+                                            document
+                                                .getElementById(
+                                                    "photoSectionFileInput_acdn"
+                                                )
+                                                ?.click()
+                                        }
+                                    >
+                                        <div
+                                            style={{
+                                                width: 80,
+                                                height: 80,
+                                                backgroundColor: "#fafafa",
+                                                border: "0.5px solid #e5e6e8",
+                                                borderRadius: 2,
+                                                overflow: "hidden",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                            }}
+                                        >
+                                            {photoSectionThumbSrc ? (
+                                                <img
+                                                    src={photoSectionThumbSrc}
+                                                    alt="메인 사진 썸네일"
+                                                    style={{
+                                                        width: "100%",
+                                                        height: "100%",
+                                                        objectFit: "cover",
+                                                    }}
+                                                    loading="lazy"
+                                                    decoding="async"
+                                                    onError={(e) => {
+                                                        // 갤러리 방식과 동일: 원본 URL로 폴백
+                                                        const img =
+                                                            e.currentTarget as HTMLImageElement & {
+                                                                dataset?: any
+                                                            }
+                                                        if (
+                                                            img.dataset?.fb ===
+                                                            "1"
+                                                        )
+                                                            return
+                                                        if (!img.dataset)
+                                                            (
+                                                                img as any
+                                                            ).dataset = {}
+                                                        img.dataset.fb = "1"
+                                                        const originalUrl =
+                                                            getPhotoSectionDisplayUrl()
+                                                        if (originalUrl)
+                                                            img.src =
+                                                                originalUrl
+                                                    }}
+                                                />
+                                            ) : (
+                                                <div
+                                                    style={{
+                                                        color: "#999",
+                                                        fontSize: 20,
+                                                        fontFamily:
+                                                            theme.font.body,
+                                                        fontWeight: 200,
+                                                        textAlign: "center",
+                                                    }}
+                                                >
+                                                    +
+                                                </div>
+                                            )}
+                                        </div>
+                                        {getPhotoSectionDisplayUrl() && (
+                                            <div
+                                                style={{
+                                                    fontSize: 12,
+                                                    fontFamily: theme.font.body,
+                                                    color: "#7f7f7f",
+                                                    textAlign: "center",
+                                                    maxWidth: 120,
+                                                    overflow: "hidden",
+                                                    textOverflow: "ellipsis",
+                                                    whiteSpace: "nowrap",
+                                                }}
+                                            >
+                                                {(() => {
+                                                    // 갤러리 방식과 동일: 업로드한 파일의 원본 이름 표시
+                                                    const fileName =
+                                                        pageSettings.photo_section_image_path
+                                                            ? pageSettings.photo_section_image_path
+                                                                  .split("/")
+                                                                  .pop() ||
+                                                              "파일명"
+                                                            : "파일명"
+
+                                                    // 파일명에서 타임스탬프와 UUID 제거하여 원본 이름 추출
+                                                    const originalName =
+                                                        fileName
+                                                            .replace(
+                                                                /^\d+-/,
+                                                                ""
+                                                            )
+                                                            .replace(
+                                                                /^[a-f0-9-]+-/,
+                                                                ""
+                                                            )
+
+                                                    return originalName.length >
+                                                        15
+                                                        ? originalName.substring(
+                                                              0,
+                                                              15
+                                                          ) + "..."
+                                                        : originalName
+                                                })()}
+                                            </div>
+                                        )}
+                                    </div>
+
                                     <div
                                         style={{
                                             display: "flex",
@@ -6473,7 +7069,7 @@ function AdminMainContent(props: any) {
                                             <div
                                                 style={{
                                                     color: "var(--Black, black)",
-                                                    fontSize: 14,
+                                                    fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                     fontFamily: theme.font.body,
                                                     wordWrap: "break-word",
                                                 }}
@@ -6490,41 +7086,6 @@ function AdminMainContent(props: any) {
                                             }
                                             style={{ display: "none" }}
                                         />
-                                        {pageSettings.photo_section_image_url && (
-                                            <button
-                                                onClick={handleFocalPointEdit}
-                                                style={{
-                                                    width: "100%",
-                                                    height: 50,
-                                                    paddingLeft: 12,
-                                                    paddingRight: 12,
-                                                    paddingTop: 8,
-                                                    paddingBottom: 8,
-                                                    background: "white",
-                                                    outline: `${theme.border.width}px #AEAEAE solid`,
-                                                    outlineOffset: "-0.50px",
-                                                    justifyContent: "center",
-                                                    alignItems: "center",
-                                                    gap: 8,
-                                                    display: "flex",
-                                                    border: "none",
-                                                    borderRadius: "2px",
-                                                    cursor: "pointer",
-                                                    opacity: 1,
-                                                }}
-                                            >
-                                                <div
-                                                    style={{
-                                                        color: "var(--Black, black)",
-                                                        fontSize: 14,
-                                                        fontFamily: theme.font.body,
-                                                        wordWrap: "break-word",
-                                                    }}
-                                                >
-                                                    크롭 수정
-                                                </div>
-                                            </button>
-                                        )}
                                     </div>
                                 </div>
 
@@ -6956,75 +7517,80 @@ function AdminMainContent(props: any) {
                                     />
                                 </FormField>
 
-                                {/* 일시 표시 위치 / 텍스트 색상 */}
-                                <div
-                                    style={{
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        gap: theme.gap.md,
-                                    }}
-                                >
-                                    <span style={theme.typography.label}>
-                                        일시 표시 위치
-                                    </span>
-                                    {/* 상단/하단 */}
+                                {/* 일시 표시 위치 / 텍스트 색상 - papillon 타입일 때만 표시 */}
+                                {pageSettings.type === "papillon" && (
                                     <div
                                         style={{
-                                            width: "100%",
-                                            display: "inline-flex",
-                                            gap: theme.gap.sm,
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            gap: theme.gap.md,
                                         }}
                                     >
-                                        {(["top", "bottom"] as const).map(
-                                            (pos) => (
-                                                <div
-                                                    key={pos}
-                                                    onClick={() =>
-                                                        setPageSettings({
-                                                            ...pageSettings,
-                                                            photo_section_overlay_position:
-                                                                pos,
-                                                        })
-                                                    }
-                                                    style={{
-                                                        flex: 1,
-                                                        height: 40,
-                                                        padding: 12,
-                                                        background:
-                                                            pageSettings.photo_section_overlay_position ===
-                                                            pos
-                                                                ? "#ECECEC"
-                                                                : "white",
-                                                        border: `1px solid ${theme.color.border}`,
-                                                        display: "flex",
-                                                        justifyContent:
-                                                            "center",
-                                                        alignItems: "center",
-                                                        cursor: "pointer",
-                                                        userSelect: "none",
-                                                    }}
-                                                >
-                                                    <span
-                                                        style={{ fontSize: 12 }}
+                                        <span style={theme.typography.label}>
+                                            일시 표시 위치
+                                        </span>
+                                        {/* 상단/하단 */}
+                                        <div
+                                            style={{
+                                                width: "100%",
+                                                display: "inline-flex",
+                                                gap: theme.gap.sm,
+                                            }}
+                                        >
+                                            {(["top", "bottom"] as const).map(
+                                                (pos) => (
+                                                    <div
+                                                        key={pos}
+                                                        onClick={() =>
+                                                            setPageSettings({
+                                                                ...pageSettings,
+                                                                photo_section_overlay_position:
+                                                                    pos,
+                                                            })
+                                                        }
+                                                        style={{
+                                                            flex: 1,
+                                                            height: 40,
+                                                            padding: 12,
+                                                            background:
+                                                                pageSettings.photo_section_overlay_position ===
+                                                                pos
+                                                                    ? "#ECECEC"
+                                                                    : "white",
+                                                            border: `1px solid ${theme.color.border}`,
+                                                            display: "flex",
+                                                            justifyContent:
+                                                                "center",
+                                                            alignItems:
+                                                                "center",
+                                                            cursor: "pointer",
+                                                            userSelect: "none",
+                                                        }}
                                                     >
-                                                        {pos === "top"
-                                                            ? "상단"
-                                                            : "하단"}
-                                                    </span>
-                                                </div>
-                                            )
-                                        )}
-                                    </div>
-                                    {/* 텍스트 색상 */}
-                                    <div
-                                        style={{
-                                            width: "100%",
-                                            display: "inline-flex",
-                                            gap: theme.gap.sm,
-                                        }}
-                                    >
-                                        {(["#ffffff", "#000000"] as const).map(
-                                            (color) => (
+                                                        <span
+                                                            style={{
+                                                                fontSize: 12,
+                                                            }}
+                                                        >
+                                                            {pos === "top"
+                                                                ? "상단"
+                                                                : "하단"}
+                                                        </span>
+                                                    </div>
+                                                )
+                                            )}
+                                        </div>
+                                        {/* 텍스트 색상 */}
+                                        <div
+                                            style={{
+                                                width: "100%",
+                                                display: "inline-flex",
+                                                gap: theme.gap.sm,
+                                            }}
+                                        >
+                                            {(
+                                                ["#ffffff", "#000000"] as const
+                                            ).map((color) => (
                                                 <div
                                                     key={color}
                                                     onClick={() =>
@@ -7060,15 +7626,27 @@ function AdminMainContent(props: any) {
                                                             : "검정색"}
                                                     </span>
                                                 </div>
-                                            )
-                                        )}
+                                            ))}
+                                        </div>
                                     </div>
-                                </div>
-
-                                {/* 저장 버튼 */}
-                                <SaveBar
-                                    onSave={savePageSettings}
-                                    loading={settingsLoading}
+                                )}
+                            </div>
+                            <div style={{ width: "100%", marginTop: 12 }}>
+                                <SaveSectionButton
+                                    onSave={async () => {
+                                        await savePageSettings(
+                                            {
+                                                wedding_date: pageSettings.wedding_date,
+                                                wedding_hour: pageSettings.wedding_hour,
+                                                wedding_minute: pageSettings.wedding_minute,
+                                                photo_section_locale: pageSettings.photo_section_locale,
+                                                venue_name: pageSettings.venue_name,
+                                                photo_section_overlay_position: pageSettings.photo_section_overlay_position,
+                                                photo_section_overlay_color: pageSettings.photo_section_overlay_color,
+                                            },
+                                            { silent: true }
+                                        )
+                                    }}
                                 />
                             </div>
                         </div>
@@ -7079,7 +7657,7 @@ function AdminMainContent(props: any) {
                         title="초대글"
                         sectionKey="invite"
                         isOpen={currentOpenSection === "invite"}
-                        onToggle={() => toggleSection("invite")}
+                        onToggle={async () => await toggleSection("invite")}
                     >
                         <div
                             style={{
@@ -7365,30 +7943,30 @@ function AdminMainContent(props: any) {
                                                 width: "100%",
                                                 flexDirection: "column",
                                                 justifyContent: "flex-start",
-                                                alignItems: "flex-start",
+                                                alignItems: "center",
                                                 display: "inline-flex",
                                             }}
                                         >
                                             <div
                                                 style={{
-                                                    alignSelf: "stretch",
                                                     color: "black",
                                                     fontSize: 18,
-                                                    ...theme.font.bodyBold,
+                                                    ...pretendardSemiBoldStyle,
                                                     lineHeight: "32px",
                                                     wordWrap: "break-word",
+                                                    textAlign: "center",
                                                 }}
                                             >
                                                 {inviteData.groomName || ""}
                                             </div>
                                             <div
                                                 style={{
-                                                    ...theme.font.bodyBold,
-                                                    alignSelf: "stretch",
                                                     color: "black",
                                                     fontSize: 18,
+                                                    ...pretendardSemiBoldStyle,
                                                     lineHeight: "32px",
                                                     wordWrap: "break-word",
+                                                    textAlign: "center",
                                                 }}
                                             >
                                                 {inviteData.brideName || ""}
@@ -7432,12 +8010,21 @@ function AdminMainContent(props: any) {
                                             }
                                             rows={6}
                                             style={{
-                                                width: "100%",
+                                                width: "calc(100% * 1.1429)",
+                                                height: "calc(120px * 1.1429)", // rows={6} * 20px lineHeight
                                                 border: "none",
                                                 outline: "none",
                                                 background: "transparent",
-                                                ...theme.typography.body,
-                                                lineHeight: "20px",
+                                                fontFamily: theme.font.body,
+                                                fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
+                                                transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                transformOrigin: "left center",
+                                                marginBottom:
+                                                    "calc(120px - 120px * 0.875)", // 하단 여백 제거
+                                                lineHeight:
+                                                    "calc(20px * 1.1429)",
+                                                paddingLeft:
+                                                    "calc(0px * 0.875)", // scale로 인한 좌측 여백 보정
                                                 color: inviteData.invitationText
                                                     ? "black"
                                                     : "#ADADAD",
@@ -7542,10 +8129,16 @@ function AdminMainContent(props: any) {
                                                     }
                                                     placeholder="아버지 성함"
                                                     style={{
-                                                        width: "100%",
+                                                        width: "calc(100% * 1.1429)",
                                                         border: "none",
                                                         outline: "none",
-                                                        fontSize: 14,
+                                                        fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
+                                                        transform:
+                                                            "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                        transformOrigin:
+                                                            "left center",
+                                                        paddingLeft:
+                                                            "calc(0px * 0.875)", // scale로 인한 좌측 여백 보정
                                                     }}
                                                 />
                                             </div>
@@ -7593,10 +8186,16 @@ function AdminMainContent(props: any) {
                                                     }
                                                     placeholder="어머니 성함"
                                                     style={{
-                                                        width: "100%",
+                                                        width: "calc(100% * 1.1429)",
                                                         border: "none",
                                                         outline: "none",
-                                                        fontSize: 14,
+                                                        fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
+                                                        transform:
+                                                            "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                        transformOrigin:
+                                                            "left center",
+                                                        paddingLeft:
+                                                            "calc(0px * 0.875)", // scale로 인한 좌측 여백 보정
                                                     }}
                                                 />
                                             </div>
@@ -7654,12 +8253,19 @@ function AdminMainContent(props: any) {
                                                     e.target.value
                                                 )
                                             }
-                                            placeholder={pageSettings.groom_name_kr || "신랑 성함"}
+                                            placeholder={
+                                                pageSettings.groom_name_kr ||
+                                                "신랑 성함"
+                                            }
                                             style={{
-                                                width: "100%",
+                                                width: "calc(100% * 1.1429)",
                                                 border: "none",
                                                 outline: "none",
-                                                fontSize: 14,
+                                                paddingLeft:
+                                                    "calc(0px * 0.875)",
+                                                fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
+                                                transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                transformOrigin: "left center",
                                             }}
                                         />
                                     </div>
@@ -7716,10 +8322,16 @@ function AdminMainContent(props: any) {
                                                     }
                                                     placeholder="아버지 성함"
                                                     style={{
-                                                        width: "100%",
+                                                        width: "calc(100% * 1.1429)",
                                                         border: "none",
                                                         outline: "none",
-                                                        fontSize: 14,
+                                                        fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
+                                                        transform:
+                                                            "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                        transformOrigin:
+                                                            "left center",
+                                                        paddingLeft:
+                                                            "calc(0px * 0.875)", // scale로 인한 좌측 여백 보정
                                                     }}
                                                 />
                                             </div>
@@ -7767,10 +8379,16 @@ function AdminMainContent(props: any) {
                                                     }
                                                     placeholder="어머니 성함"
                                                     style={{
-                                                        width: "100%",
+                                                        width: "calc(100% * 1.1429)",
                                                         border: "none",
                                                         outline: "none",
-                                                        fontSize: 14,
+                                                        fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
+                                                        transform:
+                                                            "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                        transformOrigin:
+                                                            "left center",
+                                                        paddingLeft:
+                                                            "calc(0px * 0.875)", // scale로 인한 좌측 여백 보정
                                                     }}
                                                 />
                                             </div>
@@ -7829,22 +8447,31 @@ function AdminMainContent(props: any) {
                                                     e.target.value
                                                 )
                                             }
-                                            placeholder={pageSettings.bride_name_kr || "신부 성함"}
+                                            placeholder={
+                                                pageSettings.bride_name_kr ||
+                                                "신부 성함"
+                                            }
                                             style={{
-                                                width: "100%",
+                                                width: "calc(100% * 1.1429)",
                                                 border: "none",
                                                 outline: "none",
-                                                fontSize: 14,
+                                                paddingLeft:
+                                                    "calc(0px * 0.875)",
+                                                fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
+                                                transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                transformOrigin: "left center",
                                             }}
                                         />
                                     </div>
                                 </div>
 
-                                {/* 저장 */}
-                                <SaveBar
-                                    onSave={saveInviteData}
-                                    loading={inviteSaving}
-                                />
+                                <div style={{ width: "100%", marginTop: 12 }}>
+                                    <SaveSectionButton
+                                        onSave={async () => {
+                                            await saveInviteData()
+                                        }}
+                                    />
+                                </div>
                             </div>
                         </div>
                     </AccordionSection>
@@ -7854,7 +8481,7 @@ function AdminMainContent(props: any) {
                         title="연락처"
                         sectionKey="contacts"
                         isOpen={currentOpenSection === "contacts"}
-                        onToggle={() => toggleSection("contacts")}
+                        onToggle={async () => await toggleSection("contacts")}
                     >
                         <div
                             style={{
@@ -7941,7 +8568,7 @@ function AdminMainContent(props: any) {
                                                 gap: theme.gap.sm,
                                             }}
                                         >
-                                            초대글에서 입력한 이름 불러오기
+                                            앞에서 이름 불러오기
                                         </button>
                                     </div>
                                 )}
@@ -7955,8 +8582,28 @@ function AdminMainContent(props: any) {
                                         gap: theme.gap.sm,
                                     }}
                                 >
-                                    <div style={theme.typography.label}>
-                                        신랑
+                                    <div
+                                        style={{
+                                            ...theme.typography.label,
+                                            display: "flex",
+                                            justifyContent: "space-between",
+                                            alignItems: "center",
+                                        }}
+                                    >
+                                        <span>신랑</span>
+                                        <div
+                                            style={{ width: 22, height: 13.75 }}
+                                        >
+                                            <ContactToggleButton
+                                                isOn={contactToggles.groom}
+                                                onChange={(isOn) =>
+                                                    handleContactToggleChange(
+                                                        "groom",
+                                                        isOn
+                                                    )
+                                                }
+                                            />
+                                        </div>
                                     </div>
                                     <div
                                         style={{
@@ -7993,11 +8640,16 @@ function AdminMainContent(props: any) {
                                                 }
                                                 placeholder="신랑 이름"
                                                 style={{
-                                                    width: "100%",
+                                                    width: "calc(100% * 1.1429)",
                                                     border: "none",
                                                     outline: "none",
-                                                    fontSize: 14,
+                                                    fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                     fontFamily: theme.font.body,
+                                                    transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                    transformOrigin:
+                                                        "left center",
+                                                    paddingLeft:
+                                                        "calc(0px * 0.875)", // scale로 인한 좌측 여백 보정
                                                     color: selectedContact?.groom_name
                                                         ? "black"
                                                         : "#ADADAD",
@@ -8041,11 +8693,16 @@ function AdminMainContent(props: any) {
                                                 }
                                                 placeholder="010-1234-5678"
                                                 style={{
-                                                    width: "100%",
+                                                    width: "calc(100% * 1.1429)",
                                                     border: "none",
                                                     outline: "none",
-                                                    fontSize: 14,
+                                                    fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                     fontFamily: theme.font.body,
+                                                    transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                    transformOrigin:
+                                                        "left center",
+                                                    paddingLeft:
+                                                        "calc(0px * 0.875)", // scale로 인한 좌측 여백 보정
                                                     color: selectedContact?.groom_phone
                                                         ? "black"
                                                         : "#ADADAD",
@@ -8064,8 +8721,30 @@ function AdminMainContent(props: any) {
                                         gap: theme.gap.sm,
                                     }}
                                 >
-                                    <div style={theme.typography.label}>
-                                        신랑 아버지
+                                    <div
+                                        style={{
+                                            ...theme.typography.label,
+                                            display: "flex",
+                                            justifyContent: "space-between",
+                                            alignItems: "center",
+                                        }}
+                                    >
+                                        <span>신랑 아버지</span>
+                                        <div
+                                            style={{ width: 22, height: 13.75 }}
+                                        >
+                                            <ContactToggleButton
+                                                isOn={
+                                                    contactToggles.groomFather
+                                                }
+                                                onChange={(isOn) =>
+                                                    handleContactToggleChange(
+                                                        "groomFather",
+                                                        isOn
+                                                    )
+                                                }
+                                            />
+                                        </div>
                                     </div>
                                     <div
                                         style={{
@@ -8102,11 +8781,16 @@ function AdminMainContent(props: any) {
                                                 }
                                                 placeholder="신랑 아버지 이름"
                                                 style={{
-                                                    width: "100%",
+                                                    width: "calc(100% * 1.1429)",
                                                     border: "none",
                                                     outline: "none",
-                                                    fontSize: 14,
+                                                    fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                     fontFamily: theme.font.body,
+                                                    transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                    transformOrigin:
+                                                        "left center",
+                                                    paddingLeft:
+                                                        "calc(0px * 0.875)",
                                                     color: selectedContact?.groom_father_name
                                                         ? "black"
                                                         : "#ADADAD",
@@ -8150,11 +8834,16 @@ function AdminMainContent(props: any) {
                                                 }
                                                 placeholder="010-1234-5678"
                                                 style={{
-                                                    width: "100%",
+                                                    width: "calc(100% * 1.1429)",
                                                     border: "none",
                                                     outline: "none",
-                                                    fontSize: 14,
+                                                    fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                     fontFamily: theme.font.body,
+                                                    transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                    transformOrigin:
+                                                        "left center",
+                                                    paddingLeft:
+                                                        "calc(0px * 0.875)",
                                                     color: selectedContact?.groom_father_phone
                                                         ? "black"
                                                         : "#ADADAD",
@@ -8173,8 +8862,30 @@ function AdminMainContent(props: any) {
                                         gap: theme.gap.sm,
                                     }}
                                 >
-                                    <div style={theme.typography.label}>
-                                        신랑 어머니
+                                    <div
+                                        style={{
+                                            ...theme.typography.label,
+                                            display: "flex",
+                                            justifyContent: "space-between",
+                                            alignItems: "center",
+                                        }}
+                                    >
+                                        <span>신랑 어머니</span>
+                                        <div
+                                            style={{ width: 22, height: 13.75 }}
+                                        >
+                                            <ContactToggleButton
+                                                isOn={
+                                                    contactToggles.groomMother
+                                                }
+                                                onChange={(isOn) =>
+                                                    handleContactToggleChange(
+                                                        "groomMother",
+                                                        isOn
+                                                    )
+                                                }
+                                            />
+                                        </div>
                                     </div>
                                     <div
                                         style={{
@@ -8211,11 +8922,16 @@ function AdminMainContent(props: any) {
                                                 }
                                                 placeholder="신랑 어머니 이름"
                                                 style={{
-                                                    width: "100%",
+                                                    width: "calc(100% * 1.1429)",
                                                     border: "none",
                                                     outline: "none",
-                                                    fontSize: 14,
+                                                    fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                     fontFamily: theme.font.body,
+                                                    transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                    transformOrigin:
+                                                        "left center",
+                                                    paddingLeft:
+                                                        "calc(0px * 0.875)",
                                                     color: selectedContact?.groom_mother_name
                                                         ? "black"
                                                         : "#ADADAD",
@@ -8259,11 +8975,16 @@ function AdminMainContent(props: any) {
                                                 }
                                                 placeholder="010-1234-5678"
                                                 style={{
-                                                    width: "100%",
+                                                    width: "calc(100% * 1.1429)",
                                                     border: "none",
                                                     outline: "none",
-                                                    fontSize: 14,
+                                                    fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                     fontFamily: theme.font.body,
+                                                    transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                    transformOrigin:
+                                                        "left center",
+                                                    paddingLeft:
+                                                        "calc(0px * 0.875)",
                                                     color: selectedContact?.groom_mother_phone
                                                         ? "black"
                                                         : "#ADADAD",
@@ -8282,8 +9003,28 @@ function AdminMainContent(props: any) {
                                         gap: theme.gap.sm,
                                     }}
                                 >
-                                    <div style={theme.typography.label}>
-                                        신부
+                                    <div
+                                        style={{
+                                            ...theme.typography.label,
+                                            display: "flex",
+                                            justifyContent: "space-between",
+                                            alignItems: "center",
+                                        }}
+                                    >
+                                        <span>신부</span>
+                                        <div
+                                            style={{ width: 22, height: 13.75 }}
+                                        >
+                                            <ContactToggleButton
+                                                isOn={contactToggles.bride}
+                                                onChange={(isOn) =>
+                                                    handleContactToggleChange(
+                                                        "bride",
+                                                        isOn
+                                                    )
+                                                }
+                                            />
+                                        </div>
                                     </div>
                                     <div
                                         style={{
@@ -8320,11 +9061,16 @@ function AdminMainContent(props: any) {
                                                 }
                                                 placeholder="신부 이름"
                                                 style={{
-                                                    width: "100%",
+                                                    width: "calc(100% * 1.1429)",
                                                     border: "none",
                                                     outline: "none",
-                                                    fontSize: 14,
+                                                    fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                     fontFamily: theme.font.body,
+                                                    transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                    transformOrigin:
+                                                        "left center",
+                                                    paddingLeft:
+                                                        "calc(0px * 0.875)",
                                                     color: selectedContact?.bride_name
                                                         ? "black"
                                                         : "#ADADAD",
@@ -8368,11 +9114,16 @@ function AdminMainContent(props: any) {
                                                 }
                                                 placeholder="010-1234-5678"
                                                 style={{
-                                                    width: "100%",
+                                                    width: "calc(100% * 1.1429)",
                                                     border: "none",
                                                     outline: "none",
-                                                    fontSize: 14,
+                                                    fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                     fontFamily: theme.font.body,
+                                                    transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                    transformOrigin:
+                                                        "left center",
+                                                    paddingLeft:
+                                                        "calc(0px * 0.875)",
                                                     color: selectedContact?.bride_phone
                                                         ? "black"
                                                         : "#ADADAD",
@@ -8390,8 +9141,30 @@ function AdminMainContent(props: any) {
                                         gap: theme.gap.sm,
                                     }}
                                 >
-                                    <div style={theme.typography.label}>
-                                        신부 아버지
+                                    <div
+                                        style={{
+                                            ...theme.typography.label,
+                                            display: "flex",
+                                            justifyContent: "space-between",
+                                            alignItems: "center",
+                                        }}
+                                    >
+                                        <span>신부 아버지</span>
+                                        <div
+                                            style={{ width: 22, height: 13.75 }}
+                                        >
+                                            <ContactToggleButton
+                                                isOn={
+                                                    contactToggles.brideFather
+                                                }
+                                                onChange={(isOn) =>
+                                                    handleContactToggleChange(
+                                                        "brideFather",
+                                                        isOn
+                                                    )
+                                                }
+                                            />
+                                        </div>
                                     </div>
                                     <div
                                         style={{
@@ -8428,11 +9201,16 @@ function AdminMainContent(props: any) {
                                                 }
                                                 placeholder="신부 아버지 이름"
                                                 style={{
-                                                    width: "100%",
+                                                    width: "calc(100% * 1.1429)",
                                                     border: "none",
                                                     outline: "none",
-                                                    fontSize: 14,
+                                                    fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                     fontFamily: theme.font.body,
+                                                    transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                    transformOrigin:
+                                                        "left center",
+                                                    paddingLeft:
+                                                        "calc(0px * 0.875)",
                                                     color: selectedContact?.bride_father_name
                                                         ? "black"
                                                         : "#ADADAD",
@@ -8476,11 +9254,16 @@ function AdminMainContent(props: any) {
                                                 }
                                                 placeholder="010-1234-5678"
                                                 style={{
-                                                    width: "100%",
+                                                    width: "calc(100% * 1.1429)",
                                                     border: "none",
                                                     outline: "none",
-                                                    fontSize: 14,
+                                                    fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                     fontFamily: theme.font.body,
+                                                    transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                    transformOrigin:
+                                                        "left center",
+                                                    paddingLeft:
+                                                        "calc(0px * 0.875)",
                                                     color: selectedContact?.bride_father_phone
                                                         ? "black"
                                                         : "#ADADAD",
@@ -8500,8 +9283,30 @@ function AdminMainContent(props: any) {
                                         marginBottom: 16,
                                     }}
                                 >
-                                    <div style={theme.typography.label}>
-                                        신부 어머니
+                                    <div
+                                        style={{
+                                            ...theme.typography.label,
+                                            display: "flex",
+                                            justifyContent: "space-between",
+                                            alignItems: "center",
+                                        }}
+                                    >
+                                        <span>신부 어머니</span>
+                                        <div
+                                            style={{ width: 22, height: 13.75 }}
+                                        >
+                                            <ContactToggleButton
+                                                isOn={
+                                                    contactToggles.brideMother
+                                                }
+                                                onChange={(isOn) =>
+                                                    handleContactToggleChange(
+                                                        "brideMother",
+                                                        isOn
+                                                    )
+                                                }
+                                            />
+                                        </div>
                                     </div>
                                     <div
                                         style={{
@@ -8538,11 +9343,16 @@ function AdminMainContent(props: any) {
                                                 }
                                                 placeholder="신부 어머니 이름"
                                                 style={{
-                                                    width: "100%",
+                                                    width: "calc(100% * 1.1429)",
                                                     border: "none",
                                                     outline: "none",
-                                                    fontSize: 14,
+                                                    fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                     fontFamily: theme.font.body,
+                                                    transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                    transformOrigin:
+                                                        "left center",
+                                                    paddingLeft:
+                                                        "calc(0px * 0.875)",
                                                     color: selectedContact?.bride_mother_name
                                                         ? "black"
                                                         : "#ADADAD",
@@ -8586,11 +9396,16 @@ function AdminMainContent(props: any) {
                                                 }
                                                 placeholder="010-1234-5678"
                                                 style={{
-                                                    width: "100%",
+                                                    width: "calc(100% * 1.1429)",
                                                     border: "none",
                                                     outline: "none",
-                                                    fontSize: 14,
+                                                    fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                     fontFamily: theme.font.body,
+                                                    transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                    transformOrigin:
+                                                        "left center",
+                                                    paddingLeft:
+                                                        "calc(0px * 0.875)",
                                                     color: selectedContact?.bride_mother_phone
                                                         ? "black"
                                                         : "#ADADAD",
@@ -8599,11 +9414,12 @@ function AdminMainContent(props: any) {
                                         </div>
                                     </div>
                                 </div>
-
-                                {/* 저장 버튼 */}
-                                <SaveBar
-                                    onSave={handleSaveContactInline}
-                                    loading={loading}
+                            </div>
+                            <div style={{ width: "100%", marginTop: 12 }}>
+                                <SaveSectionButton
+                                    onSave={async () => {
+                                        await handleSaveContactInline()
+                                    }}
                                 />
                             </div>
                         </div>
@@ -8613,14 +9429,15 @@ function AdminMainContent(props: any) {
                         title="캘린더"
                         sectionKey="calendar"
                         isOpen={currentOpenSection === "calendar"}
-                        onToggle={() => toggleSection("calendar")}
+                        onToggle={async () => await toggleSection("calendar")}
                     >
                         <div
                             style={{
                                 padding: "32px 16px",
                                 backgroundColor: "white",
                                 display: "flex",
-                                justifyContent: "center",
+                                flexDirection: "column",
+                                justifyContent: "flex-start",
                                 alignItems: "flex-start",
                                 gap: 10,
                             }}
@@ -8777,7 +9594,7 @@ function AdminMainContent(props: any) {
                                                 <div
                                                     style={{
                                                         color: "#757575",
-                                                        fontSize: 14,
+                                                        fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                         fontFamily:
                                                             theme.font.body,
                                                     }}
@@ -8831,7 +9648,7 @@ function AdminMainContent(props: any) {
                                                 <div
                                                     style={{
                                                         color: "#757575",
-                                                        fontSize: 14,
+                                                        fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                         fontFamily:
                                                             theme.font.body,
                                                     }}
@@ -8950,6 +9767,14 @@ function AdminMainContent(props: any) {
                                                     borderRadius: 4,
                                                     display: "flex",
                                                     alignItems: "center",
+                                                    cursor: "pointer",
+                                                }}
+                                                onClick={() => {
+                                                    const colorInput =
+                                                        document.getElementById(
+                                                            "highlight-color-picker"
+                                                        ) as HTMLInputElement
+                                                    colorInput?.click()
                                                 }}
                                             >
                                                 <div
@@ -8959,6 +9784,29 @@ function AdminMainContent(props: any) {
                                                         backgroundColor:
                                                             pageSettings.highlight_color ||
                                                             "#e0e0e0",
+                                                    }}
+                                                />
+                                                {/* 숨겨진 color input */}
+                                                <input
+                                                    id="highlight-color-picker"
+                                                    type="color"
+                                                    value={
+                                                        pageSettings.highlight_color ||
+                                                        "#e0e0e0"
+                                                    }
+                                                    onChange={(e) => {
+                                                        setPageSettings({
+                                                            ...pageSettings,
+                                                            highlight_color:
+                                                                e.target.value,
+                                                        })
+                                                    }}
+                                                    style={{
+                                                        position: "absolute",
+                                                        opacity: 0,
+                                                        pointerEvents: "none",
+                                                        width: 0,
+                                                        height: 0,
                                                     }}
                                                 />
                                             </div>
@@ -9039,7 +9887,7 @@ function AdminMainContent(props: any) {
                                                 <div
                                                     style={{
                                                         color: "#757575",
-                                                        fontSize: 14,
+                                                        fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                         fontFamily:
                                                             theme.font.body,
                                                     }}
@@ -9093,7 +9941,7 @@ function AdminMainContent(props: any) {
                                                 <div
                                                     style={{
                                                         color: "#757575",
-                                                        fontSize: 14,
+                                                        fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                         fontFamily:
                                                             theme.font.body,
                                                     }}
@@ -9103,14 +9951,21 @@ function AdminMainContent(props: any) {
                                             </div>
                                         </div>
                                     </div>
-
-                                    {/* 저장 버튼 */}
-                                    <SaveBar
-                                        onSave={savePageSettings}
-                                        loading={settingsLoading}
-                                        label="저장"
-                                    />
                                 </div>
+                            </div>
+                            <div style={{ width: "100%", marginTop: 12 }}>
+                                <SaveSectionButton
+                                    onSave={async () => {
+                                        await savePageSettings(
+                                            {
+                                                highlight_shape: pageSettings.highlight_shape,
+                                                highlight_color: pageSettings.highlight_color,
+                                                highlight_text_color: pageSettings.highlight_text_color,
+                                            },
+                                            { silent: true }
+                                        )
+                                    }}
+                                />
                             </div>
                         </div>
                     </AccordionSection>
@@ -9120,7 +9975,7 @@ function AdminMainContent(props: any) {
                         title="교통 안내"
                         sectionKey="transport"
                         isOpen={currentOpenSection === "transport"}
-                        onToggle={() => toggleSection("transport")}
+                        onToggle={async () => await toggleSection("transport")}
                     >
                         <div
                             style={{
@@ -9144,9 +9999,71 @@ function AdminMainContent(props: any) {
                                 <TransportTab
                                     pageId={currentPageId}
                                     tokenGetter={getAuthToken}
-                                    setError={setError}
-                                    setSuccess={setSuccess}
+                                    hideSaveButton={true}
                                 />
+                                <div style={{ width: "100%", marginTop: 12 }}>
+                                    <SaveSectionButton
+                                        onSave={async () => {
+                                            // TransportTab의 저장 로직을 직접 호출
+                                            const token = getAuthToken?.() || ""
+                                            const getApiBases = () => {
+                                                const bases: string[] = []
+                                                try {
+                                                    if (
+                                                        typeof window !== "undefined" &&
+                                                        window.location?.origin
+                                                    ) {
+                                                        bases.push(window.location.origin)
+                                                    }
+                                                } catch {}
+                                                bases.push(PROXY_BASE_URL)
+                                                return Array.from(new Set(bases.filter(Boolean)))
+                                            }
+                                            const bases = getApiBases()
+                                            let res: Response | null = null
+                                            let text = ""
+                                            for (const base of bases) {
+                                                try {
+                                                    const tryRes = await fetch(
+                                                        `${base}/api/page-settings?transport`,
+                                                        {
+                                                            method: "POST",
+                                                            headers: {
+                                                                "Content-Type": "application/json",
+                                                                ...(token
+                                                                    ? { Authorization: `Bearer ${token}` }
+                                                                    : {}),
+                                                            },
+                                                            body: JSON.stringify({
+                                                                pageId: currentPageId,
+                                                                items: [], // TransportTab에서 관리하는 items
+                                                                locationName: pageSettings.venue_name,
+                                                                venue_address: pageSettings.venue_address,
+                                                            }),
+                                                        }
+                                                    )
+                                                    res = tryRes
+                                                    text = await tryRes.text()
+                                                    if (tryRes.ok) break
+                                                } catch (e) {
+                                                    // continue to next base
+                                                }
+                                            }
+                                            if (!res) throw new Error("network error")
+                                            let result: any = {}
+                                            try {
+                                                result = JSON.parse(text)
+                                            } catch {
+                                                result = { raw: text }
+                                            }
+                                            if (!res.ok || !result?.success) {
+                                                throw new Error(
+                                                    result?.message || result?.error || text || "저장 실패"
+                                                )
+                                            }
+                                        }}
+                                    />
+                                </div>
                             </div>
                         </div>
                     </AccordionSection>
@@ -9156,7 +10073,23 @@ function AdminMainContent(props: any) {
                         title="안내 사항"
                         sectionKey="info"
                         isOpen={currentOpenSection === "info"}
-                        onToggle={() => toggleSection("info")}
+                        onToggle={async () => await toggleSection("info")}
+                        toggleButton={
+                            <ToggleButton
+                                isOn={pageSettings.info === "on"}
+                                onToggle={async () => {
+                                    const newInfo =
+                                        pageSettings.info === "on"
+                                            ? "off"
+                                            : "on"
+                                    setPageSettings((prev) => ({
+                                        ...prev,
+                                        info: newInfo,
+                                    }))
+                                    await savePageSettings({ info: newInfo }, { silent: true })
+                                }}
+                            />
+                        }
                     >
                         <div
                             style={{
@@ -9180,9 +10113,8 @@ function AdminMainContent(props: any) {
                                 <InfoTab
                                     pageId={currentPageId}
                                     tokenGetter={getAuthToken}
-                                    setError={setError}
-                                    setSuccess={setSuccess}
                                 />
+                                    {/* 안내 사항: 저장 버튼 중복 방지 위해 기존 추가 버튼 제거 (아코디언 닫힘 저장 유지) */}
                             </div>
                         </div>
                     </AccordionSection>
@@ -9192,7 +10124,23 @@ function AdminMainContent(props: any) {
                         title="계좌 안내"
                         sectionKey="account"
                         isOpen={currentOpenSection === "account"}
-                        onToggle={() => toggleSection("account")}
+                        onToggle={async () => await toggleSection("account")}
+                        toggleButton={
+                            <ToggleButton
+                                isOn={pageSettings.account === "on"}
+                                onToggle={async () => {
+                                    const newAccount =
+                                        pageSettings.account === "on"
+                                            ? "off"
+                                            : "on"
+                                    setPageSettings((prev) => ({
+                                        ...prev,
+                                        account: newAccount,
+                                    }))
+                                    await savePageSettings({ account: newAccount }, { silent: true })
+                                }}
+                            />
+                        }
                     >
                         <div
                             style={{
@@ -9212,78 +10160,6 @@ function AdminMainContent(props: any) {
                                     gap: "36px",
                                 }}
                             >
-                                {/* 초대글에서 이름 불러오기 버튼 */}
-                                {(inviteData.groomName ||
-                                    inviteData.brideName ||
-                                    inviteData.groomFatherName ||
-                                    inviteData.groomMotherName ||
-                                    inviteData.brideFatherName ||
-                                    inviteData.brideMotherName) && (
-                                    <div
-                                        style={{
-                                            width: "100%",
-                                            display: "flex",
-                                            justifyContent: "center",
-                                            marginBottom: theme.gap.sm,
-                                        }}
-                                    >
-                                        <button
-                                            onClick={() => {
-                                                // 초대글의 이름들을 계좌번호 필드로 복사
-                                                setSelectedContact(
-                                                    (prev) =>
-                                                        ({
-                                                            ...(prev || {}),
-                                                            page_id:
-                                                                prev?.page_id ||
-                                                                currentPageId,
-                                                            groom_name:
-                                                                inviteData.groomName ||
-                                                                prev?.groom_name ||
-                                                                "",
-                                                            bride_name:
-                                                                inviteData.brideName ||
-                                                                prev?.bride_name ||
-                                                                "",
-                                                            groom_father_name:
-                                                                inviteData.groomFatherName ||
-                                                                prev?.groom_father_name ||
-                                                                "",
-                                                            groom_mother_name:
-                                                                inviteData.groomMotherName ||
-                                                                prev?.groom_mother_name ||
-                                                                "",
-                                                            bride_father_name:
-                                                                inviteData.brideFatherName ||
-                                                                prev?.bride_father_name ||
-                                                                "",
-                                                            bride_mother_name:
-                                                                inviteData.brideMotherName ||
-                                                                prev?.bride_mother_name ||
-                                                                "",
-                                                        }) as ContactInfo
-                                                )
-                                            }}
-                                            style={{
-                                                padding: "8px 16px",
-                                                backgroundColor:
-                                                    theme.color.surface,
-                                                color: theme.color.text,
-                                                border: `1px solid ${theme.color.border}`,
-                                                borderRadius: theme.radius.sm,
-                                                fontSize: theme.text.sm,
-                                                ...theme.font.bodyBold,
-                                                cursor: "pointer",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                gap: theme.gap.sm,
-                                            }}
-                                        >
-                                            초대글에서 입력한 이름 불러오기
-                                        </button>
-                                    </div>
-                                )}
-
                                 {/* 계좌번호 입력 폼들 */}
                                 {/* 신랑측 계좌 */}
                                 <div
@@ -9301,8 +10177,31 @@ function AdminMainContent(props: any) {
                                             gap: theme.gap.sm,
                                         }}
                                     >
-                                        <div style={theme.typography.label}>
-                                            신랑
+                                        <div
+                                            style={{
+                                                ...theme.typography.label,
+                                                display: "flex",
+                                                justifyContent: "space-between",
+                                                alignItems: "center",
+                                            }}
+                                        >
+                                            <span>신랑</span>
+                                            <div
+                                                style={{
+                                                    width: 22,
+                                                    height: 13.75,
+                                                }}
+                                            >
+                                                <ContactToggleButton
+                                                    isOn={accountToggles.groom}
+                                                    onChange={(isOn) =>
+                                                        handleAccountToggleChange(
+                                                            "groom",
+                                                            isOn
+                                                        )
+                                                    }
+                                                />
+                                            </div>
                                         </div>
                                         {/* 이름 입력 */}
                                         <div
@@ -9320,22 +10219,27 @@ function AdminMainContent(props: any) {
                                             <input
                                                 type="text"
                                                 value={
-                                                    selectedContact?.groom_name ||
+                                                    selectedContact?.groom_bank_name ||
                                                     ""
                                                 }
                                                 onChange={(e) =>
                                                     handleContactInputChange(
-                                                        "groom_name",
+                                                        "groom_bank_name",
                                                         e.target.value
                                                     )
                                                 }
-                                                placeholder="신랑 이름"
+                                                placeholder="예금주"
                                                 style={{
-                                                    width: "100%",
+                                                    width: "calc(100% * 1.1429)",
                                                     border: "none",
                                                     outline: "none",
-                                                    fontSize: 14,
+                                                    fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                     fontFamily: theme.font.body,
+                                                    transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                    transformOrigin:
+                                                        "left center",
+                                                    paddingLeft:
+                                                        "calc(0px * 0.875)", // scale로 인한 좌측 여백 보정
                                                     color: selectedContact?.groom_name
                                                         ? "black"
                                                         : "#ADADAD",
@@ -9375,12 +10279,18 @@ function AdminMainContent(props: any) {
                                                     }
                                                     placeholder="은행명"
                                                     style={{
-                                                        width: "100%",
+                                                        width: "calc(100% * 1.1429)",
                                                         border: "none",
                                                         outline: "none",
-                                                        fontSize: 14,
+                                                        fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                         fontFamily:
                                                             theme.font.body,
+                                                        transform:
+                                                            "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                        transformOrigin:
+                                                            "left center",
+                                                        paddingLeft:
+                                                            "calc(0px * 0.875)", // scale로 인한 좌측 여백 보정
                                                         color: selectedContact?.groom_bank
                                                             ? "black"
                                                             : "#ADADAD",
@@ -9413,12 +10323,18 @@ function AdminMainContent(props: any) {
                                                     }
                                                     placeholder="계좌번호"
                                                     style={{
-                                                        width: "100%",
+                                                        width: "calc(100% * 1.1429)",
                                                         border: "none",
                                                         outline: "none",
-                                                        fontSize: 14,
+                                                        fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                         fontFamily:
                                                             theme.font.body,
+                                                        transform:
+                                                            "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                        transformOrigin:
+                                                            "left center",
+                                                        paddingLeft:
+                                                            "calc(0px * 0.875)", // scale로 인한 좌측 여백 보정
                                                         color: selectedContact?.groom_account
                                                             ? "black"
                                                             : "#ADADAD",
@@ -9437,8 +10353,33 @@ function AdminMainContent(props: any) {
                                             gap: theme.gap.sm,
                                         }}
                                     >
-                                        <div style={theme.typography.label}>
-                                            신랑 아버지
+                                        <div
+                                            style={{
+                                                ...theme.typography.label,
+                                                display: "flex",
+                                                justifyContent: "space-between",
+                                                alignItems: "center",
+                                            }}
+                                        >
+                                            <span>신랑 혼주 1</span>
+                                            <div
+                                                style={{
+                                                    width: 22,
+                                                    height: 13.75,
+                                                }}
+                                            >
+                                                <ContactToggleButton
+                                                    isOn={
+                                                        accountToggles.groomFather
+                                                    }
+                                                    onChange={(isOn) =>
+                                                        handleAccountToggleChange(
+                                                            "groomFather",
+                                                            isOn
+                                                        )
+                                                    }
+                                                />
+                                            </div>
                                         </div>
                                         {/* 이름 입력 */}
                                         <div
@@ -9456,22 +10397,27 @@ function AdminMainContent(props: any) {
                                             <input
                                                 type="text"
                                                 value={
-                                                    selectedContact?.groom_father_name ||
+                                                    selectedContact?.groom_father_bank_name ||
                                                     ""
                                                 }
                                                 onChange={(e) =>
                                                     handleContactInputChange(
-                                                        "groom_father_name",
+                                                        "groom_father_bank_name",
                                                         e.target.value
                                                     )
                                                 }
-                                                placeholder="신랑 아버지 이름"
+                                                placeholder="예금주"
                                                 style={{
-                                                    width: "100%",
+                                                    width: "calc(100% * 1.1429)",
                                                     border: "none",
                                                     outline: "none",
-                                                    fontSize: 14,
+                                                    fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                     fontFamily: theme.font.body,
+                                                    transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                    transformOrigin:
+                                                        "left center",
+                                                    paddingLeft:
+                                                        "calc(0px * 0.875)",
                                                     color: selectedContact?.groom_father_name
                                                         ? "black"
                                                         : "#ADADAD",
@@ -9511,12 +10457,18 @@ function AdminMainContent(props: any) {
                                                     }
                                                     placeholder="은행명"
                                                     style={{
-                                                        width: "100%",
+                                                        width: "calc(100% * 1.1429)",
                                                         border: "none",
                                                         outline: "none",
-                                                        fontSize: 14,
+                                                        fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                         fontFamily:
                                                             theme.font.body,
+                                                        transform:
+                                                            "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                        transformOrigin:
+                                                            "left center",
+                                                        paddingLeft:
+                                                            "calc(0px * 0.875)",
                                                         color: selectedContact?.groom_father_bank
                                                             ? "black"
                                                             : "#ADADAD",
@@ -9549,12 +10501,18 @@ function AdminMainContent(props: any) {
                                                     }
                                                     placeholder="계좌번호"
                                                     style={{
-                                                        width: "100%",
+                                                        width: "calc(100% * 1.1429)",
                                                         border: "none",
                                                         outline: "none",
-                                                        fontSize: 14,
+                                                        fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                         fontFamily:
                                                             theme.font.body,
+                                                        transform:
+                                                            "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                        transformOrigin:
+                                                            "left center",
+                                                        paddingLeft:
+                                                            "calc(0px * 0.875)",
                                                         color: selectedContact?.groom_father_account
                                                             ? "black"
                                                             : "#ADADAD",
@@ -9573,8 +10531,33 @@ function AdminMainContent(props: any) {
                                             gap: theme.gap.sm,
                                         }}
                                     >
-                                        <div style={theme.typography.label}>
-                                            신랑 어머니
+                                        <div
+                                            style={{
+                                                ...theme.typography.label,
+                                                display: "flex",
+                                                justifyContent: "space-between",
+                                                alignItems: "center",
+                                            }}
+                                        >
+                                            <span>신랑 혼주 2</span>
+                                            <div
+                                                style={{
+                                                    width: 22,
+                                                    height: 13.75,
+                                                }}
+                                            >
+                                                <ContactToggleButton
+                                                    isOn={
+                                                        accountToggles.groomMother
+                                                    }
+                                                    onChange={(isOn) =>
+                                                        handleAccountToggleChange(
+                                                            "groomMother",
+                                                            isOn
+                                                        )
+                                                    }
+                                                />
+                                            </div>
                                         </div>
                                         {/* 이름 입력 */}
                                         <div
@@ -9592,22 +10575,27 @@ function AdminMainContent(props: any) {
                                             <input
                                                 type="text"
                                                 value={
-                                                    selectedContact?.groom_mother_name ||
+                                                    selectedContact?.groom_mother_bank_name ||
                                                     ""
                                                 }
                                                 onChange={(e) =>
                                                     handleContactInputChange(
-                                                        "groom_mother_name",
+                                                        "groom_mother_bank_name",
                                                         e.target.value
                                                     )
                                                 }
-                                                placeholder="신랑 어머니 이름"
+                                                placeholder="예금주"
                                                 style={{
-                                                    width: "100%",
+                                                    width: "calc(100% * 1.1429)",
                                                     border: "none",
                                                     outline: "none",
-                                                    fontSize: 14,
+                                                    fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                     fontFamily: theme.font.body,
+                                                    transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                    transformOrigin:
+                                                        "left center",
+                                                    paddingLeft:
+                                                        "calc(0px * 0.875)",
                                                     color: selectedContact?.groom_mother_name
                                                         ? "black"
                                                         : "#ADADAD",
@@ -9647,12 +10635,18 @@ function AdminMainContent(props: any) {
                                                     }
                                                     placeholder="은행명"
                                                     style={{
-                                                        width: "100%",
+                                                        width: "calc(100% * 1.1429)",
                                                         border: "none",
                                                         outline: "none",
-                                                        fontSize: 14,
+                                                        fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                         fontFamily:
                                                             theme.font.body,
+                                                        transform:
+                                                            "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                        transformOrigin:
+                                                            "left center",
+                                                        paddingLeft:
+                                                            "calc(0px * 0.875)",
                                                         color: selectedContact?.groom_mother_bank
                                                             ? "black"
                                                             : "#ADADAD",
@@ -9685,12 +10679,18 @@ function AdminMainContent(props: any) {
                                                     }
                                                     placeholder="계좌번호"
                                                     style={{
-                                                        width: "100%",
+                                                        width: "calc(100% * 1.1429)",
                                                         border: "none",
                                                         outline: "none",
-                                                        fontSize: 14,
+                                                        fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                         fontFamily:
                                                             theme.font.body,
+                                                        transform:
+                                                            "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                        transformOrigin:
+                                                            "left center",
+                                                        paddingLeft:
+                                                            "calc(0px * 0.875)",
                                                         color: selectedContact?.groom_mother_account
                                                             ? "black"
                                                             : "#ADADAD",
@@ -9718,8 +10718,31 @@ function AdminMainContent(props: any) {
                                             gap: theme.gap.sm,
                                         }}
                                     >
-                                        <div style={theme.typography.label}>
-                                            신부
+                                        <div
+                                            style={{
+                                                ...theme.typography.label,
+                                                display: "flex",
+                                                justifyContent: "space-between",
+                                                alignItems: "center",
+                                            }}
+                                        >
+                                            <span>신부</span>
+                                            <div
+                                                style={{
+                                                    width: 22,
+                                                    height: 13.75,
+                                                }}
+                                            >
+                                                <ContactToggleButton
+                                                    isOn={accountToggles.bride}
+                                                    onChange={(isOn) =>
+                                                        handleAccountToggleChange(
+                                                            "bride",
+                                                            isOn
+                                                        )
+                                                    }
+                                                />
+                                            </div>
                                         </div>
                                         {/* 이름 입력 */}
                                         <div
@@ -9737,22 +10760,27 @@ function AdminMainContent(props: any) {
                                             <input
                                                 type="text"
                                                 value={
-                                                    selectedContact?.bride_name ||
+                                                    selectedContact?.bride_bank_name ||
                                                     ""
                                                 }
                                                 onChange={(e) =>
                                                     handleContactInputChange(
-                                                        "bride_name",
+                                                        "bride_bank_name",
                                                         e.target.value
                                                     )
                                                 }
-                                                placeholder="신부 이름"
+                                                placeholder="예금주"
                                                 style={{
-                                                    width: "100%",
+                                                    width: "calc(100% * 1.1429)",
                                                     border: "none",
                                                     outline: "none",
-                                                    fontSize: 14,
+                                                    fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                     fontFamily: theme.font.body,
+                                                    transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                    transformOrigin:
+                                                        "left center",
+                                                    paddingLeft:
+                                                        "calc(0px * 0.875)",
                                                     color: selectedContact?.bride_name
                                                         ? "black"
                                                         : "#ADADAD",
@@ -9792,12 +10820,18 @@ function AdminMainContent(props: any) {
                                                     }
                                                     placeholder="은행명"
                                                     style={{
-                                                        width: "100%",
+                                                        width: "calc(100% * 1.1429)",
                                                         border: "none",
                                                         outline: "none",
-                                                        fontSize: 14,
+                                                        fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                         fontFamily:
                                                             theme.font.body,
+                                                        transform:
+                                                            "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                        transformOrigin:
+                                                            "left center",
+                                                        paddingLeft:
+                                                            "calc(0px * 0.875)",
                                                         color: selectedContact?.bride_bank
                                                             ? "black"
                                                             : "#ADADAD",
@@ -9830,12 +10864,18 @@ function AdminMainContent(props: any) {
                                                     }
                                                     placeholder="계좌번호"
                                                     style={{
-                                                        width: "100%",
+                                                        width: "calc(100% * 1.1429)",
                                                         border: "none",
                                                         outline: "none",
-                                                        fontSize: 14,
+                                                        fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                         fontFamily:
                                                             theme.font.body,
+                                                        transform:
+                                                            "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                        transformOrigin:
+                                                            "left center",
+                                                        paddingLeft:
+                                                            "calc(0px * 0.875)",
                                                         color: selectedContact?.bride_account
                                                             ? "black"
                                                             : "#ADADAD",
@@ -9854,8 +10894,33 @@ function AdminMainContent(props: any) {
                                             gap: theme.gap.sm,
                                         }}
                                     >
-                                        <div style={theme.typography.label}>
-                                            신부 아버지
+                                        <div
+                                            style={{
+                                                ...theme.typography.label,
+                                                display: "flex",
+                                                justifyContent: "space-between",
+                                                alignItems: "center",
+                                            }}
+                                        >
+                                            <span>신부 혼주 1</span>
+                                            <div
+                                                style={{
+                                                    width: 22,
+                                                    height: 13.75,
+                                                }}
+                                            >
+                                                <ContactToggleButton
+                                                    isOn={
+                                                        accountToggles.brideFather
+                                                    }
+                                                    onChange={(isOn) =>
+                                                        handleAccountToggleChange(
+                                                            "brideFather",
+                                                            isOn
+                                                        )
+                                                    }
+                                                />
+                                            </div>
                                         </div>
                                         {/* 이름 입력 */}
                                         <div
@@ -9873,22 +10938,27 @@ function AdminMainContent(props: any) {
                                             <input
                                                 type="text"
                                                 value={
-                                                    selectedContact?.bride_father_name ||
+                                                    selectedContact?.bride_father_bank_name ||
                                                     ""
                                                 }
                                                 onChange={(e) =>
                                                     handleContactInputChange(
-                                                        "bride_father_name",
+                                                        "bride_father_bank_name",
                                                         e.target.value
                                                     )
                                                 }
-                                                placeholder="신부 아버지 이름"
+                                                placeholder="예금주"
                                                 style={{
-                                                    width: "100%",
+                                                    width: "calc(100% * 1.1429)",
                                                     border: "none",
                                                     outline: "none",
-                                                    fontSize: 14,
+                                                    fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                     fontFamily: theme.font.body,
+                                                    transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                    transformOrigin:
+                                                        "left center",
+                                                    paddingLeft:
+                                                        "calc(0px * 0.875)",
                                                     color: selectedContact?.bride_father_name
                                                         ? "black"
                                                         : "#ADADAD",
@@ -9928,12 +10998,18 @@ function AdminMainContent(props: any) {
                                                     }
                                                     placeholder="은행명"
                                                     style={{
-                                                        width: "100%",
+                                                        width: "calc(100% * 1.1429)",
                                                         border: "none",
                                                         outline: "none",
-                                                        fontSize: 14,
+                                                        fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                         fontFamily:
                                                             theme.font.body,
+                                                        transform:
+                                                            "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                        transformOrigin:
+                                                            "left center",
+                                                        paddingLeft:
+                                                            "calc(0px * 0.875)",
                                                         color: selectedContact?.bride_father_bank
                                                             ? "black"
                                                             : "#ADADAD",
@@ -9966,12 +11042,18 @@ function AdminMainContent(props: any) {
                                                     }
                                                     placeholder="계좌번호"
                                                     style={{
-                                                        width: "100%",
+                                                        width: "calc(100% * 1.1429)",
                                                         border: "none",
                                                         outline: "none",
-                                                        fontSize: 14,
+                                                        fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                         fontFamily:
                                                             theme.font.body,
+                                                        transform:
+                                                            "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                        transformOrigin:
+                                                            "left center",
+                                                        paddingLeft:
+                                                            "calc(0px * 0.875)",
                                                         color: selectedContact?.bride_father_account
                                                             ? "black"
                                                             : "#ADADAD",
@@ -9990,8 +11072,33 @@ function AdminMainContent(props: any) {
                                             gap: theme.gap.sm,
                                         }}
                                     >
-                                        <div style={theme.typography.label}>
-                                            신부 어머니
+                                        <div
+                                            style={{
+                                                ...theme.typography.label,
+                                                display: "flex",
+                                                justifyContent: "space-between",
+                                                alignItems: "center",
+                                            }}
+                                        >
+                                            <span>신부 혼주 2</span>
+                                            <div
+                                                style={{
+                                                    width: 22,
+                                                    height: 13.75,
+                                                }}
+                                            >
+                                                <ContactToggleButton
+                                                    isOn={
+                                                        accountToggles.brideMother
+                                                    }
+                                                    onChange={(isOn) =>
+                                                        handleAccountToggleChange(
+                                                            "brideMother",
+                                                            isOn
+                                                        )
+                                                    }
+                                                />
+                                            </div>
                                         </div>
                                         {/* 이름 입력 */}
                                         <div
@@ -10009,22 +11116,27 @@ function AdminMainContent(props: any) {
                                             <input
                                                 type="text"
                                                 value={
-                                                    selectedContact?.bride_mother_name ||
+                                                    selectedContact?.bride_mother_bank_name ||
                                                     ""
                                                 }
                                                 onChange={(e) =>
                                                     handleContactInputChange(
-                                                        "bride_mother_name",
+                                                        "bride_mother_bank_name",
                                                         e.target.value
                                                     )
                                                 }
-                                                placeholder="신부 어머니 이름"
+                                                placeholder="예금주"
                                                 style={{
-                                                    width: "100%",
+                                                    width: "calc(100% * 1.1429)",
                                                     border: "none",
                                                     outline: "none",
-                                                    fontSize: 14,
+                                                    fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                     fontFamily: theme.font.body,
+                                                    transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                    transformOrigin:
+                                                        "left center",
+                                                    paddingLeft:
+                                                        "calc(0px * 0.875)",
                                                     color: selectedContact?.bride_mother_name
                                                         ? "black"
                                                         : "#ADADAD",
@@ -10064,12 +11176,18 @@ function AdminMainContent(props: any) {
                                                     }
                                                     placeholder="은행명"
                                                     style={{
-                                                        width: "100%",
+                                                        width: "calc(100% * 1.1429)",
                                                         border: "none",
                                                         outline: "none",
-                                                        fontSize: 14,
+                                                        fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                         fontFamily:
                                                             theme.font.body,
+                                                        transform:
+                                                            "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                        transformOrigin:
+                                                            "left center",
+                                                        paddingLeft:
+                                                            "calc(0px * 0.875)",
                                                         color: selectedContact?.bride_mother_bank
                                                             ? "black"
                                                             : "#ADADAD",
@@ -10102,12 +11220,18 @@ function AdminMainContent(props: any) {
                                                     }
                                                     placeholder="계좌번호"
                                                     style={{
-                                                        width: "100%",
+                                                        width: "calc(100% * 1.1429)",
                                                         border: "none",
                                                         outline: "none",
-                                                        fontSize: 14,
+                                                        fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                         fontFamily:
                                                             theme.font.body,
+                                                        transform:
+                                                            "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                                        transformOrigin:
+                                                            "left center",
+                                                        paddingLeft:
+                                                            "calc(0px * 0.875)",
                                                         color: selectedContact?.bride_mother_account
                                                             ? "black"
                                                             : "#ADADAD",
@@ -10117,11 +11241,59 @@ function AdminMainContent(props: any) {
                                         </div>
                                     </div>
                                 </div>
-
-                                {/* 저장 버튼 */}
-                                <SaveBar
-                                    onSave={handleSaveContactInline}
-                                    loading={loading}
+                            </div>
+                            <div style={{ width: "100%", marginTop: 12 }}>
+                                <SaveSectionButton
+                                    onSave={async () => {
+                                        // 계좌 정보만 저장하는 함수
+                                        const accountData = {
+                                            page_id: currentPageId,
+                                            groom_account: selectedContact?.groom_account || "",
+                                            groom_bank: selectedContact?.groom_bank || "",
+                                            groom_bank_name: selectedContact?.groom_bank_name || "",
+                                            groom_father_account: selectedContact?.groom_father_account || "",
+                                            groom_father_bank: selectedContact?.groom_father_bank || "",
+                                            groom_father_bank_name: selectedContact?.groom_father_bank_name || "",
+                                            groom_mother_account: selectedContact?.groom_mother_account || "",
+                                            groom_mother_bank: selectedContact?.groom_mother_bank || "",
+                                            groom_mother_bank_name: selectedContact?.groom_mother_bank_name || "",
+                                            bride_account: selectedContact?.bride_account || "",
+                                            bride_bank: selectedContact?.bride_bank || "",
+                                            bride_bank_name: selectedContact?.bride_bank_name || "",
+                                            bride_father_account: selectedContact?.bride_father_account || "",
+                                            bride_father_bank: selectedContact?.bride_father_bank || "",
+                                            bride_father_bank_name: selectedContact?.bride_father_bank_name || "",
+                                            bride_mother_account: selectedContact?.bride_mother_account || "",
+                                            bride_mother_bank: selectedContact?.bride_mother_bank || "",
+                                            bride_mother_bank_name: selectedContact?.bride_mother_bank_name || "",
+                                        }
+                                        
+                                        try {
+                                            setLoading(true)
+                                            const result = await saveContact(accountData)
+                                            if (result.success) {
+                                                const saved = result.data
+                                                setSelectedContact(saved)
+                                                setContactList((prev) => {
+                                                    const others = prev.filter(
+                                                        (c) => c.page_id !== currentPageId
+                                                    )
+                                                    return [...others, saved]
+                                                })
+                                                console.log("계좌 정보가 저장되었습니다.")
+                                            } else {
+                                                console.error(result.error || "저장에 실패했습니다")
+                                            }
+                                        } catch (err) {
+                                            console.error(
+                                                err instanceof Error
+                                                    ? err.message
+                                                    : "알 수 없는 오류가 발생했습니다"
+                                            )
+                                        } finally {
+                                            setLoading(false)
+                                        }
+                                    }}
                                 />
                             </div>
                         </div>
@@ -10132,7 +11304,21 @@ function AdminMainContent(props: any) {
                         title="배경음악"
                         sectionKey="bgm"
                         isOpen={currentOpenSection === "bgm"}
-                        onToggle={() => toggleSection("bgm")}
+                        onToggle={async () => await toggleSection("bgm")}
+                        toggleButton={
+                            <ToggleButton
+                                isOn={pageSettings.bgm === "on"}
+                                onToggle={async () => {
+                                    const newBgm =
+                                        pageSettings.bgm === "on" ? "off" : "on"
+                                    setPageSettings((prev) => ({
+                                        ...prev,
+                                        bgm: newBgm,
+                                    }))
+                                    await savePageSettings({ bgm: newBgm }, { silent: true })
+                                }}
+                            />
+                        }
                     >
                         <div
                             style={{
@@ -10190,13 +11376,13 @@ function AdminMainContent(props: any) {
                                                 height: 40,
                                                 padding: 12,
                                                 backgroundColor:
-                                                    selectedBgmId === bgm.id ||
+                                                    previewBgmId === bgm.id ||
                                                     playingBgmId === bgm.id
                                                         ? "#ECECEC"
                                                         : "white",
                                                 borderRadius: 2,
                                                 border: "none",
-                                                outline: `${theme.border.width}px solid ${selectedBgmId === bgm.id || playingBgmId === bgm.id ? "black" : "#E5E6E8"}`,
+                                                outline: `${theme.border.width}px solid ${previewBgmId === bgm.id || playingBgmId === bgm.id ? "black" : "#E5E6E8"}`,
                                                 display: "flex",
                                                 justifyContent: "center",
                                                 alignItems: "center",
@@ -10212,7 +11398,7 @@ function AdminMainContent(props: any) {
                                             <span
                                                 style={{
                                                     color:
-                                                        selectedBgmId ===
+                                                        previewBgmId ===
                                                             bgm.id ||
                                                         playingBgmId === bgm.id
                                                             ? "black"
@@ -10246,13 +11432,13 @@ function AdminMainContent(props: any) {
                                                 height: 40,
                                                 padding: 12,
                                                 backgroundColor:
-                                                    selectedBgmId === bgm.id ||
+                                                    previewBgmId === bgm.id ||
                                                     playingBgmId === bgm.id
                                                         ? "#ECECEC"
                                                         : "white",
                                                 borderRadius: 2,
                                                 border: "none",
-                                                outline: `${theme.border.width}px solid ${selectedBgmId === bgm.id || playingBgmId === bgm.id ? "black" : "#E5E6E8"}`,
+                                                outline: `${theme.border.width}px solid ${previewBgmId === bgm.id || playingBgmId === bgm.id ? "black" : "#E5E6E8"}`,
                                                 display: "flex",
                                                 justifyContent: "center",
                                                 alignItems: "center",
@@ -10268,7 +11454,7 @@ function AdminMainContent(props: any) {
                                             <span
                                                 style={{
                                                     color:
-                                                        selectedBgmId ===
+                                                        previewBgmId ===
                                                             bgm.id ||
                                                         playingBgmId === bgm.id
                                                             ? "black"
@@ -10282,6 +11468,82 @@ function AdminMainContent(props: any) {
                                         </button>
                                     ))}
                                 </div>
+
+                                {/* 무료 음원 저장 버튼 */}
+                                {previewBgmId && (
+                                    <div
+                                        style={{
+                                            display: "flex",
+                                            justifyContent: "center",
+                                            marginTop: 16,
+                                        }}
+                                    >
+                                        <button
+                                            onClick={async () => {
+                                                const selectedBgm =
+                                                    FREE_BGM_LIST.find(
+                                                        (bgm) =>
+                                                            bgm.id ===
+                                                            previewBgmId
+                                                    )
+                                                if (!selectedBgm) return
+
+                                                setSettingsLoading(true)
+                                                try {
+                                                    const updatedSettings = {
+                                                        ...pageSettings,
+                                                        bgm_url:
+                                                            selectedBgm.url,
+                                                        bgm_type: "free",
+                                                    }
+
+                                                    await savePageSettings(
+                                                        updatedSettings
+                                                    )
+                                                    setPageSettings(
+                                                        updatedSettings
+                                                    )
+                                                    setSelectedBgmId(
+                                                        previewBgmId
+                                                    )
+                                                    setUploadedFileName(null) // 무료 음원 저장 시 업로드된 파일명 초기화
+
+                                                    console.log(
+                                                        "BGM이 성공적으로 저장되었습니다!"
+                                                    )
+                                                } catch (error) {
+                                                    console.error(
+                                                        "BGM 저장 실패:",
+                                                        error
+                                                    )
+                                                } finally {
+                                                    setSettingsLoading(false)
+                                                }
+                                            }}
+                                            disabled={settingsLoading}
+                                            style={{
+                                                padding: "12px 24px",
+                                                backgroundColor:
+                                                    theme.color.primary,
+                                                color: "white",
+                                                border: "none",
+                                                borderRadius: theme.radius.sm,
+                                                fontSize: theme.text.sm,
+                                                ...theme.font.bodyBold,
+                                                cursor: settingsLoading
+                                                    ? "not-allowed"
+                                                    : "pointer",
+                                                opacity: settingsLoading
+                                                    ? 0.5
+                                                    : 1,
+                                            }}
+                                        >
+                                            {settingsLoading
+                                                ? "저장 중..."
+                                                : "선택"}
+                                        </button>
+                                    </div>
+                                )}
                             </div>
 
                             {/* 직접 업로드 섹션 */}
@@ -10319,6 +11581,25 @@ function AdminMainContent(props: any) {
                                         gap: "12px",
                                     }}
                                 >
+                                    {/* 업로드된 파일명 표시 */}
+                                    {uploadedFileName && (
+                                        <div
+                                            style={{
+                                                fontSize: 14,
+                                                fontFamily:
+                                                    "Pretendard, sans-serif",
+                                                color: "#666666",
+                                                textAlign: "center",
+                                                marginTop: 6,
+                                                marginBottom: 4,
+                                                wordBreak: "break-all",
+                                            }}
+                                        >
+                                            {uploadedFileName.length > 20
+                                                ? `${uploadedFileName.substring(0, 20)}...`
+                                                : uploadedFileName}
+                                        </div>
+                                    )}
                                     <div
                                         style={{
                                             display: "flex",
@@ -10456,7 +11737,7 @@ function AdminMainContent(props: any) {
                                             <span
                                                 style={{
                                                     color: "black",
-                                                    fontSize: 14,
+                                                    fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                                     fontFamily: theme.font.body,
                                                 }}
                                             >
@@ -10465,8 +11746,6 @@ function AdminMainContent(props: any) {
                                                     : "직접 업로드"}
                                             </span>
                                         </button>
-
-                                        {/* 테스트용 버튼 제거됨 */}
                                     </div>
                                 </div>
                             </div>
@@ -10541,7 +11820,7 @@ function AdminMainContent(props: any) {
                                                 fontFamily: theme.font.body,
                                             }}
                                         >
-                                            자동 재생
+                                            자동 재생 켜기
                                         </span>
                                     </button>
                                     <button
@@ -10586,108 +11865,184 @@ function AdminMainContent(props: any) {
                                 </div>
                             </div>
 
-                            {/* 저장 버튼 */}
-                            <button
-                                onClick={() => savePageSettings()}
-                                disabled={settingsLoading}
+                            {/* 볼륨 조정 섹션 */}
+                            <div
                                 style={{
-                                    width: "100%",
-                                    height: 44,
-                                    padding: 12,
-                                    border: "none",
-                                    backgroundColor: "black",
                                     display: "flex",
-                                    justifyContent: "center",
-                                    alignItems: "center",
-                                    gap: 10,
-                                    cursor: settingsLoading
-                                        ? "not-allowed"
-                                        : "pointer",
-                                    opacity: settingsLoading ? 0.5 : 1,
+                                    flexDirection: "column",
+                                    gap: "8px",
                                 }}
                             >
-                                <span
+                                <div
                                     style={{
-                                        color: "#E6E6E6",
+                                        color: "black",
                                         fontSize: 14,
                                         ...theme.font.bodyBold,
                                     }}
                                 >
-                                    {settingsLoading ? "저장 중..." : "저장"}
-                                </span>
-                            </button>
+                                    볼륨 조정
+                                </div>
+                                <div
+                                    style={{
+                                        width: "100%",
+                                        height: 18,
+                                        position: "relative",
+                                    }}
+                                    onMouseDown={(e) => {
+                                        const handleMouseMove = (
+                                            moveEvent: MouseEvent
+                                        ) => {
+                                            const rect =
+                                                e.currentTarget.getBoundingClientRect()
+                                            const x =
+                                                moveEvent.clientX - rect.left
+                                            const percentage = Math.max(
+                                                0,
+                                                Math.min(
+                                                    100,
+                                                    (x / rect.width) * 100
+                                                )
+                                            )
+                                            const volume =
+                                                Math.round(
+                                                    (percentage / 100) * 9
+                                                ) + 1
+
+                                            const updatedSettings = {
+                                                ...pageSettings,
+                                                bgm_vol: volume,
+                                            }
+                                            setPageSettings(updatedSettings)
+
+                                            // 자동 저장
+                                            savePageSettings(
+                                                updatedSettings
+                                            ).catch((error) => {
+                                                console.error(
+                                                    "볼륨 저장 실패:",
+                                                    error
+                                                )
+                                            })
+                                        }
+
+                                        const handleMouseUp = () => {
+                                            document.removeEventListener(
+                                                "mousemove",
+                                                handleMouseMove
+                                            )
+                                            document.removeEventListener(
+                                                "mouseup",
+                                                handleMouseUp
+                                            )
+                                        }
+
+                                        document.addEventListener(
+                                            "mousemove",
+                                            handleMouseMove
+                                        )
+                                        document.addEventListener(
+                                            "mouseup",
+                                            handleMouseUp
+                                        )
+                                    }}
+                                    onClick={(e) => {
+                                        const rect =
+                                            e.currentTarget.getBoundingClientRect()
+                                        const x = e.clientX - rect.left
+                                        const percentage = Math.max(
+                                            0,
+                                            Math.min(
+                                                100,
+                                                (x / rect.width) * 100
+                                            )
+                                        )
+                                        const volume =
+                                            Math.round((percentage / 100) * 9) +
+                                            1
+
+                                        const updatedSettings = {
+                                            ...pageSettings,
+                                            bgm_vol: volume,
+                                        }
+                                        setPageSettings(updatedSettings)
+
+                                        // 자동 저장
+                                        savePageSettings(updatedSettings).catch(
+                                            (error) => {
+                                                console.error(
+                                                    "볼륨 저장 실패:",
+                                                    error
+                                                )
+                                            }
+                                        )
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            width: "100%",
+                                            height: 9,
+                                            left: 0,
+                                            top: 4,
+                                            position: "absolute",
+                                            background: "#ECECEC",
+                                            borderRadius: 999,
+                                        }}
+                                    />
+                                    <div
+                                        style={{
+                                            width: 18,
+                                            height: 18,
+                                            left: `${((pageSettings.bgm_vol || 5) - 1) * (100 / 9)}%`,
+                                            top: 0,
+                                            position: "absolute",
+                                            background: "#3F3F3F",
+                                            borderRadius: 9999,
+                                            cursor: "pointer",
+                                            transform: "translateX(-50%)",
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                            <div style={{ width: "100%" }}>
+                                <SaveSectionButton onSave={async () => {
+                                    await savePageSettings(
+                                        {
+                                            bgm_url: pageSettings.bgm_url,
+                                            bgm_type: pageSettings.bgm_type,
+                                            bgm: pageSettings.bgm,
+                                            bgm_vol: pageSettings.bgm_vol,
+                                        },
+                                        { silent: true }
+                                    )
+                                }} />
+                            </div>
                         </div>
                     </AccordionSection>
 
-                    {/* RSVP 활성화 */}
+                    {/* RSVP */}
                     <AccordionSection
-                        title="RSVP"
+                        title="참석여부 RSVP"
                         sectionKey="rsvp"
                         isOpen={currentOpenSection === "rsvp"}
-                        onToggle={() => toggleSection("rsvp")}
+                        onToggle={async () => await toggleSection("rsvp")}
+                        toggleButton={
+                            <ToggleButton
+                                isOn={pageSettings.rsvp === "on"}
+                                onToggle={async () => {
+                                    const newRsvp =
+                                        pageSettings.rsvp === "on"
+                                            ? "off"
+                                            : "on"
+                                    setPageSettings((prev) => ({
+                                        ...prev,
+                                        rsvp: newRsvp,
+                                    }))
+                                    await savePageSettings({ rsvp: newRsvp }, { silent: true })
+                                }}
+                            />
+                        }
                     >
                         <div>
-                            <div
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "space-between",
-                                    marginBottom: "16px",
-                                }}
-                            >
-                                <span
-                                    style={{
-                                        fontSize: "14px",
-                                        fontWeight: "500",
-                                        color: theme.color.text,
-                                    }}
-                                >
-                                    RSVP 활성화
-                                </span>
-                                <div
-                                    style={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "8px",
-                                    }}
-                                >
-                                    <button
-                                        onClick={() => {
-                                            const newRsvp =
-                                                pageSettings.rsvp === "on"
-                                                    ? "off"
-                                                    : "on"
-                                            setPageSettings((prev) => ({
-                                                ...prev,
-                                                rsvp: newRsvp,
-                                            }))
-                                            // 즉시 저장
-                                            savePageSettings({ rsvp: newRsvp })
-                                        }}
-                                        style={{
-                                            padding: "6px 12px",
-                                            borderRadius: "4px",
-                                            border: `1px solid ${theme.color.border}`,
-                                            backgroundColor:
-                                                pageSettings.rsvp === "on"
-                                                    ? theme.color.primary
-                                                    : theme.color.surface,
-                                            color:
-                                                pageSettings.rsvp === "on"
-                                                    ? "white"
-                                                    : theme.color.text,
-                                            cursor: "pointer",
-                                            fontSize: "12px",
-                                            fontWeight: "500",
-                                            transition: "all 0.2s",
-                                        }}
-                                    >
-                                        {pageSettings.rsvp === "on"
-                                            ? "ON"
-                                            : "OFF"}
-                                    </button>
-                                </div>
-                            </div>
                             <div
                                 style={{
                                     fontSize: "12px",
@@ -10697,80 +12052,89 @@ function AdminMainContent(props: any) {
                             >
                                 청첩장 하단에 참석 여부 입력 폼이 표시됩니다.
                             </div>
+                            {/* 참석 명단 확인 버튼 */}
+                            <div
+                                style={{
+                                    marginTop: 12,
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        marginTop: 24,
+                                        width: "50%",
+                                        height: "40px",
+                                        display: "flex",
+                                        gap: 6,
+                                    }}
+                                >
+                                    <button
+                                        type="button"
+                                        role="link"
+                                        aria-label="참석 명단 확인"
+                                        onClick={() => {
+                                            if (typeof window !== "undefined") {
+                                                const targetUrl = `https://admin.roarc.kr/rsvp/${currentPageId}`
+                                                window.open(
+                                                    targetUrl,
+                                                    "_blank",
+                                                    "noopener,noreferrer"
+                                                )
+                                            }
+                                        }}
+                                        style={{
+                                            flex: "1 1 0",
+                                            width: "100%",
+                                            height: "100%",
+                                            paddingLeft: 12,
+                                            paddingRight: 12,
+                                            paddingTop: 8,
+                                            paddingBottom: 8,
+                                            backgroundColor: "#3f3f3f",
+                                            color: "white",
+                                            outlineOffset: "-0.50px",
+                                            justifyContent: "center",
+                                            alignItems: "center",
+                                            display: "flex",
+                                            border: "none",
+                                            borderRadius: "2px",
+                                            cursor: "pointer",
+                                            opacity: 1,
+                                            fontSize: "16px",
+                                            fontFamily: theme.font.body,
+                                        }}
+                                    >
+                                        참석 명단 확인
+                                    </button>
+                                </div>
+                            </div>
+                            {/* RSVP: 저장 버튼 제거 */}
                         </div>
                     </AccordionSection>
 
-                    {/* 방명록 활성화 */}
+                    {/* 방명록 */}
                     <AccordionSection
                         title="방명록"
                         sectionKey="comments"
                         isOpen={currentOpenSection === "comments"}
-                        onToggle={() => toggleSection("comments")}
+                        onToggle={async () => await toggleSection("comments")}
+                        toggleButton={
+                            <ToggleButton
+                                isOn={pageSettings.comments === "on"}
+                                onToggle={async () => {
+                                    const newComments =
+                                        pageSettings.comments === "on"
+                                            ? "off"
+                                            : "on"
+                                    setPageSettings((prev) => ({
+                                        ...prev,
+                                        comments: newComments,
+                                    }))
+                                    await savePageSettings({ comments: newComments }, { silent: true })
+                                }}
+                            />
+                        }
                     >
                         <div>
-                            <div
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "space-between",
-                                    marginBottom: "16px",
-                                }}
-                            >
-                                <span
-                                    style={{
-                                        fontSize: "14px",
-                                        fontWeight: "500",
-                                        color: theme.color.text,
-                                    }}
-                                >
-                                    방명록 활성화
-                                </span>
-                                <div
-                                    style={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "8px",
-                                    }}
-                                >
-                                    <button
-                                        onClick={() => {
-                                            const newComments =
-                                                pageSettings.comments === "on"
-                                                    ? "off"
-                                                    : "on"
-                                            setPageSettings((prev) => ({
-                                                ...prev,
-                                                comments: newComments,
-                                            }))
-                                            // 즉시 저장
-                                            savePageSettings({
-                                                comments: newComments,
-                                            })
-                                        }}
-                                        style={{
-                                            padding: "6px 12px",
-                                            borderRadius: "4px",
-                                            border: `1px solid ${theme.color.border}`,
-                                            backgroundColor:
-                                                pageSettings.comments === "on"
-                                                    ? theme.color.primary
-                                                    : theme.color.surface,
-                                            color:
-                                                pageSettings.comments === "on"
-                                                    ? "white"
-                                                    : theme.color.text,
-                                            cursor: "pointer",
-                                            fontSize: "12px",
-                                            fontWeight: "500",
-                                            transition: "all 0.2s",
-                                        }}
-                                    >
-                                        {pageSettings.comments === "on"
-                                            ? "ON"
-                                            : "OFF"}
-                                    </button>
-                                </div>
-                            </div>
                             <div
                                 style={{
                                     fontSize: "12px",
@@ -10780,6 +12144,7 @@ function AdminMainContent(props: any) {
                             >
                                 청첩장 하단에 방명록 댓글 기능이 표시됩니다.
                             </div>
+                            {/* 방명록: 저장 버튼 제거 */}
                         </div>
                     </AccordionSection>
 
@@ -10788,7 +12153,7 @@ function AdminMainContent(props: any) {
                         title="카카오톡 공유"
                         sectionKey="kakaoShare"
                         isOpen={currentOpenSection === "kakaoShare"}
-                        onToggle={() => toggleSection("kakaoShare")}
+                        onToggle={async () => await toggleSection("kakaoShare")}
                     >
                         <div
                             style={{
@@ -10961,34 +12326,42 @@ function AdminMainContent(props: any) {
                                     placeholder="예: 2026년 1월 1일 12시 30분"
                                     disabled={settingsLoading}
                                     style={{
-                                        width: "100%",
-                                        minHeight: 96,
-                                        padding: "10px 12px",
+                                        width: "calc(100% * 1.1429)",
+                                        minHeight: "calc(96px * 1.1429)",
+                                        padding:
+                                            "calc(10px * 1.1429) calc(12px * 1.1429)",
+                                        paddingLeft: "calc(12px * 0.875)", // scale로 인한 좌측 여백 보정
                                         borderStyle: "solid",
                                         borderWidth: theme.border.width,
                                         borderColor: theme.color.border,
-                                        borderRadius: theme.border.radius,
+                                        borderRadius: `calc(${theme.border.radius}px * 1.1429)`,
                                         background: theme.color.surface,
                                         color: theme.color.text,
                                         fontFamily: theme.font.body,
-                                        fontSize: 14,
+                                        fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
+                                        transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                        transformOrigin: "left center",
+                                        marginBottom:
+                                            "calc(96px - 96px * 0.875)", // 하단 여백 제거
                                         lineHeight: 1.5,
                                         resize: "vertical",
                                     }}
                                 />
                             </FormField>
-
-                            <SaveBar
-                                onSave={() =>
-                                    savePageSettings({
-                                        kko_img: pageSettings.kko_img,
-                                        kko_title: pageSettings.kko_title,
-                                        kko_date: pageSettings.kko_date,
-                                    })
-                                }
-                                loading={settingsLoading}
-                                label="저장"
-                            />
+                            <div style={{ width: "100%", marginTop: 12 }}>
+                                <SaveSectionButton
+                                    onSave={async () => {
+                                        await savePageSettings(
+                                            {
+                                                kko_img: pageSettings.kko_img,
+                                                kko_title: pageSettings.kko_title,
+                                                kko_date: pageSettings.kko_date,
+                                            },
+                                            { silent: true }
+                                        )
+                                    }}
+                                />
+                            </div>
                         </div>
                     </AccordionSection>
 
@@ -10997,30 +12370,16 @@ function AdminMainContent(props: any) {
                 </div>
             )}
 
-            {/* Focal Point 모달 */}
-            <FocalPointModal
-                isOpen={focalPointModalOpen}
-                imageSrc={focalPointImageSrc}
-                currentFocalPoint={{
-                    x: (pageSettings.photo_section_focal_point?.x || 0.5) * 400,
-                    y: (pageSettings.photo_section_focal_point?.y || 0.5) * 300
-                }}
-                onFocalPointComplete={handleFocalPointComplete}
-                onClose={() => {
-                    setFocalPointModalOpen(false)
-                    if (focalPointImageSrc) {
-                        URL.revokeObjectURL(focalPointImageSrc)
-                        setFocalPointImageSrc("")
-                    }
-                }}
-            />
-
             {/* 갤러리 탭 */}
             {activeTab === "gallery" && (
                 <div
                     style={{
                         flex: 1,
                         overflowY: "auto",
+                        WebkitOverflowScrolling: "touch", // iOS 부드러운 스크롤
+                        minHeight: 0, // flex 아이템이 축소될 수 있도록
+                        paddingBottom: "env(safe-area-inset-bottom)", // 하단 안전 영역
+                        position: "relative", // 키보드 대응
                         backgroundColor: "#E6E6E6",
                         display: "flex",
                         flexDirection: "column",
@@ -11233,13 +12592,14 @@ function AdminMainContent(props: any) {
                                                         pageSettings.gallery_type ===
                                                         item.value
                                                     }
-                                                    onChange={() =>
+                                                    onChange={() => {
+                                                        // 로컬 상태만 업데이트 (자동 저장 제거)
                                                         setPageSettings({
                                                             ...pageSettings,
                                                             gallery_type:
                                                                 item.value,
                                                         })
-                                                    }
+                                                    }}
                                                 />
                                                 <div
                                                     style={{
@@ -11258,13 +12618,14 @@ function AdminMainContent(props: any) {
                                                 style={{
                                                     cursor: "pointer",
                                                 }}
-                                                onClick={() =>
+                                                onClick={() => {
+                                                    // 로컬 상태만 업데이트 (자동 저장 제거)
                                                     setPageSettings({
                                                         ...pageSettings,
                                                         gallery_type:
                                                             item.value,
                                                     })
-                                                }
+                                                }}
                                             >
                                                 <Card
                                                     style={{
@@ -11328,7 +12689,7 @@ function AdminMainContent(props: any) {
                                         alignSelf: "stretch",
                                         justifyContent: "flex-start",
                                         alignItems: "flex-start",
-                                        gap: 12,
+                                        gap: 8,
                                         display: "inline-flex",
                                     }}
                                 >
@@ -11396,8 +12757,105 @@ function AdminMainContent(props: any) {
                                             사진 추가
                                         </div>
                                     </button>
+                                    
+                                    {/* 전체 삭제 버튼 */}
+                                    {existingImages.length > 0 && (
+                                        <button
+                                            onClick={handleDeleteAllImages}
+                                            disabled={uploading}
+                                            style={{
+                                                width: 90,
+                                                height: 50,
+                                                paddingLeft: 12,
+                                                paddingRight: 12,
+                                                paddingTop: 0,
+                                                paddingBottom: 0,
+                                                background: "white",
+                                                border: "1px solid #f7b0b0",
+                                                borderRadius: "2px",
+                                                cursor: uploading
+                                                    ? "not-allowed"
+                                                    : "pointer",
+                                                opacity: uploading ? 0.5 : 1,
+                                                justifyContent: "center",
+                                                alignItems: "center",
+                                                display: "flex",
+                                            }}
+                                        >
+                                            <div
+                                                style={{
+                                                    color: "#b12525",
+                                                    fontSize: 14,
+                                                    fontFamily: theme.font.body,
+                                                    wordWrap: "break-word",
+                                                }}
+                                            >
+                                                전체 삭제
+                                            </div>
+                                        </button>
+                                    )}
                                 </div>
                             </div>
+
+                            {/* 순서 저장 버튼 */}
+                            <AnimatePresence>
+                                {hasUnsavedChanges && (
+                                    <motion.div
+                                        initial={{
+                                            scale: 0.8,
+                                        }}
+                                        animate={{
+                                            scale: 1,
+                                        }}
+                                        exit={{
+                                            opacity: 0,
+                                        }}
+                                        transition={{
+                                            duration: 0.2,
+                                            ease: "easeInOut",
+                                        }}
+                                        style={{
+                                            width: "100%",
+                                            marginTop: 8,
+                                            transformOrigin: "center top",
+                                        }}
+                                    >
+                                        <button
+                                            onClick={saveImageOrder}
+                                            disabled={isSavingOrder}
+                                            style={{
+                                                width: "100%",
+                                                height: 50,
+                                                paddingLeft: 12,
+                                                paddingRight: 12,
+                                                paddingTop: 8,
+                                                paddingBottom: 8,
+                                                background: "#3f3f3f",
+                                                border: "none",
+                                                borderRadius: "2px",
+                                                cursor: isSavingOrder
+                                                    ? "not-allowed"
+                                                    : "pointer",
+                                                opacity: isSavingOrder ? 0.5 : 1,
+                                                justifyContent: "center",
+                                                alignItems: "center",
+                                                display: "flex",
+                                            }}
+                                        >
+                                            <div
+                                                style={{
+                                                    color: "white",
+                                                    fontSize: 14,
+                                                    fontFamily: theme.font.bodyBold,
+                                                    wordWrap: "break-word",
+                                                }}
+                                            >
+                                                {isSavingOrder ? "저장 중..." : "순서 저장"}
+                                            </div>
+                                        </button>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
 
                             {/* 숨겨진 파일 입력 */}
                             <input
@@ -11585,32 +13043,6 @@ function AdminMainContent(props: any) {
                                         </UiGrid>
                                     )}
 
-                                    {/* 전체 삭제 버튼 */}
-                                    {existingImages.length > 0 && (
-                                        <button
-                                            onClick={handleDeleteAllImages}
-                                            disabled={uploading}
-                                            style={{
-                                                width: "100%",
-                                                padding: "12px 16px",
-                                                backgroundColor: uploading
-                                                    ? "#9ca3af"
-                                                    : "#B12525",
-                                                color: "white",
-                                                border: "none",
-                                                borderRadius: "2px",
-                                                cursor: uploading
-                                                    ? "not-allowed"
-                                                    : "pointer",
-                                                fontSize: "14px",
-                                                ...theme.font.bodyBold,
-                                                marginTop: "16px",
-                                                marginBottom: "48px",
-                                            }}
-                                        >
-                                            전체 삭제
-                                        </button>
-                                    )}
                                 </div>
                             )}
                             {/* Footer at the end of gallery tab */}
@@ -11627,13 +13059,9 @@ function AdminMainContent(props: any) {
 function InfoTab({
     pageId,
     tokenGetter,
-    setError,
-    setSuccess,
 }: {
     pageId: string
     tokenGetter: () => string | null
-    setError: (error: string | null) => void
-    setSuccess: (success: string | null) => void
 }): JSX.Element {
     type InfoItem = {
         id?: string
@@ -11748,12 +13176,10 @@ function InfoTab({
 
     const save = async () => {
         if (!pageId) {
-            setError("페이지 ID가 필요합니다")
+            console.warn("페이지 ID가 필요합니다")
             return
         }
         setSaving(true)
-        setError(null)
-        setSuccess(null)
         try {
             const token = tokenGetter?.() || ""
             const getApiBases = () => {
@@ -11809,9 +13235,9 @@ function InfoTab({
                     result?.message || result?.error || text || "저장 실패"
                 )
             }
-            setSuccess("안내 사항이 저장되었습니다.")
+            console.log("안내 사항이 저장되었습니다.")
         } catch (e: any) {
-            setError(e?.message || "저장 중 오류가 발생했습니다")
+            console.error(e?.message || "저장 중 오류가 발생했습니다")
         } finally {
             setSaving(false)
         }
@@ -11850,7 +13276,6 @@ function InfoTab({
         async function load() {
             if (!pageId) return
             setLoading(true)
-            setError(null)
             try {
                 const res = await request(
                     `/api/page-settings?info&pageId=${encodeURIComponent(pageId)}`
@@ -11894,6 +13319,7 @@ function InfoTab({
                 flexDirection: "column",
                 gap: 24,
                 alignItems: "stretch",
+                overflow: "hidden",
             }}
         >
             {loading ? (
@@ -11906,154 +13332,158 @@ function InfoTab({
                         <div
                             key={index}
                             style={{
-                                width: "100%",
-                                padding: 16,
+                                width: "calc(100% * 1.1429)",
+                                transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                transformOrigin: "left center",
+                                display: "flex",
+                                padding: 12,
                                 border: `1px solid ${theme.color.border}`,
                                 outlineOffset: -0.5,
-                                display: "flex",
                                 flexDirection: "column",
-                                gap: theme.gap.sm,
-                                marginBottom: 16,
+                                gap: theme.gap.xs,
+                                marginBottom: 0,
                                 alignItems: "flex-start",
                             }}
                         >
                             <div
                                 style={{
                                     width: "100%",
+                                    height: "40px",
                                     display: "flex",
-                                    justifyContent: "space-between",
-                                    alignItems: "center",
+                                    gap: 8,
                                 }}
                             >
-                                <div
+                                <input
                                     style={{
-                                        textAlign: "center",
-                                        color: "black",
-                                        fontSize: 14,
-                                        ...theme.font.bodyBold,
+                                        flex: 1,
+                                        width: "70%",
+                                        height: "100%",
+                                        padding: "calc(12px * 1.1429)",
+                                        paddingLeft: "calc(12px * 0.875)",
+                                        background: "white",
+                                        border: `1px solid ${theme.color.border}`,
+                                        outlineOffset: -0.25,
+                                        fontSize: 14, // iOS 자동 확대 방지를 위해 16px로 설정
+                                        fontFamily: theme.font.body,
+                                        color:
+                                            item.title === ""
+                                                ? "#ADADAD"
+                                                : "black",
                                     }}
-                                >
-                                    안내 사항
-                                </div>
+                                    placeholder="안내 사항 제목"
+                                    value={item.title}
+                                    onChange={(e) =>
+                                        change(index, "title", e.target.value)
+                                    }
+                                />
                                 <div
                                     style={{
                                         display: "flex",
-                                        gap: 4,
                                         alignItems: "center",
+                                        width: "30%",
+                                        height: "100%",
                                     }}
                                 >
-                                    <button
-                                        onClick={() => move(index, -1)}
-                                        disabled={index === 0}
+                                    <div
                                         style={{
-                                            padding: 6,
-                                            border: `1px solid ${theme.color.border}`,
-                                            outlineOffset: -1,
-                                            background: "white",
-                                            cursor:
-                                                index === 0
-                                                    ? "not-allowed"
-                                                    : "pointer",
-                                            opacity: index === 0 ? 0.5 : 1,
+                                            display: "flex",
+                                            flex: "1",
+                                            height: "100%",
+                                            alignItems: "stretch",
                                         }}
                                     >
-                                        <div
-                                            style={{
-                                                width: 16,
-                                                height: 16,
-                                                padding: "13px 9px",
-                                                display: "flex",
-                                                flexDirection: "column",
-                                                justifyContent: "center",
-                                                alignItems: "center",
+                                        <CustomOrderDropdown
+                                            value={index + 1}
+                                            onChange={(newPosition) => {
+                                                const targetIndex =
+                                                    (newPosition as number) - 1
+                                                if (
+                                                    targetIndex !== index &&
+                                                    targetIndex >= 0 &&
+                                                    targetIndex < items.length
+                                                ) {
+                                                    setItems((prev) => {
+                                                        const next = [...prev]
+                                                        const [movedItem] =
+                                                            next.splice(
+                                                                index,
+                                                                1
+                                                            )
+                                                        next.splice(
+                                                            targetIndex,
+                                                            0,
+                                                            movedItem
+                                                        )
+                                                        return next.map(
+                                                            (it, i) => ({
+                                                                ...it,
+                                                                display_order:
+                                                                    i + 1,
+                                                            })
+                                                        )
+                                                    })
+                                                }
                                             }}
-                                        >
-                                            <svg
-                                                width="12"
-                                                height="12"
-                                                viewBox="0 0 12 12"
-                                                fill="none"
-                                                xmlns="http://www.w3.org/2000/svg"
-                                            >
-                                                <path
-                                                    d="M6 3L9 6L3 6L6 3Z"
-                                                    fill="#757575"
-                                                />
-                                            </svg>
-                                        </div>
-                                    </button>
-                                    <button
-                                        onClick={() => move(index, 1)}
-                                        disabled={index === items.length - 1}
+                                            options={Array.from(
+                                                { length: items.length },
+                                                (_, i) => ({
+                                                    value: i + 1,
+                                                    label: `${i + 1}번째`,
+                                                })
+                                            )}
+                                            placeholder="순서 선택"
+                                        />
+                                    </div>
+                                    <div
+                                        data-svg-wrapper
                                         style={{
-                                            padding: 6,
-                                            border: `1px solid ${theme.color.border}`,
-                                            outlineOffset: -1,
-                                            background: "white",
-                                            cursor:
-                                                index === items.length - 1
-                                                    ? "not-allowed"
-                                                    : "pointer",
-                                            opacity:
-                                                index === items.length - 1
-                                                    ? 0.5
-                                                    : 1,
+                                            position: "relative",
+                                            cursor: "pointer",
+                                            flex: "0 0 32px",
+                                            width: 32,
+                                            height: 36,
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                        }}
+                                        onClick={() => {
+                                            setItems((prev) =>
+                                                prev.filter(
+                                                    (_, i) => i !== index
+                                                )
+                                            )
                                         }}
                                     >
-                                        <div
-                                            style={{
-                                                width: 16,
-                                                height: 16,
-                                                padding: "13px 9px",
-                                                display: "flex",
-                                                flexDirection: "column",
-                                                justifyContent: "center",
-                                                alignItems: "center",
-                                            }}
+                                        <svg
+                                            width="32"
+                                            height="32"
+                                            viewBox="0 0 32 32"
+                                            fill="none"
+                                            xmlns="http://www.w3.org/2000/svg"
                                         >
-                                            <div
-                                                style={{
-                                                    width: 12,
-                                                    height: 5.5,
-                                                    border: "1.5px solid #757575",
-                                                    borderRadius: 1,
-                                                    transform: "rotate(180deg)",
-                                                }}
+                                            <path
+                                                d="M14.625 24.5C14.1437 24.5 13.7319 24.3261 13.3895 23.9782C13.0471 23.6304 12.8756 23.2117 12.875 22.7222V11.1667H12V9.38889H16.375V8.5H21.625V9.38889H26V11.1667H25.125V22.7222C25.125 23.2111 24.9538 23.6298 24.6114 23.9782C24.269 24.3267 23.8568 24.5006 23.375 24.5H14.625ZM16.375 20.9444H18.125V12.9444H16.375V20.9444ZM19.875 20.9444H21.625V12.9444H19.875V20.9444Z"
+                                                fill="#AEAEAE"
                                             />
-                                        </div>
-                                    </button>
+                                        </svg>
+                                    </div>
                                 </div>
                             </div>
-                            <input
-                                style={{
-                                    width: "100%",
-                                    height: 40,
-                                    padding: 12,
-                                    background: "white",
-                                    border: `1px solid ${theme.color.border}`,
-                                    outlineOffset: -0.25,
-                                    fontSize: 14,
-                                    fontFamily: theme.font.body,
-                                    color:
-                                        item.title === "" ? "#ADADAD" : "black",
-                                }}
-                                placeholder="안내 사항 제목"
-                                value={item.title}
-                                onChange={(e) =>
-                                    change(index, "title", e.target.value)
-                                }
-                            />
                             <textarea
                                 id={`info-description-${index}`}
                                 style={{
-                                    width: "100%",
-                                    height: 120,
-                                    padding: 12,
+                                    width: "calc(100% * 1.1429)",
+                                    height: "calc(120px * 1.1429)",
+                                    margin: "calc(-20px * 0.125)", // scale로 인한 여분 공간 제거
+                                    padding: "calc(12px * 1.1429)",
+                                    paddingLeft: "calc(12px * 0.875)", // scale로 인한 좌측 여백 보정
                                     background: "white",
                                     border: `1px solid ${theme.color.border}`,
                                     outlineOffset: -0.25,
-                                    fontSize: 14,
+                                    fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                     fontFamily: theme.font.body,
+                                    transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                    transformOrigin: "left center",
                                     color:
                                         item.description === ""
                                             ? "#ADADAD"
@@ -12084,10 +13514,11 @@ function InfoTab({
                                         outlineOffset: -0.5,
                                         background: "white",
                                         cursor: "pointer",
-                                        fontSize: 10,
+                                        fontSize: 12,
                                         ...theme.font.bodyBold,
                                         color: "#7F7F7F",
                                         lineHeight: "20px",
+                                        WebkitTextFillColor: "#7F7F7F",
                                     }}
                                     title="선택한 텍스트를 두껍게 (**텍스트**)"
                                 >
@@ -12102,7 +13533,7 @@ function InfoTab({
                                         outlineOffset: -0.5,
                                         background: "white",
                                         cursor: "pointer",
-                                        fontSize: 10,
+                                        fontSize: 12,
                                         fontFamily: theme.font.body,
                                         color: "#7F7F7F",
                                         lineHeight: "20px",
@@ -12168,13 +13599,13 @@ function InfoTab({
 function TransportTab({
     pageId,
     tokenGetter,
-    setError,
-    setSuccess,
+    hideSaveButton = false,
+    onSaveRef,
 }: {
     pageId: string
     tokenGetter: () => string | null
-    setError: (error: string | null) => void
-    setSuccess: (success: string | null) => void
+    hideSaveButton?: boolean
+    onSaveRef?: React.MutableRefObject<(() => Promise<void>) | null>
 }): JSX.Element {
     type TransportItem = {
         id?: string
@@ -12182,6 +13613,8 @@ function TransportTab({
         description: string
         display_order: number
     }
+
+    const addressLayerCleanupRef = React.useRef<(() => void) | null>(null)
 
     const DEFAULT_ITEMS: TransportItem[] = [
         {
@@ -12224,20 +13657,82 @@ function TransportTab({
         }
     }
 
-    // 다음 Postcode API 스크립트 로드
+    // 다음 Postcode API 스크립트 로드 (싱글톤 패턴 및 안전한 로딩)
     const loadDaumPostcodeScript = (): Promise<void> => {
         return new Promise((resolve, reject) => {
+            // 이미 로드된 경우 즉시 resolve
             if ((window as any).daum && (window as any).daum.Postcode) {
                 resolve()
                 return
             }
 
+            // 글로벌 로딩 상태 확인 (싱글톤 패턴)
+            if ((window as any).__daumPostcodeLoading) {
+                // 이미 로딩 중이면 완료될 때까지 대기
+                const checkDaumAPI = () => {
+                    if ((window as any).daum && (window as any).daum.Postcode) {
+                        resolve()
+                    } else if ((window as any).__daumPostcodeLoading) {
+                        setTimeout(checkDaumAPI, 100)
+                    } else {
+                        reject(new Error("다음 Postcode API 로드 실패"))
+                    }
+                }
+                checkDaumAPI()
+                return
+            }
+
+            // 기존 스크립트가 있는지 확인
+            const existingScript = document.querySelector(
+                'script[src*="mapjsapi/bundle/postcode"]'
+            )
+            if (existingScript) {
+                // 기존 스크립트가 로드 완료될 때까지 대기
+                const checkDaumAPI = () => {
+                    if ((window as any).daum && (window as any).daum.Postcode) {
+                        resolve()
+                    } else {
+                        setTimeout(checkDaumAPI, 100)
+                    }
+                }
+                checkDaumAPI()
+                return
+            }
+
+            // 로딩 시작 플래그 설정
+            ;(window as any).__daumPostcodeLoading = true
+
             const script = document.createElement("script")
             script.src =
-                "//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"
-            script.onload = () => resolve()
-            script.onerror = () =>
+                "https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"
+            script.async = true
+            script.defer = true
+
+            // 타임아웃 설정 (10초)
+            const timeoutId = setTimeout(() => {
+                ;(window as any).__daumPostcodeLoading = false
+                reject(new Error("다음 Postcode API 로드 타임아웃"))
+            }, 10000)
+
+            script.onload = () => {
+                clearTimeout(timeoutId)
+                // API가 완전히 초기화될 때까지 잠시 대기
+                setTimeout(() => {
+                    ;(window as any).__daumPostcodeLoading = false
+                    if ((window as any).daum && (window as any).daum.Postcode) {
+                        resolve()
+                    } else {
+                        reject(new Error("다음 Postcode API 초기화 실패"))
+                    }
+                }, 200)
+            }
+
+            script.onerror = () => {
+                clearTimeout(timeoutId)
+                ;(window as any).__daumPostcodeLoading = false
                 reject(new Error("다음 Postcode API 로드 실패"))
+            }
+
             document.head.appendChild(script)
         })
     }
@@ -12272,9 +13767,10 @@ function TransportTab({
         })
     }
 
-    // Google Maps API 스크립트 로드
+    // Google Maps API 스크립트 로드 (싱글톤 패턴 및 안전한 로딩)
     const loadGoogleMapsScript = (): Promise<void> => {
         return new Promise((resolve, reject) => {
+            // 이미 로드된 경우 즉시 resolve
             if (
                 (window as any).google &&
                 (window as any).google.maps &&
@@ -12284,43 +13780,109 @@ function TransportTab({
                 return
             }
 
+            // 글로벌 로딩 상태 확인 (싱글톤 패턴)
+            if ((window as any).__googleMapsLoading) {
+                // 이미 로딩 중이면 완료될 때까지 대기
+                return waitForGoogleMapsAPI().then(resolve).catch(reject)
+            }
+
+            // 기존 스크립트가 있는지 확인
+            const existingScript = document.querySelector(
+                'script[src*="maps.googleapis.com"]'
+            )
+            if (existingScript) {
+                return waitForGoogleMapsAPI().then(resolve).catch(reject)
+            }
+
+            // 로딩 시작 플래그 설정
+            ;(window as any).__googleMapsLoading = true
+
             // Google Maps API 키 가져오기 (map-config.js에서)
-            fetch("https://wedding-admin-proxy.vercel.app/api/map-config")
-                .then((response) => response.json())
+            const configPromise = fetch(
+                "https://wedding-admin-proxy.vercel.app/api/map-config",
+                {
+                    method: "GET",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    // 네트워크 타임아웃 설정
+                    signal: AbortSignal.timeout(5000),
+                }
+            )
+                .then((response) => {
+                    if (!response.ok) {
+                        throw new Error(
+                            `HTTP ${response.status}: ${response.statusText}`
+                        )
+                    }
+                    return response.json()
+                })
+                .catch((error) => {
+                    console.warn(
+                        "Google Maps API 키 로드 실패, 폴백 모드로 진행:",
+                        error.message
+                    )
+                    // 폴백: API 키 없이도 진행 (주소만 저장)
+                    return { success: false, data: { googleMapsApiKey: null } }
+                })
+
+            configPromise
                 .then((config: any) => {
                     if (config.success && config.data.googleMapsApiKey) {
                         const apiKey = config.data.googleMapsApiKey
 
-                        // 기존 스크립트가 있는지 확인
-                        const existingScript = document.querySelector(
-                            'script[src*="maps.googleapis.com"]'
-                        )
-                        if (existingScript) {
-                            return waitForGoogleMapsAPI()
-                                .then(resolve)
-                                .catch(reject)
-                        }
-
                         const script = document.createElement("script")
                         script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=geometry`
+                        script.async = true
+                        script.defer = true
+
+                        // 타임아웃 설정 (15초)
+                        const timeoutId = setTimeout(() => {
+                            ;(window as any).__googleMapsLoading = false
+                            reject(new Error("Google Maps API 로드 타임아웃"))
+                        }, 15000)
+
                         script.onload = () => {
-                            waitForGoogleMapsAPI().then(resolve).catch(reject)
+                            clearTimeout(timeoutId)
+                            waitForGoogleMapsAPI()
+                                .then(() => {
+                                    ;(window as any).__googleMapsLoading = false
+                                    resolve()
+                                })
+                                .catch((error) => {
+                                    ;(window as any).__googleMapsLoading = false
+                                    reject(error)
+                                })
                         }
-                        script.onerror = () =>
+
+                        script.onerror = () => {
+                            clearTimeout(timeoutId)
+                            ;(window as any).__googleMapsLoading = false
                             reject(new Error("Google Maps API 로드 실패"))
+                        }
 
                         document.head.appendChild(script)
                     } else {
-                        reject(
-                            new Error("Google Maps API 키를 찾을 수 없습니다")
+                        // API 키가 없어도 주소 검색은 가능하므로 성공으로 처리
+                        console.warn(
+                            "Google Maps API 키를 찾을 수 없습니다. 주소 검색만 사용됩니다."
                         )
+                        ;(window as any).__googleMapsLoading = false
+                        resolve()
                     }
                 })
-                .catch(() => reject(new Error("Map config 로드 실패")))
+                .catch((error) => {
+                    console.warn(
+                        "Map config 로드 실패, 주소 검색만 사용됩니다:",
+                        error.message
+                    )
+                    ;(window as any).__googleMapsLoading = false
+                    resolve() // 폴백 모드로 진행
+                })
         })
     }
 
-    // 주소를 좌표로 변환
+    // 주소를 좌표로 변환 (타임아웃 및 에러 핸들링 강화)
     const geocodeAddress = (
         address: string
     ): Promise<{ lat: number; lng: number }> => {
@@ -12337,17 +13899,28 @@ function TransportTab({
                 return
             }
 
+            // 타임아웃 설정 (8초)
+            const timeoutId = setTimeout(() => {
+                reject(new Error("주소 변환 타임아웃"))
+            }, 8000)
+
             const geocoder = new (window as any).google.maps.Geocoder()
 
             geocoder.geocode(
                 { address: address, region: "KR" },
                 (results: GoogleGeocodeResult[] | null, status: string) => {
+                    clearTimeout(timeoutId)
+
                     if (status === "OK" && results && results.length > 0) {
-                        const location = results[0].geometry.location
-                        resolve({
-                            lat: location.lat(),
-                            lng: location.lng(),
-                        })
+                        try {
+                            const location = results[0].geometry.location
+                            resolve({
+                                lat: location.lat(),
+                                lng: location.lng(),
+                            })
+                        } catch (error) {
+                            reject(new Error("좌표 추출 실패"))
+                        }
                     } else {
                         reject(new Error(`주소 변환 실패: ${status}`))
                     }
@@ -12358,9 +13931,14 @@ function TransportTab({
 
     // 다음 주소 검색 레이어 닫기
     const closeDaumPostcode = () => {
+        if (typeof document === "undefined") return
         const element_layer = document.getElementById("addressLayer")
         if (element_layer) {
             element_layer.style.display = "none"
+        }
+        if (typeof window !== "undefined") {
+            addressLayerCleanupRef.current?.()
+            addressLayerCleanupRef.current = null
         }
     }
 
@@ -12393,18 +13971,30 @@ function TransportTab({
         }
     }
 
-    // 다음 Postcode API 레이어 열기
+    // 다음 Postcode API 레이어 열기 (안전한 에러 처리)
     const openDaumPostcode = async () => {
         try {
-            await loadDaumPostcodeScript()
-            await loadGoogleMapsScript()
+            // 타임아웃 설정 (전체 작업 30초 제한)
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(
+                    () => reject(new Error("주소 검색 초기화 타임아웃")),
+                    30000
+                )
+            })
 
-            // API 로드 완료 후 잠시 대기 (안정성 확보)
-            await new Promise((resolve) => setTimeout(resolve, 500))
+            const initPromise = Promise.all([
+                loadDaumPostcodeScript(),
+                loadGoogleMapsScript(),
+            ]).then(() => {
+                // API 로드 완료 후 잠시 대기 (안정성 확보)
+                return new Promise((resolve) => setTimeout(resolve, 500))
+            })
+
+            await Promise.race([initPromise, timeoutPromise])
 
             const element_layer = document.getElementById("addressLayer")
             if (!element_layer) {
-                setError("주소 검색 레이어를 찾을 수 없습니다.")
+                console.error("주소 검색 레이어를 찾을 수 없습니다.")
                 return
             }
 
@@ -12418,8 +14008,22 @@ function TransportTab({
                     setVenue_address(fullAddress)
 
                     try {
-                        // 주소를 좌표로 변환
-                        const coordinates = await geocodeAddress(baseAddress)
+                        // 주소를 좌표로 변환 (타임아웃 10초)
+                        const coordinatesPromise = geocodeAddress(baseAddress)
+                        const timeoutPromise = new Promise<never>(
+                            (_, reject) => {
+                                setTimeout(
+                                    () =>
+                                        reject(new Error("좌표 변환 타임아웃")),
+                                    10000
+                                )
+                            }
+                        )
+
+                        const coordinates = await Promise.race([
+                            coordinatesPromise,
+                            timeoutPromise,
+                        ])
 
                         // 페이지 설정에 좌표 저장
                         await saveCoordinatesToServer(
@@ -12428,19 +14032,21 @@ function TransportTab({
                             fullAddress
                         )
 
-                        setSuccess(
+                        console.log(
                             `주소와 좌표가 모두 설정되었습니다: ${fullAddress}`
                         )
                     } catch (error) {
                         // 좌표 변환 실패해도 주소는 저장
+                        console.warn("좌표 변환 실패:", error)
                         try {
                             await saveCoordinatesToServer(0, 0, fullAddress)
-                            setSuccess(
+                            console.log(
                                 `주소가 설정되었습니다: ${fullAddress} (좌표 변환 실패)`
                             )
                         } catch (saveError) {
-                            setError(
-                                "주소 설정에 실패했습니다. 다시 시도해주세요."
+                            console.error(
+                                "주소 설정에 실패했습니다. 다시 시도해주세요.",
+                                saveError
                             )
                         }
                     }
@@ -12473,8 +14079,15 @@ function TransportTab({
                 initLayerPosition()
             }
 
+            // 기존 리스너가 있다면 먼저 정리
+            addressLayerCleanupRef.current?.()
+
             window.addEventListener("resize", handleResize)
             window.addEventListener("orientationchange", handleResize)
+            addressLayerCleanupRef.current = () => {
+                window.removeEventListener("resize", handleResize)
+                window.removeEventListener("orientationchange", handleResize)
+            }
         } catch (error) {
             // Google Maps API 실패 시 주소만 저장하는 폴백
             try {
@@ -12484,14 +14097,14 @@ function TransportTab({
                 if (fallbackAddress && fallbackAddress.trim()) {
                     setVenue_address(fallbackAddress.trim())
                     await saveCoordinatesToServer(0, 0, fallbackAddress.trim())
-                    setSuccess(
+                    console.log(
                         `주소가 설정되었습니다: ${fallbackAddress} (수동 입력)`
                     )
                 } else {
-                    setError("주소가 입력되지 않았습니다.")
+                    console.warn("주소가 입력되지 않았습니다.")
                 }
             } catch (fallbackError) {
-                setError("주소 검색 및 입력에 실패했습니다.")
+                console.error("주소 검색 및 입력에 실패했습니다.")
             }
         }
     }
@@ -12571,7 +14184,6 @@ function TransportTab({
         async function load() {
             if (!pageId) return
             setLoading(true)
-            setError(null)
             try {
                 const res = await request(
                     `/api/page-settings?transport&pageId=${encodeURIComponent(pageId)}`
@@ -12609,7 +14221,8 @@ function TransportTab({
                 } else if (mounted) {
                     setItems(DEFAULT_ITEMS)
                 }
-            } catch (_e) {
+            } catch (error) {
+                console.warn("TransportTab 로드 실패:", error)
                 if (mounted) setItems(DEFAULT_ITEMS)
             } finally {
                 if (mounted) setLoading(false)
@@ -12712,12 +14325,10 @@ function TransportTab({
 
     const save = async () => {
         if (!pageId) {
-            setError("페이지 ID가 필요합니다")
+            console.warn("페이지 ID가 필요합니다")
             return
         }
         setSaving(true)
-        setError(null)
-        setSuccess(null)
         try {
             const token = tokenGetter?.() || ""
             const getApiBases = () => {
@@ -12779,9 +14390,9 @@ function TransportTab({
                     result?.message || result?.error || text || "저장 실패"
                 )
             }
-            setSuccess("교통안내가 저장되었습니다.")
+            console.log("교통안내가 저장되었습니다.")
         } catch (e: any) {
-            setError(e?.message || "저장 중 오류가 발생했습니다")
+            console.error(e?.message || "저장 중 오류가 발생했습니다")
         } finally {
             setSaving(false)
         }
@@ -12795,9 +14406,10 @@ function TransportTab({
                 flexDirection: "column",
                 gap: 24,
                 alignItems: "stretch",
+                overflow: "hidden",
             }}
         >
-            {/* 식장 이름 */}
+            {/* 예식 장소 이름 */}
             <div
                 style={{
                     width: "100%",
@@ -12813,7 +14425,7 @@ function TransportTab({
                         ...theme.typography.label,
                     }}
                 >
-                    식장 이름
+                    예식 장소
                 </div>
                 <div
                     style={{
@@ -12823,22 +14435,26 @@ function TransportTab({
                         fontFamily: theme.font.body,
                     }}
                 >
-                    식장 이름에 홀 이름을 쓰고싶다면 여기에 써주세요
+                    층 / 홀 정보는 예식 장소와 함께 입력해주세요
                 </div>
                 <input
                     style={{
                         flex: 1,
-                        height: 40,
-                        padding: 12,
+                        height: "calc(40px * 1.1429)",
+                        padding: "calc(12px * 1.1429)",
+                        paddingLeft: "calc(12px * 0.875)", // scale로 인한 좌측 여백 보정
                         background: "white",
                         border: `1px solid ${theme.color.border}`,
                         outlineOffset: -0.25,
-                        fontSize: 14,
+                        fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                         fontFamily: theme.font.body,
                         color: locationName ? "black" : "#ADADAD",
-                        width: "100%",
+                        width: "calc(100% * 1.1429)",
+                        transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                        transformOrigin: "left center",
+                        marginBottom: "calc(40px - 40px * 0.875)", // 하단 여백 제거
                     }}
-                    placeholder="그랜드볼룸, 사파이어홀"
+                    placeholder="그랜드볼룸 | 사파이어홀"
                     value={locationName}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                         setLocationName(e.target.value)
@@ -12853,66 +14469,99 @@ function TransportTab({
                         marginTop: 16,
                     }}
                 >
-                    식장 주소
+                    예식장 주소
                 </div>
                 <div
                     style={{
-                        textAlign: "center",
-                        color: "#AEAEAE",
-                        fontSize: 14,
-                        fontFamily: theme.font.body,
+                        width: "calc(100% * 1.1429)",
+                        height: "calc(40px*1.1429)",
+                        transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                        transformOrigin: "left center",
+                        display: "flex",
+                        gap: 6,
+                        marginBottom: -8,
                     }}
                 >
-                    도로명 주소를 입력해주세요
+                    {/* 도로명 주소 입력 버튼 */}
+                    <button
+                        type="button"
+                        onClick={openDaumPostcode}
+                        style={{
+                            flex: "1 1 0",
+                            width: "100%",
+                            height: "100%",
+                            paddingLeft: 12,
+                            paddingRight: 12,
+                            paddingTop: 8,
+                            paddingBottom: 8,
+                            backgroundColor: "#3f3f3f",
+                            color: "white",
+                            outlineOffset: "-0.50px",
+                            justifyContent: "center",
+                            alignItems: "center",
+                            display: "flex",
+                            border: "none",
+                            borderRadius: "2px",
+                            cursor: "pointer",
+                            opacity: 1,
+                            fontSize: "16px",
+                            fontFamily: theme.font.body,
+                        }}
+                    >
+                        도로명 주소 입력
+                    </button>
+
+                    {/* 상세 주소 입력 */}
+                    <input
+                        style={{
+                            flex: 1,
+                            height: "100%",
+                            borderRadius: 2,
+                            padding: "calc(12px * 1.1429)",
+                            paddingLeft: "calc(12px * 0.875)", // scale로 인한 좌측 여백 보정
+                            background: "#ffffff",
+                            border: `1px solid ${theme.color.border}`,
+                            outlineOffset: -0.25,
+                            fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
+                            fontFamily: theme.font.body,
+                            color: detailAddress ? "black" : "#ADADAD",
+                            width: "100%",
+                        }}
+                        placeholder="상세 주소 입력"
+                        value={detailAddress || ""}
+                        onChange={(e) => setDetailAddress(e.target.value)}
+                        onBlur={() => {
+                            // 상세 주소 입력 변경 시 전체 주소 프리뷰 갱신
+                            const combined = venue_address
+                                ? `${venue_address} ${detailAddress || ""}`.trim()
+                                : detailAddress || ""
+                            setVenue_address(combined)
+                        }}
+                    />
                 </div>
                 <input
                     style={{
                         flex: 1,
-                        height: 40,
-                        padding: 12,
+                        height: "calc(40px * 1.1429)",
+                        padding: "calc(12px * 1.1429)",
+                        paddingLeft: "calc(12px * 0.875)", // scale로 인한 좌측 여백 보정
                         background: "#f5f5f5",
                         border: `1px solid ${theme.color.border}`,
                         outlineOffset: -0.25,
-                        fontSize: 14,
+                        fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                         fontFamily: theme.font.body,
                         color: venue_address ? "black" : "#ADADAD",
-                        width: "100%",
-                        marginTop: 0,
+                        width: "calc(100% * 1.1429)",
                         cursor: "pointer",
+                        transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                        transformOrigin: "left center",
                     }}
-                    placeholder="도로명 주소 입력 버튼을 클릭하세요"
+                    placeholder="예식장 주소"
                     value={venue_address}
                     readOnly={true}
                     onClick={openDaumPostcode}
                     onChange={() => {}} // 직접 입력 방지
                 />
-
-                {/* 상세 주소 입력 */}
-                <input
-                    style={{
-                        flex: 1,
-                        height: 40,
-                        padding: 12,
-                        background: "#ffffff",
-                        border: `1px solid ${theme.color.border}`,
-                        outlineOffset: -0.25,
-                        fontSize: 14,
-                        fontFamily: theme.font.body,
-                        color: detailAddress ? "black" : "#ADADAD",
-                        width: "100%",
-                    }}
-                    placeholder="상세 주소를 입력하세요"
-                    value={detailAddress || ""}
-                    onChange={(e) => setDetailAddress(e.target.value)}
-                    onBlur={() => {
-                        // 상세 주소 입력 변경 시 전체 주소 프리뷰 갱신
-                        const combined = venue_address
-                            ? `${venue_address} ${detailAddress || ""}`.trim()
-                            : detailAddress || ""
-                        setVenue_address(combined)
-                    }}
-                />
-
                 {/* 다음 주소 검색 레이어 */}
                 <div
                     id="addressLayer"
@@ -12925,7 +14574,7 @@ function TransportTab({
                         left: "50%",
                         top: "50%",
                         transform: "translate(-50%, -50%)",
-                        width: "88%",
+                        width: "100%",
                         height: "400px",
                         backgroundColor: "white",
                         boxShadow: "0 10px 30px rgba(0, 0, 0, 0.3)",
@@ -12971,36 +14620,6 @@ function TransportTab({
                     </div>
                 </div>
 
-                {/* 도로명 주소 입력 버튼 */}
-                <button
-                    type="button"
-                    onClick={openDaumPostcode}
-                    style={{
-                        flex: "1 1 0",
-                        width: "100%",
-                        paddingLeft: 12,
-                        paddingRight: 12,
-                        paddingTop: 8,
-                        paddingBottom: 8,
-                        backgroundColor: "#e0e0e0",
-                        color: "black",
-                        outline: "0.50px var(--roarc-grey-500, #AEAEAE) solid",
-                        outlineOffset: "-0.50px",
-                        justifyContent: "center",
-                        alignItems: "center",
-                        gap: 8,
-                        display: "flex",
-                        border: "none",
-                        borderRadius: "2px",
-                        cursor: "pointer",
-                        opacity: 1,
-                        fontSize: "14px",
-                        fontFamily: theme.font.body,
-                    }}
-                >
-                    도로명 주소 입력
-                </button>
-
                 {/* 공용 알림으로 이동 */}
             </div>
 
@@ -13014,148 +14633,158 @@ function TransportTab({
                         <div
                             key={index}
                             style={{
-                                width: "100%",
-                                padding: 16,
+                                width: "calc(100% * 1.1429)",
+                                transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                transformOrigin: "left center",
+                                display: "flex",
+                                padding: 12,
                                 border: `1px solid ${theme.color.border}`,
                                 outlineOffset: -0.5,
-                                display: "flex",
                                 flexDirection: "column",
-                                gap: theme.gap.sm,
-                                marginBottom: 16,
+                                gap: theme.gap.xs,
+                                marginBottom: 0,
                                 alignItems: "flex-start",
                             }}
                         >
                             <div
                                 style={{
                                     width: "100%",
+                                    height: "40px",
                                     display: "flex",
-                                    justifyContent: "space-between",
-                                    alignItems: "center",
+                                    gap: 8,
                                 }}
                             >
-                                <div
+                                <input
                                     style={{
-                                        textAlign: "center",
-                                        ...theme.typography.label,
+                                        flex: 1,
+                                        height: "100%",
+                                        width: "70%",
+                                        padding: "calc(12px * 1.1429)",
+                                        paddingLeft: "calc(12px * 0.875)",
+                                        background: "white",
+                                        border: `1px solid ${theme.color.border}`,
+                                        outlineOffset: -0.25,
+                                        fontSize: 14, // iOS 자동 확대 방지를 위해 16px로 설정
+                                        fontFamily: theme.font.body,
+                                        color:
+                                            item.title === ""
+                                                ? "#ADADAD"
+                                                : "black",
                                     }}
-                                >
-                                    교통 안내
-                                </div>
+                                    placeholder="교통 수단"
+                                    value={item.title}
+                                    onChange={(e) =>
+                                        change(index, "title", e.target.value)
+                                    }
+                                />
                                 <div
                                     style={{
                                         display: "flex",
-                                        gap: 4,
                                         alignItems: "center",
+                                        width: "30%",
+                                        height: "100%",
                                     }}
                                 >
-                                    <button
-                                        onClick={() => move(index, -1)}
-                                        disabled={index === 0}
+                                    <div
                                         style={{
-                                            padding: 6,
-                                            border: `1px solid ${theme.color.border}`,
-                                            outlineOffset: -1,
-                                            background: "white",
-                                            cursor:
-                                                index === 0
-                                                    ? "not-allowed"
-                                                    : "pointer",
-                                            opacity: index === 0 ? 0.5 : 1,
+                                            display: "flex",
+                                            flex: "1",
+                                            height: "100%",
+                                            alignItems: "stretch",
                                         }}
                                     >
-                                        <div
-                                            style={{
-                                                width: 16,
-                                                height: 16,
-                                                padding: "13px 9px",
-                                                display: "flex",
-                                                flexDirection: "column",
-                                                justifyContent: "center",
-                                                alignItems: "center",
+                                        <CustomOrderDropdown
+                                            value={index + 1}
+                                            onChange={(newPosition) => {
+                                                const targetIndex =
+                                                    (newPosition as number) - 1
+                                                if (
+                                                    targetIndex !== index &&
+                                                    targetIndex >= 0 &&
+                                                    targetIndex < items.length
+                                                ) {
+                                                    setItems((prev) => {
+                                                        const next = [...prev]
+                                                        const [movedItem] =
+                                                            next.splice(
+                                                                index,
+                                                                1
+                                                            )
+                                                        next.splice(
+                                                            targetIndex,
+                                                            0,
+                                                            movedItem
+                                                        )
+                                                        return next.map(
+                                                            (it, i) => ({
+                                                                ...it,
+                                                                display_order:
+                                                                    i + 1,
+                                                            })
+                                                        )
+                                                    })
+                                                }
                                             }}
-                                        >
-                                            <div
-                                                style={{
-                                                    width: 12,
-                                                    height: 5.5,
-                                                    border: "1.5px solid #757575",
-                                                    borderRadius: 1,
-                                                }}
-                                            />
-                                        </div>
-                                    </button>
-                                    <button
-                                        onClick={() => move(index, 1)}
-                                        disabled={index === items.length - 1}
+                                            options={Array.from(
+                                                { length: items.length },
+                                                (_, i) => ({
+                                                    value: i + 1,
+                                                    label: `${i + 1}번째`,
+                                                })
+                                            )}
+                                            placeholder="순서 선택"
+                                        />
+                                    </div>
+                                    <div
+                                        data-svg-wrapper
                                         style={{
-                                            padding: 6,
-                                            border: `1px solid ${theme.color.border}`,
-                                            outlineOffset: -1,
-                                            background: "white",
-                                            cursor:
-                                                index === items.length - 1
-                                                    ? "not-allowed"
-                                                    : "pointer",
-                                            opacity:
-                                                index === items.length - 1
-                                                    ? 0.5
-                                                    : 1,
+                                            position: "relative",
+                                            cursor: "pointer",
+                                            flex: "0 0 32px",
+                                            width: 32,
+                                            height: 36,
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                        }}
+                                        onClick={() => {
+                                            setItems((prev) =>
+                                                prev.filter(
+                                                    (_, i) => i !== index
+                                                )
+                                            )
                                         }}
                                     >
-                                        <div
-                                            style={{
-                                                width: 16,
-                                                height: 16,
-                                                padding: "13px 9px",
-                                                display: "flex",
-                                                flexDirection: "column",
-                                                justifyContent: "center",
-                                                alignItems: "center",
-                                            }}
+                                        <svg
+                                            width="32"
+                                            height="32"
+                                            viewBox="0 0 32 32"
+                                            fill="none"
+                                            xmlns="http://www.w3.org/2000/svg"
                                         >
-                                            <div
-                                                style={{
-                                                    width: 12,
-                                                    height: 5.5,
-                                                    border: "1.5px solid #757575",
-                                                    borderRadius: 1,
-                                                    transform: "rotate(180deg)",
-                                                }}
+                                            <path
+                                                d="M14.625 24.5C14.1437 24.5 13.7319 24.3261 13.3895 23.9782C13.0471 23.6304 12.8756 23.2117 12.875 22.7222V11.1667H12V9.38889H16.375V8.5H21.625V9.38889H26V11.1667H25.125V22.7222C25.125 23.2111 24.9538 23.6298 24.6114 23.9782C24.269 24.3267 23.8568 24.5006 23.375 24.5H14.625ZM16.375 20.9444H18.125V12.9444H16.375V20.9444ZM19.875 20.9444H21.625V12.9444H19.875V20.9444Z"
+                                                fill="#AEAEAE"
                                             />
-                                        </div>
-                                    </button>
+                                        </svg>
+                                    </div>
                                 </div>
                             </div>
-                            <input
-                                style={{
-                                    width: "100%",
-                                    height: 40,
-                                    padding: 12,
-                                    background: "white",
-                                    border: `1px solid ${theme.color.border}`,
-                                    outlineOffset: -0.25,
-                                    fontSize: 14,
-                                    fontFamily: theme.font.body,
-                                    color:
-                                        item.title === "" ? "#ADADAD" : "black",
-                                }}
-                                placeholder="버스"
-                                value={item.title}
-                                onChange={(e) =>
-                                    change(index, "title", e.target.value)
-                                }
-                            />
                             <textarea
                                 id={`description-${index}`}
                                 style={{
-                                    width: "100%",
-                                    height: 120,
-                                    padding: 12,
+                                    width: "calc(100% * 1.1429)",
+                                    height: "calc(120px * 1.1429)",
+                                    padding: "calc(12px * 1.1429)",
+                                    paddingLeft: "calc(12px * 0.875)", // scale로 인한 좌측 여백 보정
                                     background: "white",
+                                    margin: "calc(-20px * 0.125)", // scale로 인한 여분 공간 제거
                                     border: `1px solid ${theme.color.border}`,
                                     outlineOffset: -0.25,
-                                    fontSize: 14,
+                                    fontSize: 16, // iOS 자동 확대 방지를 위해 16px로 설정
                                     fontFamily: theme.font.body,
+                                    transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                    transformOrigin: "left center",
                                     color:
                                         item.description === ""
                                             ? "#ADADAD"
@@ -13186,10 +14815,11 @@ function TransportTab({
                                         outlineOffset: -0.5,
                                         background: "white",
                                         cursor: "pointer",
-                                        fontSize: 10,
+                                        fontSize: 12,
                                         ...theme.font.bodyBold,
                                         color: "#7F7F7F",
                                         lineHeight: "20px",
+                                        WebkitTextFillColor: "#7F7F7F",
                                     }}
                                     title="선택한 텍스트를 두껍게 (*텍스트*)"
                                 >
@@ -13204,7 +14834,7 @@ function TransportTab({
                                         outlineOffset: -0.5,
                                         background: "white",
                                         cursor: "pointer",
-                                        fontSize: 10,
+                                        fontSize: 12,
                                         fontFamily: theme.font.body,
                                         color: "#7F7F7F",
                                         lineHeight: "20px",
@@ -13240,31 +14870,28 @@ function TransportTab({
             )}
 
             {/* 교통안내 저장 버튼 */}
-
-            <button
-                onClick={save}
-                disabled={saving}
-                style={{
-                    width: "100%",
-                    height: 44,
-                    background: saving ? "#9ca3af" : "#111827",
-                    color: "white",
-                    border: "none",
-                    borderRadius: 2,
-                    fontSize: 14,
-                    ...theme.font.bodyBold,
-                    cursor: saving ? "not-allowed" : "pointer",
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                }}
-            >
-                {saving ? "저장 중..." : "저장"}
-            </button>
-
-            {/* 공용 알림으로 이동 */}
-
-            {/* 하단 고정 저장 액션바 - 갤러리 순서 변경 시 표시 */}
+            {!hideSaveButton && (
+                <button
+                    onClick={save}
+                    disabled={saving}
+                    style={{
+                        width: "100%",
+                        height: 44,
+                        background: saving ? "#9ca3af" : "#111827",
+                        color: "white",
+                        border: "none",
+                        borderRadius: 2,
+                        fontSize: 14,
+                        ...theme.font.bodyBold,
+                        cursor: saving ? "not-allowed" : "pointer",
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                    }}
+                >
+                    {saving ? "저장 중..." : "저장"}
+                </button>
+            )}
         </div>
     )
 }
@@ -13276,6 +14903,8 @@ export default function AdminNew(props: any) {
     const [saveFunction, setSaveFunction] = useState<
         (() => Promise<void>) | null
     >(null)
+    const [showCopyPopup, setShowCopyPopup] = useState(false)
+    const [currentUser, setCurrentUser] = useState<any>(null)
 
     // AdminMainContent에서 상태를 업데이트할 수 있도록 콜백 함수들 제공
     const updateSaveState = (
@@ -13290,7 +14919,14 @@ export default function AdminNew(props: any) {
 
     return (
         <>
-            <AdminMainContent {...props} updateSaveState={updateSaveState} />
+            <AdminMainContent
+                {...props}
+                updateSaveState={updateSaveState}
+                showCopyPopup={showCopyPopup}
+                setShowCopyPopup={setShowCopyPopup}
+                currentUser={currentUser}
+                setCurrentUser={setCurrentUser}
+            />
             {/* Footer */}
             <div
                 style={{
@@ -13356,14 +14992,13 @@ export default function AdminNew(props: any) {
                     © roarc. all rights reseved.
                 </span>
             </div>
-            {/* 하단 고정 저장 액션바 - 갤러리 순서 변경 시 표시 */}
-            {hasChanges && saveFunction && (
-                <SaveActionBar
-                    hasUnsavedChanges={hasChanges}
-                    onSave={saveFunction}
-                    isSaving={isSaving}
-                />
-            )}
+            {/* 하단 고정 액션바 - 갤러리 순서 변경 시 저장 버튼, 항상 청첩장 보기 버튼 */}
+            <BottomActionBar
+                hasChanges={hasChanges}
+                saveFunction={saveFunction}
+                isSaving={isSaving}
+                currentUser={currentUser}
+            />
         </>
     )
 }
@@ -13426,16 +15061,85 @@ function InputField({
 }
 
 // 하단 고정 액션바 컴포넌트
-function SaveActionBar({
-    hasUnsavedChanges,
-    onSave,
+// 경량 브로드캐스트: 어디서든 호출하여 자동 저장 토스트 노출
+function broadcastAutoSaveToast() {
+    if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("autosave:flash"))
+    }
+}
+
+function BottomActionBar({
+    hasChanges,
+    saveFunction,
     isSaving,
+    currentUser,
 }: {
-    hasUnsavedChanges: boolean
-    onSave: () => void
+    hasChanges: boolean
+    saveFunction: (() => Promise<void>) | null
     isSaving: boolean
+    currentUser: any
 }) {
-    if (!hasUnsavedChanges) return null
+    const formatDateForUrl = (dateString: string) => {
+        const date = new Date(dateString)
+        const year = String(date.getFullYear()).slice(-2) // 뒤 2자리만 (2025 -> 25)
+        const month = String(date.getMonth() + 1).padStart(2, "0")
+        const day = String(date.getDate()).padStart(2, "0")
+        return `${year}${month}${day}`
+    }
+
+    const handleViewInvitation = () => {
+        if (currentUser?.wedding_date && currentUser?.page_id) {
+            const formattedDate = formatDateForUrl(currentUser.wedding_date)
+            const invitationUrl = `https://mcard.roarc.kr/${formattedDate}/${currentUser.page_id}`
+            window.open(invitationUrl, "_blank")
+        } else {
+            alert(
+                "사용자 정보가 불완전합니다. wedding_date와 page_id가 필요합니다."
+            )
+        }
+    }
+
+    const timersRef = React.useRef<{ enter?: number; exit?: number; dots?: number; rotate?: number }>({})
+    const [toastVisible, setToastVisible] = React.useState(false)
+    const [toastPhase, setToastPhase] = React.useState<"idle" | "enter" | "visible" | "exit">("idle")
+    const [dotCount, setDotCount] = React.useState(1)
+    const [rotationDeg, setRotationDeg] = React.useState(0)
+
+    React.useEffect(() => {
+        const clearAll = () => {
+            if (timersRef.current.enter) clearTimeout(timersRef.current.enter)
+            if (timersRef.current.exit) clearTimeout(timersRef.current.exit)
+            if (timersRef.current.dots) clearInterval(timersRef.current.dots)
+            if (timersRef.current.rotate) clearInterval(timersRef.current.rotate)
+            timersRef.current = {}
+        }
+
+        const onFlash = () => {
+            clearAll()
+            setToastVisible(true)
+            setToastPhase("enter")
+            timersRef.current.enter = window.setTimeout(() => setToastPhase("visible"), 30)
+            timersRef.current.dots = window.setInterval(() => {
+                setDotCount((c) => (c >= 3 ? 1 : c + 1))
+            }, 350)
+            timersRef.current.rotate = window.setInterval(() => {
+                setRotationDeg((deg) => deg + 180)
+            }, 500)
+            timersRef.current.exit = window.setTimeout(() => {
+                setToastPhase("exit")
+                window.setTimeout(() => {
+                    setToastVisible(false)
+                    clearAll()
+                }, 220)
+            }, 1500)
+        }
+
+        window.addEventListener("autosave:flash", onFlash)
+        return () => {
+            window.removeEventListener("autosave:flash", onFlash)
+            clearAll()
+        }
+    }, [])
 
     return (
         <div
@@ -13445,30 +15149,127 @@ function SaveActionBar({
                 right: 0,
                 bottom: 0,
                 zIndex: 1000,
+                display: "flex",
+                flexDirection: "column",
             }}
         >
+            {/* 저장 버튼 - 갤러리 순서 변경 시에만 표시 */}
+            {hasChanges && saveFunction && (
+                <button
+                    onClick={async () => {
+                        broadcastAutoSaveToast()
+                        await saveFunction()
+                    }}
+                    disabled={isSaving}
+                    style={{
+                        width: "100%",
+                        height: "56px",
+                        backgroundColor: isSaving ? "#6b7280" : "#000000",
+                        color: "white",
+                        border: "none",
+                        fontSize: 16,
+                        ...theme.font.bodyBold,
+                        cursor: isSaving ? "not-allowed" : "pointer",
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        gap: 8,
+                        opacity: isSaving ? 0.6 : 1,
+                    }}
+                >
+                    {isSaving ? "저장 중..." : "저장하기"}
+                </button>
+            )}
+
+            {/* 자동 저장 알림 토스트 (청첩장 보기 위 20px) */}
+            {toastVisible && (
+                <div
+                    role="status"
+                    aria-live="polite"
+                    style={{
+                        position: "relative",
+                        width: "100%",
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        marginBottom: 20,
+                    }}
+                >
+                    <div
+                        style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 6,
+                            padding: "10px 12px",
+                            borderRadius: 37,
+                            background: "#ffffff",
+                            color: "#757575",
+                            boxShadow: theme.shadow.pop,
+                            fontFamily: theme.font.body,
+                            fontSize: 16,
+                            transform:
+                                toastPhase === "enter"
+                                    ? "translateY(8px)"
+                                    : toastPhase === "exit"
+                                    ? "translateY(8px)"
+                                    : "translateY(0)",
+                            opacity: toastPhase === "enter" ? 0 : toastPhase === "exit" ? 0 : 1,
+                            transition: "opacity .18s ease, transform .18s ease",
+                        }}
+                    >
+                        {/* 회전 아이콘 (제공된 SVG, 0.5초마다 easeInOut 회전) */}
+                        <span
+                            aria-hidden
+                            style={{
+                                display: "inline-flex",
+                                width: 16,
+                                height: 16,
+                                transform: `rotate(${rotationDeg}deg)`,
+                                transition: "transform .5s ease-in-out",
+                            }}
+                        >
+                            <svg
+                                width="16"
+                                height="16"
+                                viewBox="0 0 16 16"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                            >
+                                <path
+                                    d="M15.086 8.75C14.711 12.3328 11.6817 15.125 8 15.125C6.64123 15.1255 5.31065 14.7374 4.16518 14.0065C3.01971 13.2756 2.10712 12.2325 1.535 11M0.875 14.375V10.625H3.125M0.914 7.25C1.289 3.66725 4.3175 0.875 8 0.875C9.35877 0.874549 10.6893 1.26264 11.8348 1.99351C12.9803 2.72437 13.8929 3.76754 14.465 5M15.125 1.625V5.375H12.875"
+                                    stroke="#757575"
+                                    strokeLinecap="square"
+                                />
+                            </svg>
+                        </span>
+                        <span style={{ letterSpacing: "-0.01em", color: "#757575" }}>자동 저장 중</span>
+                        <span aria-hidden style={{ width: 18, display: "inline-flex", color: "#757575" }}>
+                            {".".repeat(dotCount)}
+                        </span>
+                    </div>
+                </div>
+            )}
+
+            {/* 청첩장 보기 버튼 - 항상 표시 */}
             <button
-                onClick={onSave}
-                disabled={isSaving}
+                onClick={handleViewInvitation}
                 style={{
                     width: "100%",
                     height: "calc(56px + env(safe-area-inset-bottom, 0px))",
-                    backgroundColor: isSaving ? "#6b7280" : "#000000",
+                    backgroundColor: "#000",
                     color: "white",
                     border: "none",
-                    borderRadius: 0,
                     fontSize: 16,
                     ...theme.font.bodyBold,
-                    cursor: isSaving ? "not-allowed" : "pointer",
+                    cursor: "pointer",
                     display: "flex",
                     justifyContent: "center",
                     alignItems: "center",
                     gap: 8,
-                    opacity: isSaving ? 0.6 : 1,
                     paddingBottom: "env(safe-area-inset-bottom, 0px)",
                 }}
             >
-                {isSaving ? "저장 중..." : "저장하기"}
+                청첩장 보기
             </button>
         </div>
     )
@@ -13498,145 +15299,6 @@ function CustomOrderDropdown({
     // 선택된 옵션 라벨 찾기
     const selectedOption = options.find((opt) => opt.value === value)
     const selectedLabel = selectedOption?.label
-
-    // 드롭다운 토글
-    const toggleDropdown = () => {
-        setIsOpen(!isOpen)
-        if (!isOpen) {
-            setFocusedIndex(0)
-            // 스크롤 잠금
-            if (typeof document !== "undefined") {
-                document.body.style.overflow = "hidden"
-            }
-            // 위치 계산
-            requestAnimationFrame(() => updateMenuPosition())
-        } else {
-            setFocusedIndex(-1)
-            // 스크롤 복원
-            if (typeof document !== "undefined") {
-                document.body.style.overflow = ""
-            }
-            setMenuStyle(null)
-        }
-    }
-
-    // 옵션 선택
-    const handleSelect = (selectedValue: string | number) => {
-        onChange(selectedValue)
-        setIsOpen(false)
-        setFocusedIndex(-1)
-        if (typeof document !== "undefined") {
-            document.body.style.overflow = ""
-        }
-        buttonRef.current?.focus()
-    }
-
-    // 키보드 이벤트 처리
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (!isOpen) {
-            if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault()
-                toggleDropdown()
-            }
-            return
-        }
-
-        switch (e.key) {
-            case "Escape":
-                e.preventDefault()
-                setIsOpen(false)
-                setFocusedIndex(-1)
-                if (typeof document !== "undefined") {
-                    document.body.style.overflow = ""
-                }
-                buttonRef.current?.focus()
-                break
-            case "Enter":
-            case " ":
-                e.preventDefault()
-                if (focusedIndex >= 0 && focusedIndex < options.length) {
-                    handleSelect(options[focusedIndex].value)
-                }
-                break
-            case "ArrowDown":
-                e.preventDefault()
-                setFocusedIndex((prev) =>
-                    prev < options.length - 1 ? prev + 1 : 0
-                )
-                break
-            case "ArrowUp":
-                e.preventDefault()
-                setFocusedIndex((prev) =>
-                    prev > 0 ? prev - 1 : options.length - 1
-                )
-                break
-        }
-    }
-
-    // 바깥 클릭 시 닫기
-    React.useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            const target = event.target as Node
-            // 드롭다운 버튼 영역 또는 포털로 렌더된 메뉴 내부 클릭은 무시
-            const clickedInsideButton = !!(
-                dropdownRef.current && dropdownRef.current.contains(target)
-            )
-            const clickedInsideMenu = !!(
-                listRef.current && listRef.current.contains(target)
-            )
-            if (clickedInsideButton || clickedInsideMenu) return
-            setIsOpen(false)
-            setFocusedIndex(-1)
-            if (typeof document !== "undefined") {
-                document.body.style.overflow = ""
-            }
-        }
-
-        if (
-            isOpen &&
-            typeof document !== "undefined" &&
-            typeof window !== "undefined"
-        ) {
-            document.addEventListener("mousedown", handleClickOutside)
-            window.addEventListener("scroll", updateMenuPosition, true)
-            window.addEventListener("resize", updateMenuPosition)
-        }
-
-        return () => {
-            if (
-                typeof document !== "undefined" &&
-                typeof window !== "undefined"
-            ) {
-                document.removeEventListener("mousedown", handleClickOutside)
-                window.removeEventListener("scroll", updateMenuPosition, true)
-                window.removeEventListener("resize", updateMenuPosition)
-            }
-        }
-    }, [isOpen])
-
-    // 포커스된 옵션으로 스크롤
-    React.useEffect(() => {
-        if (isOpen && focusedIndex >= 0 && listRef.current) {
-            const focusedElement = listRef.current.children[
-                focusedIndex
-            ] as HTMLElement
-            if (focusedElement) {
-                focusedElement.scrollIntoView({
-                    block: "nearest",
-                    behavior: "smooth",
-                })
-            }
-        }
-    }, [focusedIndex, isOpen])
-
-    // 컴포넌트 언마운트 시 스크롤 복원
-    React.useEffect(() => {
-        return () => {
-            if (typeof document !== "undefined") {
-                document.body.style.overflow = ""
-            }
-        }
-    }, [])
 
     // 버튼 기준으로 메뉴 위치 계산 (실제 메뉴 높이 추정으로 보정)
     const updateMenuPosition = () => {
@@ -13686,6 +15348,137 @@ function CustomOrderDropdown({
         })
     }
 
+    // 드롭다운 토글
+    const toggleDropdown = () => {
+        setIsOpen(!isOpen)
+        if (!isOpen) {
+            setFocusedIndex(0)
+            // 위치 계산
+            requestAnimationFrame(() => updateMenuPosition())
+        } else {
+            setFocusedIndex(-1)
+            setMenuStyle(null)
+        }
+    }
+
+    // 옵션 선택
+    const handleSelect = (selectedValue: string | number) => {
+        onChange(selectedValue)
+        setIsOpen(false)
+        setFocusedIndex(-1)
+        buttonRef.current?.focus()
+    }
+
+    // 키보드 이벤트 처리
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (!isOpen) {
+            if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault()
+                toggleDropdown()
+            }
+            return
+        }
+
+        switch (e.key) {
+            case "Escape":
+                e.preventDefault()
+                setIsOpen(false)
+                setFocusedIndex(-1)
+                buttonRef.current?.focus()
+                break
+            case "Enter":
+            case " ":
+                e.preventDefault()
+                if (focusedIndex >= 0 && focusedIndex < options.length) {
+                    handleSelect(options[focusedIndex].value)
+                }
+                break
+            case "ArrowDown":
+                e.preventDefault()
+                setFocusedIndex((prev) =>
+                    prev < options.length - 1 ? prev + 1 : 0
+                )
+                break
+            case "ArrowUp":
+                e.preventDefault()
+                setFocusedIndex((prev) =>
+                    prev > 0 ? prev - 1 : options.length - 1
+                )
+                break
+        }
+    }
+
+    // 바깥 클릭 시 닫기
+    React.useEffect(() => {
+        if (
+            !isOpen ||
+            typeof document === "undefined" ||
+            typeof window === "undefined"
+        ) {
+            return
+        }
+
+        let scrollTimeout: ReturnType<typeof setTimeout> | null = null
+
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target as Node
+            const clickedInsideButton = !!(
+                dropdownRef.current && dropdownRef.current.contains(target)
+            )
+            const clickedInsideMenu = !!(
+                listRef.current && listRef.current.contains(target)
+            )
+            if (clickedInsideButton || clickedInsideMenu) return
+            setIsOpen(false)
+            setFocusedIndex(-1)
+        }
+
+        const handleScroll = () => {
+            if (scrollTimeout) return
+            scrollTimeout = setTimeout(() => {
+                updateMenuPosition()
+                scrollTimeout = null
+            }, 16) // ~60fps
+        }
+
+        const handleResize = () => {
+            updateMenuPosition()
+        }
+
+        document.addEventListener("mousedown", handleClickOutside)
+        window.addEventListener("scroll", handleScroll, { passive: true })
+        window.addEventListener("resize", handleResize, { passive: true })
+
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside)
+            window.removeEventListener("scroll", handleScroll)
+            window.removeEventListener("resize", handleResize)
+            if (scrollTimeout) {
+                clearTimeout(scrollTimeout)
+                scrollTimeout = null
+            }
+            // 스크롤 복원 (안전장치)
+            if (typeof document !== "undefined") {
+                document.body.style.overflow = ""
+            }
+        }
+    }, [isOpen])
+
+    React.useEffect(() => {
+        if (!isOpen) {
+            setMenuStyle(null)
+            return
+        }
+        if (typeof window === "undefined") {
+            updateMenuPosition()
+            return
+        }
+        const rafId = window.requestAnimationFrame(() => updateMenuPosition())
+        return () => {
+            window.cancelAnimationFrame(rafId)
+        }
+    }, [isOpen])
+
     return (
         <div ref={dropdownRef} style={{ position: "relative" }}>
             <button
@@ -13698,10 +15491,10 @@ function CustomOrderDropdown({
                 onKeyDown={handleKeyDown}
                 style={{
                     width: "100%",
-                    minHeight: 32, // 모바일 터치 타겟
+                    height: "100%", // 모바일 터치 타겟
                     padding: "10px 12px",
                     backgroundColor: "#ffffff",
-                    border: `1px solid ${theme.color.border}`,
+                    border: "none",
                     fontSize: 12, // 모바일 줌 방지
                     ...theme.font.bodyBold,
                     color: "#757575",
@@ -13748,50 +15541,76 @@ function CustomOrderDropdown({
                 menuStyle &&
                 typeof document !== "undefined" &&
                 ReactDOM.createPortal(
-                    <div
-                        ref={listRef}
-                        role="listbox"
-                        tabIndex={-1}
-                        aria-label="순서 옵션 목록"
-                        style={menuStyle}
-                    >
-                        {options.map((option, index) => (
-                            <div
-                                key={option.value}
-                                role="option"
-                                aria-selected={value === option.value}
-                                tabIndex={focusedIndex === index ? 0 : -1}
-                                onClick={() => handleSelect(option.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Enter" || e.key === " ") {
-                                        e.preventDefault()
-                                        handleSelect(option.value)
-                                    }
-                                }}
-                                style={{
-                                    padding: "12px 14px",
-                                    fontSize: 12,
-                                    ...theme.font.bodyBold,
-                                    lineHeight: "18px",
-                                    color: "#757575",
-                                    backgroundColor:
-                                        value === option.value
-                                            ? "#F3F4F6"
-                                            : "#ffffff",
-                                    cursor: "pointer",
-                                    outline:
-                                        focusedIndex === index
-                                            ? "0.5px solid rgb(156, 156, 156)"
-                                            : "0.5px solid rgb(229, 230, 232)",
-                                    transition: "background-color 0.15s ease",
-                                }}
-                                onMouseEnter={() => setFocusedIndex(index)}
-                                onMouseLeave={() => setFocusedIndex(-1)}
-                            >
-                                {option.label}
-                            </div>
-                        ))}
-                    </div>,
+                    <>
+                        {/* 스크롤 방지 배경 */}
+                        <div
+                            style={{
+                                position: "fixed",
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                background: "transparent",
+                                zIndex: 9999,
+                            }}
+                            onClick={() => {
+                                setIsOpen(false)
+                                setFocusedIndex(-1)
+                                if (typeof document !== "undefined") {
+                                    document.body.style.overflow = ""
+                                }
+                            }}
+                            onTouchMove={(e) => e.preventDefault()}
+                        />
+                        <div
+                            ref={listRef}
+                            role="listbox"
+                            tabIndex={-1}
+                            aria-label="순서 옵션 목록"
+                            style={menuStyle}
+                        >
+                            {options.map((option, index) => (
+                                <div
+                                    key={option.value}
+                                    role="option"
+                                    aria-selected={value === option.value}
+                                    tabIndex={focusedIndex === index ? 0 : -1}
+                                    onClick={() => handleSelect(option.value)}
+                                    onKeyDown={(e) => {
+                                        if (
+                                            e.key === "Enter" ||
+                                            e.key === " "
+                                        ) {
+                                            e.preventDefault()
+                                            handleSelect(option.value)
+                                        }
+                                    }}
+                                    style={{
+                                        padding: "12px 14px",
+                                        fontSize: 12,
+                                        ...theme.font.bodyBold,
+                                        lineHeight: "18px",
+                                        color: "#757575",
+                                        backgroundColor:
+                                            value === option.value
+                                                ? "#F3F4F6"
+                                                : "#ffffff",
+                                        cursor: "pointer",
+                                        outline:
+                                            focusedIndex === index
+                                                ? "0.5px solid rgb(156, 156, 156)"
+                                                : "0.5px solid rgb(229, 230, 232)",
+                                        transition:
+                                            "background-color 0.15s ease",
+                                    }}
+                                    onMouseEnter={() => setFocusedIndex(index)}
+                                    onMouseLeave={() => setFocusedIndex(-1)}
+                                >
+                                    {option.label}
+                                </div>
+                            ))}
+                        </div>
+                    </>,
                     document.body
                 )}
         </div>

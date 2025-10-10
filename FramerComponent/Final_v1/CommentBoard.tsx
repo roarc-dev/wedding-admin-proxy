@@ -2,6 +2,7 @@ import * as React from "react"
 import { useState, useEffect } from "react"
 import { addPropertyControls, ControlType } from "framer"
 import { motion } from "framer-motion"
+import { createPortal } from "react-dom"
 // @ts-ignore
 import typography from "https://cdn.roarc.kr/fonts/typography.js?v=27c65dba30928cbbce6839678016d9ac"
 
@@ -654,37 +655,42 @@ export default function CommentBoard({
             )}
 
             {/* 작성 모달 */}
-            {showWriteModal && (
-                <div
-                    role="dialog"
-                    aria-modal="true"
-                    style={{
-                        position: "fixed",
-                        inset: 0,
-                        backgroundColor: "rgba(0, 0, 0, 0.5)",
-                        display: "flex",
-                        justifyContent: "center",
-                        alignItems: "center",
-                        zIndex: 1000,
-                    }}
-                    onClick={() => {
-                        // 배경 클릭 시 닫기 (모달 내부 클릭은 버블링 방지)
-                        setShowWriteModal(false)
-                        setErrorMessage("")
-                    }}
-                >
+            {showWriteModal &&
+                typeof window !== "undefined" &&
+                createPortal(
                     <div
+                        role="dialog"
+                        aria-modal="true"
                         style={{
-                            backgroundColor: BG,
-                            padding: 24,
-                            borderRadius: 0,
-                            width: "min(560px, 92vw)",
-                            border: "none",
-                            WebkitTextSizeAdjust: "100%",
-                            textSizeAdjust: "100%",
+                            position: "fixed",
+                            inset: 0,
+                            // 배경 오버레이 제거 (투명)
+                            backgroundColor: "transparent",
+                            display: "flex",
+                            justifyContent: "center",
+                            alignItems: "center",
+                            zIndex: 1000,
                         }}
-                        onClick={(e) => e.stopPropagation()}
+                        onClick={() => {
+                            // 배경 클릭 시 닫기 (모달 내부 클릭은 버블링 방지)
+                            setShowWriteModal(false)
+                            setErrorMessage("")
+                        }}
                     >
+                        <div
+                            style={{
+                                backgroundColor: BG,
+                                padding: 24,
+                                borderRadius: 0,
+                                width: "min(720px, 96vw)",
+                                border: "none",
+                                WebkitTextSizeAdjust: "100%",
+                                textSizeAdjust: "100%",
+                                // 더 강한 그림자 적용
+                                boxShadow: "0 20px 60px rgba(0, 0, 0, 0.22)",
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
                         <div
                             style={{
                                 display: "flex",
@@ -825,36 +831,42 @@ export default function CommentBoard({
                                 등록
                             </button>
                         </div>
-                    </div>
-                </div>
-            )}
+                        </div>
+                    </div>,
+                    document.body
+                )}
 
             {/* 삭제 모달 */}
-            {showDeleteModal && (
-                <div
-                    style={{
-                        position: "fixed",
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        backgroundColor: "rgba(0, 0, 0, 0.5)",
-                        display: "flex",
-                        justifyContent: "center",
-                        alignItems: "center",
-                        zIndex: 1000,
-                    }}
-                >
+            {showDeleteModal &&
+                typeof window !== "undefined" &&
+                createPortal(
                     <div
                         style={{
-                            backgroundColor: BG,
-                            padding: 32,
-                            borderRadius: 0,
-                            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.2)",
-                            minWidth: 320,
-                            border: "none",
+                            position: "fixed",
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            // 배경 오버레이 제거 (투명)
+                            backgroundColor: "transparent",
+                            display: "flex",
+                            justifyContent: "center",
+                            alignItems: "center",
+                            zIndex: 1000,
                         }}
+                        onClick={cancelDelete}
                     >
+                        <div
+                            style={{
+                                backgroundColor: BG,
+                                padding: 32,
+                                borderRadius: 0,
+                                boxShadow: "0 20px 60px rgba(0, 0, 0, 0.22)",
+                                width: "min(520px, 94vw)",
+                                border: "none",
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
                         <h4
                             style={{
                                 margin: "0 0 16px 0",
@@ -942,9 +954,10 @@ export default function CommentBoard({
                                 삭제
                             </button>
                         </div>
-                    </div>
-                </div>
-            )}
+                        </div>
+                    </div>,
+                    document.body
+                )}
                 </motion.div>
             </div>
         </div>

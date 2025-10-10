@@ -5,6 +5,22 @@ import React, {
 } from "react"
 import { addPropertyControls, ControlType } from "framer"
 
+// 타입 정의
+interface FormData {
+    guestName: string
+    guestType: string
+    relationType: string
+    mealTime: string
+    guestCount: number
+    phoneNumber: string
+    consentPersonalInfo: boolean
+}
+
+interface RSVPProps {
+    pageId?: string
+    style?: React.CSSProperties
+}
+
 /**
  * @framerDisableUnlink
  * @framerSupportedLayoutWidth fixed
@@ -12,31 +28,32 @@ import { addPropertyControls, ControlType } from "framer"
  * @framerIntrinsicWidth 400
  * @framerIntrinsicHeight 800
  */
-export default function RSVPForm2(props) {
+export default function RSVPForm2(props: RSVPProps) {
     const {
         // Supabase 직접 연결 제거 - 프록시 사용
         pageId = "",
         style,
-        backgroundColor = "#ffffff",
-        buttonColor = "#3b82f6",
-        buttonTextColor = "#ffffff",
-        borderColor = "#e5e7eb",
-        accentColor = "#888888",
-        textColor = "#374151",
-        // 통합 선택 버튼 색상 컨트롤
-        selectionButtonBgColor = "#999999",
-        selectionButtonBorderColor = "#e5e7eb",
-        selectionButtonActiveBgColor = "#f0f1ff",
-        selectionButtonActiveBorderColor = "#888888", // 추가된 속성
-        checkboxBorderColor = "#e5e7eb",
-        checkboxCheckedBgColor = "#999999",
-        checkboxCheckedBorderColor = "#888888",
     } = props
+
+    // 고정 색상 값들
+    const backgroundColor = "#ffffff"
+    const buttonColor = "#3b82f6"
+    const buttonTextColor = "#ffffff"
+    const borderColor = "#e5e7eb"
+    const accentColor = "#888888"
+    const textColor = "#374151"
+    const selectionButtonBgColor = "#999999"
+    const selectionButtonBorderColor = "#e5e7eb"
+    const selectionButtonActiveBgColor = "#f0f1ff"
+    const selectionButtonActiveBorderColor = "#888888"
+    const checkboxBorderColor = "#e5e7eb"
+    const checkboxCheckedBgColor = "#999999"
+    const checkboxCheckedBorderColor = "#888888"
 
     // 프록시 서버 URL
     const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app"
 
-    const [formData, setFormData] = useState({
+    const [formData, setFormData] = useState<FormData>({
         guestName: "",
         guestType: "",
         relationType: "",
@@ -48,11 +65,11 @@ export default function RSVPForm2(props) {
 
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [submitStatus, setSubmitStatus] = useState("")
-    const [errors, setErrors] = useState({})
+    const [errors, setErrors] = useState<Record<string, string>>({})
     const [isPrivacyExpanded, setIsPrivacyExpanded] = useState(false)
 
     // 전화번호 포맷팅 함수
-    const formatPhoneNumber = (value) => {
+    const formatPhoneNumber = (value: string) => {
         // 숫자만 추출
         const numbers = value.replace(/[^\d]/g, "")
 
@@ -71,7 +88,7 @@ export default function RSVPForm2(props) {
 
     // 입력 검증 함수
     const validateForm = () => {
-        const newErrors = {}
+        const newErrors: Record<string, string> = {}
 
         // 필수 필드 검증
         if (!formData.guestName.trim()) {
@@ -108,8 +125,9 @@ export default function RSVPForm2(props) {
         return Object.keys(newErrors).length === 0
     }
 
-    const handleInputChange = (e) => {
-        const { name, value, type, checked } = e.target
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        const { name, value, type } = e.target
+        const checked = 'checked' in e.target ? e.target.checked : false
 
         if (name === "phoneNumber") {
             // 전화번호는 특별 처리
@@ -127,10 +145,11 @@ export default function RSVPForm2(props) {
 
         // 입력 시 해당 필드의 에러 제거
         if (errors[name]) {
-            setErrors((prev) => ({
-                ...prev,
-                [name]: undefined,
-            }))
+            setErrors((prev) => {
+                const newErrors = { ...prev }
+                delete newErrors[name]
+                return newErrors
+            })
         }
     }
 
@@ -160,7 +179,7 @@ export default function RSVPForm2(props) {
             guest_type: formData.guestType,
             relation_type: formData.relationType,
             meal_time: formData.mealTime,
-            guest_count: parseInt(formData.guestCount),
+            guest_count: formData.guestCount,
             phone_number: formData.phoneNumber,
             consent_personal_info: formData.consentPersonalInfo,
             page_id: pageId,
@@ -208,7 +227,7 @@ export default function RSVPForm2(props) {
                 phoneNumber: "",
                 consentPersonalInfo: false,
             })
-        } catch (error) {
+        } catch (error: any) {
             console.error("제출 에러:", error)
             setSubmitStatus("error")
             alert(`제출 실패: ${error.message}`)
@@ -793,7 +812,7 @@ export default function RSVPForm2(props) {
                             value={formData.phoneNumber}
                             onChange={handleInputChange}
                             placeholder=""
-                            maxLength="13"
+                            maxLength={13}
                             style={{
                                 width: "100%",
                                 padding: "12px",
@@ -1086,71 +1105,5 @@ addPropertyControls(RSVPForm2, {
         title: "페이지 ID",
         defaultValue: "",
         placeholder: "예: wedding-main, anniversary-2024",
-    },
-    backgroundColor: {
-        type: ControlType.Color,
-        title: "배경색",
-        defaultValue: "#ffffff",
-    },
-    buttonColor: {
-        type: ControlType.Color,
-        title: "버튼 배경색",
-        defaultValue: "#3b82f6",
-    },
-    buttonTextColor: {
-        type: ControlType.Color,
-        title: "버튼 글자색",
-        defaultValue: "#ffffff",
-    },
-    borderColor: {
-        type: ControlType.Color,
-        title: "테두리 색상",
-        defaultValue: "#e5e7eb",
-    },
-    accentColor: {
-        type: ControlType.Color,
-        title: "강조 색상",
-        defaultValue: "#3b82f6",
-    },
-    textColor: {
-        type: ControlType.Color,
-        title: "글자 색상",
-        defaultValue: "#374151",
-    },
-    // 모든 선택 버튼 색상
-    selectionButtonBgColor: {
-        type: ControlType.Color,
-        title: "모든 선택 버튼 배경색",
-        defaultValue: "#ffffff",
-    },
-    selectionButtonBorderColor: {
-        type: ControlType.Color,
-        title: "모든 선택 버튼 테두리색",
-        defaultValue: "#e5e7eb",
-    },
-    selectionButtonActiveBgColor: {
-        type: ControlType.Color,
-        title: "모든 선택 버튼 강조 배경색",
-        defaultValue: "#e3e3e3",
-    },
-    selectionButtonActiveBorderColor: {
-        type: ControlType.Color,
-        title: "모든 선택 버튼 강조 테두리색",
-        defaultValue: "#999999",
-    },
-    checkboxBorderColor: {
-        type: ControlType.Color,
-        title: "체크박스 테두리 색상",
-        defaultValue: "#e5e7eb",
-    },
-    checkboxCheckedBgColor: {
-        type: ControlType.Color,
-        title: "체크박스 체크 시 배경색",
-        defaultValue: "#3b82f6",
-    },
-    checkboxCheckedBorderColor: {
-        type: ControlType.Color,
-        title: "체크박스 체크 시 테두리색",
-        defaultValue: "#3b82f6",
     },
 })

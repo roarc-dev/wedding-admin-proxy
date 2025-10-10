@@ -562,30 +562,30 @@ export default function WeddingInvitation(props: InviteNameProps) {
                             width: "100%",
                             flexDirection: "column",
                             justifyContent: "flex-start",
-                            alignItems: "flex-start",
+                            alignItems: "center",
                             display: "inline-flex",
                         }}
                     >
                         <div
                             style={{
-                                alignSelf: "stretch",
                                 color: "black",
                                 fontSize: 18,
                                 ...pretendardSemiBoldStyle,
                                 lineHeight: "32px",
                                 wordWrap: "break-word",
+                                textAlign: "center",
                             }}
                         >
                             {weddingData.groomName || ""}
                         </div>
                         <div
                             style={{
-                                alignSelf: "stretch",
                                 color: "black",
                                 fontSize: 18,
                                 ...pretendardSemiBoldStyle,
                                 lineHeight: "32px",
                                 wordWrap: "break-word",
+                                textAlign: "center",
                             }}
                         >
                             {weddingData.brideName || ""}
