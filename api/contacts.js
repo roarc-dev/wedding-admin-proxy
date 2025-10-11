@@ -131,11 +131,35 @@ export default async function handler(req, res) {
 }
 
 async function handleGetContacts(req) {
-  const { pageId } = req.query
+  const { pageId, action } = req.query
   
-  console.log('handleGetContacts - pageId:', pageId)
+  console.log('handleGetContacts - pageId:', pageId, 'action:', action)
 
   try {
+    // getByPageId 액션인 경우 page_settings에서 account 토글 상태 확인
+    if (action === 'getByPageId' && pageId) {
+      console.log('Checking page_settings account toggle for pageId:', pageId)
+      
+      const { data: settingsData, error: settingsError } = await supabase
+        .from('page_settings')
+        .select('account')
+        .eq('page_id', pageId)
+        .single()
+
+      if (settingsError && settingsError.code !== 'PGRST116') {
+        console.error('Settings query error:', settingsError)
+      }
+
+      // account가 'off'인 경우 빈 배열 반환
+      if (settingsData?.account === 'off') {
+        console.log('Account toggle is off, returning empty array')
+        return { 
+          success: true, 
+          data: [] 
+        }
+      }
+    }
+
     let query = supabase
       .from('wedding_contacts')
       .select('*')
