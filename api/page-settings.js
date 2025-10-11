@@ -528,6 +528,25 @@ async function handleGetInfo(req, res) {
   }
 
   try {
+    // page_settings에서 info 토글 상태 조회
+    const { data: settingsData, error: settingsError } = await supabase
+      .from('page_settings')
+      .select('info')
+      .eq('page_id', pageId)
+      .single()
+
+    if (settingsError && settingsError.code !== 'PGRST116') {
+      console.error('Settings query error:', settingsError)
+    }
+
+    // info가 'off'인 경우 빈 배열 반환
+    if (settingsData?.info === 'off') {
+      return res.json({
+        success: true,
+        data: []
+      })
+    }
+
     // info_item 테이블에서 안내 사항 정보 조회
     const { data: infoData, error: infoError } = await supabase
       .from('info_item')
