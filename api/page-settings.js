@@ -243,7 +243,7 @@ async function handleGetSettings(req, res) {
 }
 
 async function handleUpdateSettings(req, res, validatedUser) {
-  const { settings } = req.body
+  const { settings, pageId } = req.body
 
   if (!settings) {
     return res.status(400).json({
@@ -253,25 +253,32 @@ async function handleUpdateSettings(req, res, validatedUser) {
   }
 
   try {
-    // 1) 로그인 사용자 기준으로 page_id 결정
-    const userId = validatedUser?.userId
-    if (!userId) {
-      return res.status(401).json({ success: false, error: '인증 사용자 정보를 찾을 수 없습니다' })
-    }
+    let effectivePageId = null
 
-    const { data: adminUser, error: adminErr } = await supabase
-      .from('admin_users')
-      .select('id, page_id')
-      .eq('id', userId)
-      .single()
+    // pageId가 명시적으로 제공된 경우 (승인 시 등) 해당 pageId 사용
+    if (pageId) {
+      effectivePageId = pageId
+    } else {
+      // 1) 로그인 사용자 기준으로 page_id 결정
+      const userId = validatedUser?.userId
+      if (!userId) {
+        return res.status(401).json({ success: false, error: '인증 사용자 정보를 찾을 수 없습니다' })
+      }
 
-    if (adminErr) {
-      throw adminErr
-    }
+      const { data: adminUser, error: adminErr } = await supabase
+        .from('admin_users')
+        .select('id, page_id')
+        .eq('id', userId)
+        .single()
 
-    const effectivePageId = adminUser?.page_id
-    if (!effectivePageId) {
-      return res.status(400).json({ success: false, error: '이 사용자에게 page_id가 부여되지 않았습니다' })
+      if (adminErr) {
+        throw adminErr
+      }
+
+      effectivePageId = adminUser?.page_id
+      if (!effectivePageId) {
+        return res.status(400).json({ success: false, error: '이 사용자에게 page_id가 부여되지 않았습니다' })
+      }
     }
 
     // 허용된 컬럼만 저장 (알 수 없는 키로 인한 에러 방지)
@@ -314,6 +321,8 @@ async function handleUpdateSettings(req, res, validatedUser) {
       'kko_img',
       'kko_title',
       'kko_date',
+      'vid_url',
+      'vid_url_saved',
     ]
 
     let sanitized = Object.fromEntries(
