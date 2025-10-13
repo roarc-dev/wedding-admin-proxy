@@ -296,6 +296,7 @@ async function handleUpdateSettings(req, res, validatedUser) {
       'wedding_hour',
       'wedding_minute',
       'venue_name',
+      'venue_name_kr',
       'venue_address',
       'venue_lat',
       'venue_lng',
@@ -495,7 +496,11 @@ async function handleUpdateTransport(req, res, validatedUser) {
       updateData.venue_address = venue_address
     }
 
-    if (locationName !== undefined || venue_address !== undefined) {
+    if (req.body.venue_name_kr !== undefined) {
+      updateData.venue_name_kr = req.body.venue_name_kr
+    }
+
+    if (locationName !== undefined || venue_address !== undefined || req.body.venue_name_kr !== undefined) {
       const { error: updateError } = await supabase
         .from('page_settings')
         .upsert(
