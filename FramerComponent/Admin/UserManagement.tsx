@@ -555,16 +555,32 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
                     const finalPageId = pageIdInput.trim() || approvingUser.page_id
                     
                     if (finalPageId) {
-                        const pageSettingsResult = await updatePageSettingsWithWeddingInfo(
-                            finalPageId,
-                            approvingUser.wedding_date || undefined,
-                            approvingUser.groom_name_en || undefined,
-                            approvingUser.bride_name_en || undefined
-                        )
+                        // 먼저 page_settings에 초기 row 생성 (웨딩 정보 포함)
+                        try {
+                            const initialPageSettingsResponse = await fetch(`${PROXY_BASE_URL}/api/page-settings`, {
+                                method: "POST",
+                                headers: {
+                                    "Content-Type": "application/json",
+                                    Authorization: `Bearer ${getAuthToken()}`,
+                                },
+                                body: JSON.stringify({
+                                    pageId: finalPageId,
+                                    settings: {
+                                        type: "papillon",
+                                        wedding_date: approvingUser.wedding_date || null,
+                                        groom_name_en: approvingUser.groom_name_en || null,
+                                        bride_name_en: approvingUser.bride_name_en || null,
+                                    },
+                                }),
+                            })
 
-                        if (!pageSettingsResult.success) {
-                            console.warn("Page settings update failed:", pageSettingsResult.error)
-                            // 페이지 설정 업데이트 실패해도 승인은 성공으로 처리
+                            if (initialPageSettingsResponse.ok) {
+                                console.log("Initial page settings created successfully")
+                            } else {
+                                console.warn("Initial page settings creation failed:", await initialPageSettingsResponse.text())
+                            }
+                        } catch (error) {
+                            console.warn("Initial page settings creation error:", error)
                         }
 
                         // RSVP HTML 페이지 생성
