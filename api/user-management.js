@@ -163,7 +163,7 @@ async function handleGetRequest(req, res) {
 
   const { data: users, error } = await supabase
     .from('admin_users')
-    .select('id, username, name, is_active, created_at, last_login, updated_at, role, approval_status, page_id, expiry_date')
+    .select('id, username, name, is_active, created_at, last_login, updated_at, role, approval_status, page_id, expiry_date, wedding_date, groom_name_en, bride_name_en')
     .order('created_at', { ascending: false })
 
   if (error) {
@@ -890,10 +890,12 @@ async function handleApproveUser(req, res, body) {
       updated_at: new Date().toISOString()
     }
 
+    const trimmedPageId = typeof pageId === 'string' ? pageId.trim() : ''
+
     if (status === 'approved') {
       updateData.is_active = true
-      if (pageId) {
-        updateData.page_id = pageId
+      if (trimmedPageId) {
+        updateData.page_id = trimmedPageId
       }
     }
 
@@ -912,42 +914,15 @@ async function handleApproveUser(req, res, body) {
       })
     }
 
+    const finalPageId = (trimmedPageId || updatedUser.page_id || '').trim()
+
     // 승인 시 page_settings 테이블에 초기 row 생성
-    if (status === 'approved' && pageId) {
-      try {
-        // 웨딩 정보 가져오기
-        const weddingInfo = {
-          wedding_date: updatedUser.wedding_date || null,
-          groom_name_en: updatedUser.groom_name_en || null,
-          bride_name_en: updatedUser.bride_name_en || null,
-        }
-
-        // page_settings에 초기 row 생성
-        const { data: pageSettingsData, error: pageSettingsError } = await supabase
-          .from('page_settings')
-          .upsert(
-            {
-              page_id: pageId,
-              ...weddingInfo,
-              type: 'papillon', // 기본 타입
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            },
-            { onConflict: 'page_id' }
-          )
-          .select()
-          .single()
-
-        if (pageSettingsError) {
-          console.error('Page settings creation error:', pageSettingsError)
-          // page_settings 생성 실패해도 사용자 승인은 성공으로 처리
-        } else {
-          console.log('Page settings created successfully:', pageSettingsData)
-        }
-      } catch (pageSettingsErr) {
-        console.error('Page settings creation exception:', pageSettingsErr)
-        // page_settings 생성 실패해도 사용자 승인은 성공으로 처리
-      }
+    if (status === 'approved' && finalPageId) {
+      await seedPageSettingsForUser(finalPageId, {
+        wedding_date: updatedUser.wedding_date || null,
+        groom_name_en: updatedUser.groom_name_en || '',
+        bride_name_en: updatedUser.bride_name_en || ''
+      })
     }
 
     return res.status(200).json({
@@ -965,4 +940,131 @@ async function handleApproveUser(req, res, body) {
   }
 }
 
-// Version: 2025-01-22 - Unified User Management API
+async function seedPageSettingsForUser(pageId, weddingInfo = {}) {
+  if (!pageId) return
+
+  try {
+    const { data: existingSettingsRaw, error: existingError } = await supabase
+      .from('page_settings')
+      .select('page_id, wedding_date, groom_name_en, bride_name_en')
+      .eq('page_id', pageId)
+      .maybeSingle()
+
+    let existingSettings = existingSettingsRaw
+
+    if (existingError && existingError.code && existingError.code !== 'PGRST116') {
+      console.error('Page settings lookup error:', existingError)
+      return
+    }
+
+    const now = new Date().toISOString()
+
+    if (!existingSettings) {
+      const defaults = buildDefaultPageSettings(pageId, weddingInfo, now)
+      const { error: insertError } = await supabase
+        .from('page_settings')
+        .insert(defaults)
+
+      if (insertError) {
+        if (insertError.code === '23505') {
+          const { data: reloadedData, error: reloadError } = await supabase
+            .from('page_settings')
+            .select('page_id, wedding_date, groom_name_en, bride_name_en')
+            .eq('page_id', pageId)
+            .maybeSingle()
+
+          if (reloadError && reloadError.code && reloadError.code !== 'PGRST116') {
+            console.error('Page settings reload error after conflict:', reloadError)
+            return
+          }
+
+          existingSettings = reloadedData
+        } else {
+          console.error('Page settings seed insert error:', insertError)
+          return
+        }
+      } else {
+        console.log(`Page settings seeded for page_id: ${pageId}`)
+        return
+      }
+    }
+
+    if (!existingSettings) {
+      return
+    }
+
+    const weddingUpdates = {}
+    if (!existingSettings.wedding_date && weddingInfo.wedding_date) {
+      weddingUpdates.wedding_date = weddingInfo.wedding_date
+    }
+    if (!existingSettings.groom_name_en && weddingInfo.groom_name_en) {
+      weddingUpdates.groom_name_en = weddingInfo.groom_name_en
+    }
+    if (!existingSettings.bride_name_en && weddingInfo.bride_name_en) {
+      weddingUpdates.bride_name_en = weddingInfo.bride_name_en
+    }
+
+    if (Object.keys(weddingUpdates).length > 0) {
+      const { error: updateError } = await supabase
+        .from('page_settings')
+        .update({ ...weddingUpdates, updated_at: now })
+        .eq('page_id', pageId)
+
+      if (updateError) {
+        console.error('Page settings wedding info update error:', updateError)
+      }
+    }
+  } catch (error) {
+    console.error('Page settings seeding failed:', error)
+  }
+}
+
+function buildDefaultPageSettings(pageId, weddingInfo = {}, timestamp = new Date().toISOString()) {
+  return {
+    page_id: pageId,
+    type: 'papillon',
+    groom_name_kr: '',
+    groom_name_en: weddingInfo.groom_name_en || '',
+    bride_name_kr: '',
+    bride_name_en: weddingInfo.bride_name_en || '',
+    last_groom_name_kr: '',
+    last_groom_name_en: '',
+    last_bride_name_kr: '',
+    last_bride_name_en: '',
+    wedding_date: weddingInfo.wedding_date || null,
+    wedding_hour: '14',
+    wedding_minute: '00',
+    venue_name: '',
+    venue_address: '',
+    venue_lat: null,
+    venue_lng: null,
+    photo_section_image_url: '',
+    photo_section_image_path: '',
+    photo_section_location: '',
+    photo_section_overlay_position: 'bottom',
+    photo_section_overlay_color: '#ffffff',
+    photo_section_locale: 'en',
+    highlight_shape: 'circle',
+    highlight_color: '#e0e0e0',
+    highlight_text_color: 'black',
+    gallery_type: 'thumbnail',
+    info: null,
+    account: null,
+    bgm: 'off',
+    bgm_url: '',
+    bgm_type: 'none',
+    bgm_autoplay: false,
+    bgm_vol: 50,
+    rsvp: 'off',
+    comments: 'off',
+    kko_img: '',
+    kko_title: '',
+    kko_date: '',
+    vid_url: '',
+    vid_url_saved: '',
+    created_at: timestamp,
+    updated_at: timestamp
+  }
+}
+
+// Version: 2025-10-13 - Unified User Management API
