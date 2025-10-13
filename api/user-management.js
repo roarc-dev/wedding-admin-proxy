@@ -1035,6 +1035,7 @@ function buildDefaultPageSettings(pageId, weddingInfo = {}, timestamp = new Date
     wedding_hour: '14',
     wedding_minute: '00',
     venue_name: '',
+    venue_name_kr: '',
     venue_address: '',
     venue_lat: null,
     venue_lng: null,
