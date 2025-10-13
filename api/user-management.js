@@ -901,7 +901,7 @@ async function handleApproveUser(req, res, body) {
       .from('admin_users')
       .update(updateData)
       .eq('id', userId)
-      .select('id, username, name, is_active, approval_status, page_id')
+      .select('id, username, name, is_active, approval_status, page_id, wedding_date, groom_name_en, bride_name_en')
       .single()
 
     if (error) {
@@ -910,6 +910,44 @@ async function handleApproveUser(req, res, body) {
         success: false,
         error: '사용자 승인 처리 중 오류가 발생했습니다'
       })
+    }
+
+    // 승인 시 page_settings 테이블에 초기 row 생성
+    if (status === 'approved' && pageId) {
+      try {
+        // 웨딩 정보 가져오기
+        const weddingInfo = {
+          wedding_date: updatedUser.wedding_date || null,
+          groom_name_en: updatedUser.groom_name_en || null,
+          bride_name_en: updatedUser.bride_name_en || null,
+        }
+
+        // page_settings에 초기 row 생성
+        const { data: pageSettingsData, error: pageSettingsError } = await supabase
+          .from('page_settings')
+          .upsert(
+            {
+              page_id: pageId,
+              ...weddingInfo,
+              type: 'papillon', // 기본 타입
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            },
+            { onConflict: 'page_id' }
+          )
+          .select()
+          .single()
+
+        if (pageSettingsError) {
+          console.error('Page settings creation error:', pageSettingsError)
+          // page_settings 생성 실패해도 사용자 승인은 성공으로 처리
+        } else {
+          console.log('Page settings created successfully:', pageSettingsData)
+        }
+      } catch (pageSettingsErr) {
+        console.error('Page settings creation exception:', pageSettingsErr)
+        // page_settings 생성 실패해도 사용자 승인은 성공으로 처리
+      }
     }
 
     return res.status(200).json({
