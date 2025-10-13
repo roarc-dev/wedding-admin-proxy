@@ -194,6 +194,7 @@ async function handleGetSettings(req, res) {
         highlight_color: '#e0e0e0',
         highlight_text_color: 'black',
         gallery_type: 'thumbnail',
+        bgm: 'off',
         bgm_url: '',
         bgm_type: '',
         bgm_autoplay: false,
