@@ -97,6 +97,12 @@ function generateRSVPHTML(pageId) {
         #root {
             width: 100%;
             max-width: 430px;
+            margin: 0 auto;
+            padding: 24px;
+            background-color: transparent;
+            border-radius: 0px;
+            font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Apple SD Gothic Neo", "Noto Sans KR", "Apple Color Emoji", "Segoe UI Emoji";
+            height: fit-content;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -412,16 +418,6 @@ function generateRSVPHTML(pageId) {
                 };
             }, [showFilterDropdown]);
 
-            const containerStyle = {
-                width: "100%",
-                maxWidth: "430px",
-                margin: "0 auto",
-                padding: "24px",
-                backgroundColor: backgroundColor,
-                borderRadius: "0px",
-                fontFamily: pretendardRegular,
-                height: "fit-content",
-            };
 
             // 통계 탭 렌더링
             const renderStatisticsTab = () => (
@@ -822,7 +818,7 @@ function generateRSVPHTML(pageId) {
             );
 
             return (
-                <div style={containerStyle}>
+                <div>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "20px", marginBottom: "20px", width: "100%" }}>
                         <h1 style={{ fontFamily: p22FontFamily, fontSize: "25px", lineHeight: "0.7em", color: "black", margin: 0 }}>RSVP</h1>
                         <p style={{ fontFamily: pretendardRegular, fontWeight: 400, color: "#8c8c8c", fontSize: "15px", margin: 0 }}>결과 페이지</p>
