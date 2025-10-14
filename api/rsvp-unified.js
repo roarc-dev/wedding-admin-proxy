@@ -64,7 +64,6 @@ function generateRSVPHTML(pageId) {
             margin-top: 40px;
             margin-bottom: 40px;
             display: flex;
-            flex-direction: column;
             align-items: center;
         }
 
@@ -103,7 +102,6 @@ function generateRSVPHTML(pageId) {
             border-radius: 0px;
             font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Apple SD Gothic Neo", "Noto Sans KR", "Apple Color Emoji", "Segoe UI Emoji";
             height: fit-content;
-            display: flex;
             flex-direction: column;
             align-items: center;
         }
@@ -421,8 +419,8 @@ function generateRSVPHTML(pageId) {
 
             // 통계 탭 렌더링
             const renderStatisticsTab = () => (
-                React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "12px", marginTop: "0" } },
-                    React.createElement("div", { style: { backgroundColor: cardBackgroundColor, padding: "24px", width: "100%" } },
+                React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "12px", marginTop: "20" } },
+                    React.createElement("div", { style: { backgroundColor: cardBackgroundColor, padding: "24px" } },
                         React.createElement("h3", { style: { fontSize: "14px", color: headerColor, marginBottom: "12px", textAlign: "center", fontFamily: pretendardSemiBold } }, "참석 여부"),
                         React.createElement("div", { style: { width: "100%", height: "1px", backgroundColor: borderColor, marginBottom: "16px" } }),
                         React.createElement("div", { style: { display: "flex", gap: "6px" } },
@@ -440,7 +438,7 @@ function generateRSVPHTML(pageId) {
                             )
                         )
                     ),
-                    React.createElement("div", { style: { backgroundColor: cardBackgroundColor, padding: "24px", width: "100%" } },
+                    React.createElement("div", { style: { backgroundColor: cardBackgroundColor, padding: "24px" } },
                         React.createElement("h3", { style: { fontSize: "14px", color: headerColor, marginBottom: "12px", textAlign: "center", fontFamily: pretendardSemiBold } }, "식사 여부"),
                         React.createElement("div", { style: { width: "100%", height: "1px", backgroundColor: borderColor, marginBottom: "16px" } }),
                         React.createElement("div", { style: { display: "flex", gap: "6px" } },
