@@ -33,14 +33,17 @@ async function fetchPageSettings(pageId: string): Promise<PageSettings | null> {
     return null
 }
 
-function extractPath(url?: string): string {
-    if (!url) return ""
+function formatWeddingDate(weddingDate?: string): string {
+    if (!weddingDate) return ""
     try {
-        const parsed = new URL(url)
-        const path = parsed.pathname.replace(/^\//, "")
-        return path || ""
+        // "2025-12-06" 형태를 "251206"으로 변환
+        const date = new Date(weddingDate)
+        const year = date.getFullYear().toString().slice(-2) // 마지막 2자리
+        const month = (date.getMonth() + 1).toString().padStart(2, "0")
+        const day = date.getDate().toString().padStart(2, "0")
+        return `${year}${month}${day}`
     } catch {
-        return url
+        return ""
     }
 }
 
@@ -107,74 +110,28 @@ export default function KakaoShare(props: KakaoShareProps) {
     const templateArgs = useMemo(() => {
         if (!settings) return null
 
-        const fallbackTitle = `${settings.groom_name_kr || "신랑"} ♥ ${settings.bride_name_kr || "신부"} 결혼합니다`
-        const fallbackBody = (() => {
-            if (!settings.wedding_date) return "결혼식 정보를 확인해 주세요"
-            try {
-                const [yearStr, monthStr, dayStr] = settings.wedding_date
-                    .split("-")
-                    .map((value) => value.trim())
-                const year = Number(yearStr)
-                const month = Number(monthStr)
-                const day = Number(dayStr)
-                if (!year || !month || !day) {
-                    return "결혼식 정보를 확인해 주세요"
-                }
+        // Admin.tsx에서 이미 포맷팅된 정보를 그대로 사용
+        const customTitle =
+            settings.kko_title?.trim() ||
+            `${settings.groom_name_kr || "신랑"} ♥ ${settings.bride_name_kr || "신부"} 결혼합니다`
 
-                const date = new Date(year, month - 1, day)
-                const weekdays = [
-                    "일요일",
-                    "월요일",
-                    "화요일",
-                    "수요일",
-                    "목요일",
-                    "금요일",
-                    "토요일",
-                ]
-                const weekday = weekdays[date.getDay()]
+        const customBody =
+            settings.kko_date?.trim() || "결혼식 정보를 확인해 주세요"
 
-                const hourRaw = settings.wedding_hour ?? ""
-                const minuteRaw = settings.wedding_minute ?? ""
-                const hour = Number(hourRaw)
-                const minute = Number(minuteRaw)
+        const imageUrl =
+            settings.kko_img?.trim() || settings.photo_section_image_url || ""
 
-                const hasHour = hourRaw !== "" && !Number.isNaN(hour)
-                const hasMinute = minuteRaw !== "" && !Number.isNaN(minute)
-
-                const period = hasHour ? (hour < 12 ? "오전" : "오후") : ""
-                const hour12 = hasHour
-                    ? hour % 12 === 0
-                        ? 12
-                        : hour % 12
-                    : ""
-                const minuteText = hasMinute && minute > 0 ? ` ${minute}분` : ""
-
-                const timeText = hasHour
-                    ? `${period ? `${period} ` : ""}${hour12}시${minuteText}`
-                    : ""
-
-                return `${year}년 ${month}월 ${day}일 ${weekday}${timeText ? ` ${timeText}` : ""}`
-            } catch {
-                return "결혼식 정보를 확인해 주세요"
-            }
-        })()
-
-        const customTitle = settings.kko_title?.trim()
-            ? settings.kko_title
-            : fallbackTitle
-        const customBody = settings.kko_date?.trim()
-            ? settings.kko_date
-            : fallbackBody
-
-        const imageUrl = settings.kko_img?.trim()
-            ? settings.kko_img
-            : settings.photo_section_image_url || ""
+        // 카카오 템플릿에서 ${REGI_WEB_DOMAIN}/${WEDDING_URL} 형태로 사용
+        // REGI_WEB_DOMAIN: "https://mcard.roarc.kr/"
+        // WEDDING_URL: 날짜/page_id 형태 (예: "251206/wedding-demo")
+        const formattedDate = formatWeddingDate(settings.wedding_date)
+        const pathWithDate = formattedDate ? `${formattedDate}/${pageId}` : pageId
 
         return {
             WEDDING_IMAGE: imageUrl,
             CUSTOM_TITLE: customTitle,
             CUSTOM_BODY: customBody,
-            WEDDING_URL: extractPath(settings.page_url),
+            WEDDING_URL: pathWithDate, // 날짜/page_id 형태 전달
         }
     }, [settings])
 

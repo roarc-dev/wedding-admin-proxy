@@ -111,77 +111,6 @@ export default async function handler(req, res) {
   }
 }
 
-async function fetchWeddingInfoForDefaults(pageId) {
-  try {
-    const { data: adminUser, error: adminErr } = await supabase
-      .from('admin_users')
-      .select('wedding_date, groom_name_en, bride_name_en')
-      .eq('page_id', pageId)
-      .single()
-
-    if (adminErr && adminErr.code !== 'PGRST116') {
-      throw adminErr
-    }
-
-    return {
-      wedding_date: adminUser?.wedding_date || null,
-      groom_name_en: adminUser?.groom_name_en || '',
-      bride_name_en: adminUser?.bride_name_en || ''
-    }
-  } catch (err) {
-    console.log('Failed to fetch wedding info from admin_users:', err)
-    return {
-      wedding_date: null,
-      groom_name_en: '',
-      bride_name_en: ''
-    }
-  }
-}
-
-async function buildDefaultPageSettings(pageId) {
-  const weddingInfo = await fetchWeddingInfoForDefaults(pageId)
-  return {
-    page_id: pageId,
-    type: 'papillon',
-    groom_name_kr: '',
-    groom_name_en: weddingInfo.groom_name_en || '',
-    bride_name_kr: '',
-    bride_name_en: weddingInfo.bride_name_en || '',
-    wedding_date: weddingInfo.wedding_date || null,
-    wedding_hour: '14',
-    wedding_minute: '00',
-    venue_name: '',
-    venue_address: '',
-    venue_name_kr: '',
-    venue_lat: null,
-    venue_lng: null,
-    photo_section_image_url: '',
-    photo_section_image_path: '',
-    photo_section_location: '',
-    photo_section_overlay_position: 'bottom',
-    photo_section_overlay_color: '#ffffff',
-    photo_section_locale: 'en',
-    highlight_shape: 'circle',
-    highlight_color: '#e0e0e0',
-    highlight_text_color: 'black',
-    gallery_type: 'thumbnail',
-    info: 'off',
-    account: 'off',
-    bgm: 'off',
-    bgm_url: '',
-    bgm_type: '',
-    bgm_autoplay: false,
-    bgm_vol: 3,
-    rsvp: 'off',
-    comments: 'off',
-    kko_img: '',
-    kko_title: '',
-    kko_date: '',
-    vid_url: '',
-    vid_url_saved: ''
-  }
-}
-
 async function handleGetSettings(req, res) {
   let { pageId } = req.query
 
@@ -223,7 +152,60 @@ async function handleGetSettings(req, res) {
 
     // 레코드가 없으면 기본값으로 생성
     if (!data) {
-      const defaultSettings = await buildDefaultPageSettings(pageId)
+      // 최초 로그인 시 admin_users에서 웨딩 정보 가져오기
+      let weddingInfo = {}
+      try {
+        const { data: adminUser, error: adminErr } = await supabase
+          .from('admin_users')
+          .select('wedding_date, groom_name_en, bride_name_en')
+          .eq('page_id', pageId)
+          .single()
+
+        if (!adminErr && adminUser) {
+          weddingInfo = {
+            wedding_date: adminUser.wedding_date || null,
+            groom_name_en: adminUser.groom_name_en || '',
+            bride_name_en: adminUser.bride_name_en || ''
+          }
+        }
+      } catch (err) {
+        console.log('Failed to fetch wedding info from admin_users:', err)
+      }
+
+      const defaultSettings = {
+        page_id: pageId,
+        type: 'papillon',
+        groom_name_kr: '',
+        groom_name_en: weddingInfo.groom_name_en || '',
+        bride_name_kr: '',
+        bride_name_en: weddingInfo.bride_name_en || '',
+        wedding_date: weddingInfo.wedding_date || null,
+        wedding_hour: '14',
+        wedding_minute: '00',
+        venue_name: '',
+        venue_address: '',
+        photo_section_image_url: '',
+        photo_section_image_path: '',
+        photo_section_location: '',
+        photo_section_overlay_position: 'bottom',
+        photo_section_overlay_color: '#ffffff',
+        photo_section_locale: 'en',
+        highlight_shape: 'circle',
+        highlight_color: '#e0e0e0',
+        highlight_text_color: 'black',
+        gallery_type: 'thumbnail',
+        bgm: 'off',
+        bgm_url: '',
+        bgm_type: '',
+        bgm_autoplay: false,
+        bgm_vol: 3,
+        rsvp: 'off',
+        comments: 'off',
+        kko_img: '',
+        kko_title: '',
+        kko_date: ''
+      }
+
       const { data: newData, error: insertError } = await supabase
         .from('page_settings')
         .insert(defaultSettings)
@@ -319,6 +301,7 @@ async function handleUpdateSettings(req, res, validatedUser) {
       'venue_address',
       'venue_lat',
       'venue_lng',
+      'transport_location_name',
       'photo_section_image_url',
       'photo_section_image_path',
       'photo_section_location',
@@ -372,26 +355,17 @@ async function handleUpdateSettings(req, res, validatedUser) {
     // 승인 시에만 덮어쓰기 방지가 적용됨
     const finalSettings = { ...normalized }
 
-    const { data: existingData, error: existingError } = await supabase
-      .from('page_settings')
-      .select('page_id')
-      .eq('page_id', effectivePageId)
-      .single()
-
-    if (existingError && existingError.code !== 'PGRST116') {
-      throw existingError
+    // bgm 필드가 없는 경우 기본값 설정 (NOT NULL 제약조건 해결)
+    if (!Object.prototype.hasOwnProperty.call(finalSettings, 'bgm')) {
+      finalSettings.bgm = 'off'
     }
-
-    const defaultRow = existingData ? null : await buildDefaultPageSettings(effectivePageId)
-    const baseRow = defaultRow || { page_id: effectivePageId }
 
     const { data, error } = await supabase
       .from('page_settings')
       .upsert(
         {
-          ...baseRow,
-          ...finalSettings,
           page_id: effectivePageId,
+          ...finalSettings,
           updated_at: new Date().toISOString()
         },
         { onConflict: 'page_id' }
@@ -534,24 +508,11 @@ async function handleUpdateTransport(req, res, validatedUser) {
     }
 
     if (locationName !== undefined || venue_address !== undefined || req.body.venue_name_kr !== undefined) {
-      const { data: existingSettings, error: existingError } = await supabase
-        .from('page_settings')
-        .select('page_id')
-        .eq('page_id', pageId)
-        .single()
-
-      if (existingError && existingError.code !== 'PGRST116') {
-        throw existingError
-      }
-
-      const defaultRow = existingSettings ? null : await buildDefaultPageSettings(pageId)
-      const baseRow = defaultRow || { page_id }
-
       const { error: updateError } = await supabase
         .from('page_settings')
         .upsert(
           {
-            ...baseRow,
+            page_id: pageId,
             ...updateData
           },
           { onConflict: 'page_id' }

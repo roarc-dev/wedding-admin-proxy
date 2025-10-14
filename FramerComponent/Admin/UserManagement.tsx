@@ -570,6 +570,7 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
                                         wedding_date: approvingUser.wedding_date || null,
                                         groom_name_en: approvingUser.groom_name_en || null,
                                         bride_name_en: approvingUser.bride_name_en || null,
+                                        venue_name_kr: "",
                                         bgm: "off", // NOT NULL 제약조건 해결
                                         bgm_type: "none",
                                         bgm_autoplay: false,

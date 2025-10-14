@@ -14,7 +14,7 @@ import typography from "https://cdn.roarc.kr/fonts/typography.js?v=27c65dba30928
 const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app"
 
 interface LocationSettings {
-    venue_name: string
+    venue_name_kr: string
     venue_address: string
     transport_location_name: string
 }
@@ -77,7 +77,7 @@ const DEFAULT_MARKER_SVG = `data:image/svg+xml;base64,${encodeSvgToBase64(NAVER_
 async function getLocationSettings(pageId: string): Promise<LocationSettings> {
     if (!pageId)
         return {
-            venue_name: "",
+            venue_name_kr: "",
             venue_address: "",
             transport_location_name: "",
         }
@@ -88,14 +88,14 @@ async function getLocationSettings(pageId: string): Promise<LocationSettings> {
         )
         if (!response.ok)
             return {
-                venue_name: "",
+                venue_name_kr: "",
                 venue_address: "",
                 transport_location_name: "",
             }
         const result = await response.json()
         if (result && result.success && result.data) {
             return {
-                venue_name: result.data.venue_name || "",
+                venue_name_kr: result.data.venue_name_kr || "",
                 venue_address: result.data.venue_address || "",
                 transport_location_name:
                     result.data.transport_location_name || "",
@@ -103,12 +103,12 @@ async function getLocationSettings(pageId: string): Promise<LocationSettings> {
         }
     } catch (_) {
         return {
-            venue_name: "",
+            venue_name_kr: "",
             venue_address: "",
             transport_location_name: "",
         }
     }
-    return { venue_name: "", venue_address: "", transport_location_name: "" }
+    return { venue_name_kr: "", venue_address: "", transport_location_name: "" }
 }
 
 async function getMapConfig(): Promise<{
@@ -340,7 +340,7 @@ export default function LocationUnified({
 
     // 통합 상태 관리
     const [locationSettings, setLocationSettings] = useState<LocationSettings>({
-        venue_name: "",
+        venue_name_kr: "",
         venue_address: "",
         transport_location_name: "",
     })
@@ -442,7 +442,7 @@ export default function LocationUnified({
                 "click",
                 () => {
                     const venueName =
-                        locationSettings.venue_name ||
+                        locationSettings.venue_name_kr ||
                         locationSettings.venue_address ||
                         "위치"
                     const encodedName = encodeURIComponent(venueName)
@@ -499,10 +499,10 @@ export default function LocationUnified({
         }
     }
 
-    // 표시할 장소명
+    // 표시할 장소명 (venue_name_kr 우선, 없으면 transport_location_name)
     const displayLocationName =
+        locationSettings.venue_name_kr ||
         locationSettings.transport_location_name ||
-        locationSettings.venue_name ||
         "장소이름"
 
     // 지도 앱 링크
