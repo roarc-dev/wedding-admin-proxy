@@ -44,16 +44,17 @@ function generateRSVPHTML(pageId) {
             padding: 0;
             background-color: #EBEBEB;
             font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, 'Apple Color Emoji', 'Segoe UI Emoji';
+            width: 100vw;
+            min-height: 100vh;
         }
 
-        .container {
-            width: 430px;
-            height: 100vh;
-            margin: 0 auto;
-            background-color: #EBEBEB;
+        .full-width-container {
+            width: 100vw;
+            min-height: 100vh;
             display: flex;
-            flex-direction: column;
-            align-items: center;
+            justify-content: center;
+            align-items: flex-start;
+            background-color: #EBEBEB;
         }
 
         .content-wrapper {
@@ -103,17 +104,10 @@ function generateRSVPHTML(pageId) {
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="full-width-container">
         <div class="content-wrapper">
-            <div class="header-text">
-                <h1 class="rsvp-title">RSVP</h1>
-                <p class="rsvp-subtitle">결과페이지</p>
-            </div>
             <div id="root"></div>
-        </div>
-    </div>
-
-    <script type="text/babel">
+            <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
         // Typography 폰트 모듈 로딩
@@ -419,13 +413,14 @@ function generateRSVPHTML(pageId) {
             }, [showFilterDropdown]);
 
             const containerStyle = {
-                maxWidth: "430px",
                 width: "100%",
+                maxWidth: "430px",
                 margin: "0 auto",
                 padding: "24px",
                 backgroundColor: backgroundColor,
                 borderRadius: "0px",
                 fontFamily: pretendardRegular,
+                height: "fit-content",
             };
 
             // 통계 탭 렌더링
@@ -830,7 +825,7 @@ function generateRSVPHTML(pageId) {
                 <div style={containerStyle}>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "20px", marginBottom: "20px", width: "100%" }}>
                         <h1 style={{ fontFamily: p22FontFamily, fontSize: "25px", lineHeight: "0.7em", color: "black", margin: 0 }}>RSVP</h1>
-                        <p style={{ fontFamily: pretendardRegular, fontWeight: 400, color: "#8c8c8c", fontSize: "15px", margin: 0 }}>결과페이지</p>
+                        <p style={{ fontFamily: pretendardRegular, fontWeight: 400, color: "#8c8c8c", fontSize: "15px", margin: 0 }}>결과 페이지</p>
                     </div>
 
                     <div style={{ width: "100%", maxWidth: "430px", display: "flex", justifyContent: "flex-start", alignItems: "center" }}>
@@ -1011,10 +1006,12 @@ function generateRSVPHTML(pageId) {
             );
         }
 
-        // React 18의 createRoot를 사용하여 렌더링
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(React.createElement(RSVPAttendeeList, { pageId: "${pageId}" }));
-    </script>
+            // React 18의 createRoot를 사용하여 렌더링
+            const root = ReactDOM.createRoot(document.getElementById('root'));
+            root.render(React.createElement(RSVPAttendeeList, { pageId: "${pageId}" }));
+            </script>
+        </div>
+    </div>
 </body>
 </html>`;
 }
