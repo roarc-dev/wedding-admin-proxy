@@ -419,39 +419,39 @@ function generateRSVPHTML(pageId) {
 
             // 통계 탭 렌더링
             const renderStatisticsTab = () => (
-                React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "12px", marginTop: "20" } },
+                React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "12px", margin-top: "20px" } },
                     React.createElement("div", { style: { backgroundColor: cardBackgroundColor, padding: "24px" } },
-                        React.createElement("h3", { style: { fontSize: "14px", color: headerColor, marginBottom: "12px", textAlign: "center", fontFamily: pretendardSemiBold } }, "참석 여부"),
-                        React.createElement("div", { style: { width: "100%", height: "1px", backgroundColor: borderColor, marginBottom: "16px" } }),
+                        React.createElement("h3", { style: { fontSize: "14px", color: headerColor, margin-bottom: "12px", textAlign: "center", fontFamily: pretendardSemiBold } }, "참석 여부"),
+                        React.createElement("div", { style: { width: "100%", height: "1px", backgroundColor: borderColor, margin-bottom: "16px" } }),
                         React.createElement("div", { style: { display: "flex", gap: "6px" } },
                             React.createElement("div", { style: { flex: "1", padding: "0 12px", textAlign: "center" } },
-                                React.createElement("div", { style: { fontSize: "12px", color: "#666666", marginBottom: "8px", fontFamily: pretendardSemiBold } }, "참석가능"),
+                                React.createElement("div", { style: { fontSize: "12px", color: "#666666", margin-bottom: "8px", fontFamily: pretendardSemiBold } }, "참석가능"),
                                 React.createElement("div", { style: { fontSize: "16px", color: headerColor, fontFamily: pretendardSemiBold } }, summary.attending)
                             ),
                             React.createElement("div", { style: { flex: "1", padding: "0 12px", textAlign: "center" } },
-                                React.createElement("div", { style: { fontSize: "12px", color: "#999999", marginBottom: "8px", fontFamily: "Pretendard Regular" } }, "신랑측"),
+                                React.createElement("div", { style: { fontSize: "12px", color: "#999999", margin-bottom: "8px", fontFamily: "Pretendard Regular" } }, "신랑측"),
                                 React.createElement("div", { style: { fontSize: "16px", color: groomSideColor, fontFamily: pretendardSemiBold } }, summary.groomSideAttending)
                             ),
                             React.createElement("div", { style: { flex: "1", padding: "0 12px", textAlign: "center" } },
-                                React.createElement("div", { style: { fontSize: "12px", color: "#999999", marginBottom: "8px", fontFamily: "Pretendard Regular" } }, "신부측"),
+                                React.createElement("div", { style: { fontSize: "12px", color: "#999999", margin-bottom: "8px", fontFamily: "Pretendard Regular" } }, "신부측"),
                                 React.createElement("div", { style: { fontSize: "16px", color: brideSideColor, fontFamily: pretendardSemiBold } }, summary.brideSideAttending)
                             )
                         )
                     ),
                     React.createElement("div", { style: { backgroundColor: cardBackgroundColor, padding: "24px" } },
-                        React.createElement("h3", { style: { fontSize: "14px", color: headerColor, marginBottom: "12px", textAlign: "center", fontFamily: pretendardSemiBold } }, "식사 여부"),
-                        React.createElement("div", { style: { width: "100%", height: "1px", backgroundColor: borderColor, marginBottom: "16px" } }),
+                        React.createElement("h3", { style: { fontSize: "14px", color: headerColor, margin-bottom: "12px", textAlign: "center", fontFamily: pretendardSemiBold } }, "식사 여부"),
+                        React.createElement("div", { style: { width: "100%", height: "1px", backgroundColor: borderColor, margin-bottom: "16px" } }),
                         React.createElement("div", { style: { display: "flex", gap: "6px" } },
                             React.createElement("div", { style: { flex: "1", padding: "0 12px", textAlign: "center" } },
-                                React.createElement("div", { style: { fontSize: "12px", color: "#666666", marginBottom: "8px", fontFamily: pretendardSemiBold } }, "식사 인원"),
+                                React.createElement("div", { style: { fontSize: "12px", color: "#666666", margin-bottom: "8px", fontFamily: pretendardSemiBold } }, "식사 인원"),
                                 React.createElement("div", { style: { fontSize: "16px", color: headerColor, fontFamily: pretendardSemiBold } }, summary.mealCount)
                             ),
                             React.createElement("div", { style: { flex: "1", padding: "0 12px", textAlign: "center" } },
-                                React.createElement("div", { style: { fontSize: "12px", color: "#999999", marginBottom: "6px", fontFamily: "Pretendard Regular" } }, "신랑측"),
+                                React.createElement("div", { style: { fontSize: "12px", color: "#999999", margin-bottom: "6px", fontFamily: "Pretendard Regular" } }, "신랑측"),
                                 React.createElement("div", { style: { fontSize: "16px", color: groomSideColor, fontFamily: pretendardSemiBold } }, summary.groomMealCount)
                             ),
                             React.createElement("div", { style: { flex: "1", padding: "0 12px", textAlign: "center" } },
-                                React.createElement("div", { style: { fontSize: "12px", color: "#999999", marginBottom: "6px", fontFamily: "Pretendard Regular" } }, "신부측"),
+                                React.createElement("div", { style: { fontSize: "12px", color: "#999999", margin-bottom: "6px", fontFamily: "Pretendard Regular" } }, "신부측"),
                                 React.createElement("div", { style: { fontSize: "16px", color: brideSideColor, fontFamily: pretendardSemiBold } }, summary.brideMealCount)
                             )
                         )
@@ -463,7 +463,7 @@ function generateRSVPHTML(pageId) {
             const renderListTab = () => (
                 <div>
                     {/* 검색 및 필터 */}
-                    <div style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: "12px" }}>
+                    <div style={{ display: "flex", gap: "6px", alignItems: "center", margin-bottom: "12px" }}>
                         <div
                             className="filter-dropdown-container"
                             style={{
@@ -627,7 +627,7 @@ function generateRSVPHTML(pageId) {
                     </div>
 
                     {/* CSV 다운로드 버튼 */}
-                    <div style={{ padding: "6px 0", display: "flex", justifyContent: "center", alignItems: "center", marginBottom: "32px" }}>
+                    <div style={{ padding: "6px 0", display: "flex", justifyContent: "center", alignItems: "center", margin-bottom: "32px" }}>
                         <button
                             onClick={downloadCSV}
                             disabled={isLoading || filteredAttendees.length === 0}
@@ -746,8 +746,8 @@ function generateRSVPHTML(pageId) {
                             justifyContent: "center",
                             alignItems: "center",
                             gap: "8px",
-                            marginTop: "24px",
-                            marginBottom: "16px",
+                            margin-top: "24px",
+                            margin-bottom: "16px",
                         }}>
                             <button
                                 onClick={() => handlePageChange(currentPage - 1)}
@@ -817,12 +817,12 @@ function generateRSVPHTML(pageId) {
 
             return (
                 <div>
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "20px", marginBottom: "20px", width: "100%" }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "20px", "margin-bottom": "20px", width: "100%" }}>
                         <h1 style={{ fontFamily: p22FontFamily, fontSize: "25px", lineHeight: "0.7em", color: "black", margin: 0 }}>RSVP</h1>
                         <p style={{ fontFamily: pretendardRegular, fontWeight: 400, color: "#8c8c8c", fontSize: "15px", margin: 0 }}>결과 페이지</p>
                     </div>
 
-                    <div style={{ width: "100%", maxWidth: "430px", display: "flex", justifyContent: "flex-start", alignItems: "center" }}>
+                    <div style={{ width: "100%", maxWidth: "430px", display: "flex", justifyContent: "flex-start", alignItems: "center", margin-bottom: "20px" }}>
                         <button
                             onClick={() => setActiveTab("statistics")}
                             style={{
@@ -868,7 +868,7 @@ function generateRSVPHTML(pageId) {
                     </div>
 
                     {error && (
-                        <div style={{ padding: "12px", backgroundColor: "#fef2f2", color: "#dc2626", borderRadius: "0px", marginBottom: "16px", fontFamily: "Pretendard Regular" }}>
+                        <div style={{ padding: "12px", backgroundColor: "#fef2f2", color: "#dc2626", borderRadius: "0px", margin-bottom: "16px", fontFamily: "Pretendard Regular" }}>
                             {error}
                         </div>
                     )}
@@ -877,7 +877,7 @@ function generateRSVPHTML(pageId) {
                         {activeTab === "statistics" ? renderStatisticsTab() : renderListTab()}
                     </div>
 
-                    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", marginTop: "12px" }}>
+                    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", margin-top: "12px" }}>
                         <button
                             onClick={loadAttendees}
                             disabled={isLoading || !pageId.trim()}
@@ -910,7 +910,7 @@ function generateRSVPHTML(pageId) {
 
                     {!error && !isLoading && attendees.length === 0 && pageId.trim() && (
                         <div style={{ textAlign: "center", padding: "48px 24px", color: "#6b7280" }}>
-                            <div style={{ fontSize: "18px", marginBottom: "8px", fontFamily: pretendardSemiBold }}>
+                            <div style={{ fontSize: "18px", margin-bottom: "8px", fontFamily: pretendardSemiBold }}>
                                 응답이 없습니다
                             </div>
                             <p style={{ fontSize: "14px", fontFamily: "Pretendard Regular" }}>
@@ -921,7 +921,7 @@ function generateRSVPHTML(pageId) {
 
                     {!pageId.trim() && (
                         <div style={{ textAlign: "center", padding: "48px 24px", color: "#6b7280" }}>
-                            <div style={{ fontSize: "18px", marginBottom: "8px", fontFamily: pretendardSemiBold }}>
+                            <div style={{ fontSize: "18px", margin-bottom: "8px", fontFamily: pretendardSemiBold }}>
                                 페이지 ID를 설정해주세요
                             </div>
                             <p style={{ fontSize: "14px", fontFamily: pretendardRegular }}>
@@ -940,7 +940,7 @@ function generateRSVPHTML(pageId) {
                             justifyContent: "center",
                             marginTop: "120px",
                             paddingTop: "40px",
-                            paddingBottom: "30px",
+                            padding-bottom: "30px",
                             gap: "10px",
                         }}
                     >
