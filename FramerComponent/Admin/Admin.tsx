@@ -16225,11 +16225,12 @@ function TransportTab({
                             setDetailAddress(e.target.value)
                         }}
                         onBlur={() => {
-                            // 상세 주소 입력 변경 시 전체 주소 프리뷰 갱신
-                            const combined = detailAddress
-                                ? `${baseAddress} ${detailAddress}`.trim()
-                                : baseAddress
-                            setVenue_address(combined)
+                            if (detailAddress && detailAddress.trim()) {
+                                // 상세 주소 입력 완료 시 전체 주소 업데이트하고 입력칸 초기화
+                                const combined = `${baseAddress} ${detailAddress}`.trim()
+                                setVenue_address(combined)
+                                setDetailAddress("") // 입력 완료 후 초기화
+                            }
                         }}
                         onClick={() => {
                             if (!addressSearched) {
@@ -16243,12 +16244,13 @@ function TransportTab({
                         onClick={() => {
                             if (addressInputUsed || !addressSearched) return // 이미 사용된 경우 또는 주소 검색 전 무시
 
-                            // 상세 주소 입력 변경 시 전체 주소 프리뷰 갱신
-                            const combined = venue_address
-                                ? `${venue_address} ${detailAddress || ""}`.trim()
-                                : detailAddress || ""
-                            setVenue_address(combined)
-                            setAddressInputUsed(true) // 사용됨 표시
+                            if (detailAddress && detailAddress.trim()) {
+                                // 상세 주소 입력 완료 시 전체 주소 업데이트하고 입력칸 초기화
+                                const combined = `${baseAddress} ${detailAddress}`.trim()
+                                setVenue_address(combined)
+                                setDetailAddress("") // 입력 완료 후 초기화
+                                setAddressInputUsed(true) // 사용됨 표시
+                            }
                         }}
                         style={{
                             width: 90,
