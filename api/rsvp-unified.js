@@ -419,44 +419,44 @@ function generateRSVPHTML(pageId) {
 
             // 통계 탭 렌더링
             const renderStatisticsTab = () => (
-                React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "12px", marginTop: "20px" } },
-                    React.createElement("div", { style: { backgroundColor: cardBackgroundColor, padding: "24px" } },
-                        React.createElement("h3", { style: { fontSize: "14px", color: headerColor, marginBottom: "12px", textAlign: "center", fontFamily: pretendardSemiBold } }, "참석 여부"),
-                        React.createElement("div", { style: { width: "100%", height: "1px", backgroundColor: borderColor, marginBottom: "16px" } }),
-                        React.createElement("div", { style: { display: "flex", gap: "6px" } },
-                            React.createElement("div", { style: { flex: "1", padding: "0 12px", textAlign: "center" } },
-                                React.createElement("div", { style: { fontSize: "12px", color: "#666666", marginBottom: "8px", fontFamily: pretendardSemiBold } }, "참석가능"),
-                                React.createElement("div", { style: { fontSize: "16px", color: headerColor, fontFamily: pretendardSemiBold } }, summary.attending)
-                            ),
-                            React.createElement("div", { style: { flex: "1", padding: "0 12px", textAlign: "center" } },
-                                React.createElement("div", { style: { fontSize: "12px", color: "#999999", marginBottom: "8px", fontFamily: "Pretendard Regular" } }, "신랑측"),
-                                React.createElement("div", { style: { fontSize: "16px", color: groomSideColor, fontFamily: pretendardSemiBold } }, summary.groomSideAttending)
-                            ),
-                            React.createElement("div", { style: { flex: "1", padding: "0 12px", textAlign: "center" } },
-                                React.createElement("div", { style: { fontSize: "12px", color: "#999999", marginBottom: "8px", fontFamily: "Pretendard Regular" } }, "신부측"),
-                                React.createElement("div", { style: { fontSize: "16px", color: brideSideColor, fontFamily: pretendardSemiBold } }, summary.brideSideAttending)
-                            )
-                        )
-                    ),
-                    React.createElement("div", { style: { backgroundColor: cardBackgroundColor, padding: "24px" } },
-                        React.createElement("h3", { style: { fontSize: "14px", color: headerColor, marginBottom: "12px", textAlign: "center", fontFamily: pretendardSemiBold } }, "식사 여부"),
-                        React.createElement("div", { style: { width: "100%", height: "1px", backgroundColor: borderColor, marginBottom: "16px" } }),
-                        React.createElement("div", { style: { display: "flex", gap: "6px" } },
-                            React.createElement("div", { style: { flex: "1", padding: "0 12px", textAlign: "center" } },
-                                React.createElement("div", { style: { fontSize: "12px", color: "#666666", marginBottom: "8px", fontFamily: pretendardSemiBold } }, "식사 인원"),
-                                React.createElement("div", { style: { fontSize: "16px", color: headerColor, fontFamily: pretendardSemiBold } }, summary.mealCount)
-                            ),
-                            React.createElement("div", { style: { flex: "1", padding: "0 12px", textAlign: "center" } },
-                                React.createElement("div", { style: { fontSize: "12px", color: "#999999", marginBottom: "6px", fontFamily: "Pretendard Regular" } }, "신랑측"),
-                                React.createElement("div", { style: { fontSize: "16px", color: groomSideColor, fontFamily: pretendardSemiBold } }, summary.groomMealCount)
-                            ),
-                            React.createElement("div", { style: { flex: "1", padding: "0 12px", textAlign: "center" } },
-                                React.createElement("div", { style: { fontSize: "12px", color: "#999999", marginBottom: "6px", fontFamily: "Pretendard Regular" } }, "신부측"),
-                                React.createElement("div", { style: { fontSize: "16px", color: brideSideColor, fontFamily: pretendardSemiBold } }, summary.brideMealCount)
-                            )
-                        )
-                    )
-                )
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "20px" }}>
+                    <div style={{ backgroundColor: cardBackgroundColor, padding: "24px" }}>
+                        <h3 style={{ fontSize: "14px", color: headerColor, marginBottom: "12px", textAlign: "center", fontFamily: pretendardSemiBold }}>참석 여부</h3>
+                        <div style={{ width: "100%", height: "1px", backgroundColor: borderColor, marginBottom: "16px" }} />
+                        <div style={{ display: "flex", gap: "6px" }}>
+                            <div style={{ flex: "1", padding: "0 12px", textAlign: "center" }}>
+                                <div style={{ fontSize: "12px", color: "#666666", marginBottom: "8px", fontFamily: pretendardSemiBold }}>참석가능</div>
+                                <div style={{ fontSize: "16px", color: headerColor, fontFamily: pretendardSemiBold }}>{summary.attending}</div>
+                            </div>
+                            <div style={{ flex: "1", padding: "0 12px", textAlign: "center" }}>
+                                <div style={{ fontSize: "12px", color: "#999999", marginBottom: "8px", fontFamily: "Pretendard Regular" }}>신랑측</div>
+                                <div style={{ fontSize: "16px", color: groomSideColor, fontFamily: pretendardSemiBold }}>{summary.groomSideAttending}</div>
+                            </div>
+                            <div style={{ flex: "1", padding: "0 12px", textAlign: "center" }}>
+                                <div style={{ fontSize: "12px", color: "#999999", marginBottom: "8px", fontFamily: "Pretendard Regular" }}>신부측</div>
+                                <div style={{ fontSize: "16px", color: brideSideColor, fontFamily: pretendardSemiBold }}>{summary.brideSideAttending}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div style={{ backgroundColor: cardBackgroundColor, padding: "24px" }}>
+                        <h3 style={{ fontSize: "14px", color: headerColor, marginBottom: "12px", textAlign: "center", fontFamily: pretendardSemiBold }}>식사 여부</h3>
+                        <div style={{ width: "100%", height: "1px", backgroundColor: borderColor, marginBottom: "16px" }} />
+                        <div style={{ display: "flex", gap: "6px" }}>
+                            <div style={{ flex: "1", padding: "0 12px", textAlign: "center" }}>
+                                <div style={{ fontSize: "12px", color: "#666666", marginBottom: "8px", fontFamily: pretendardSemiBold }}>식사 인원</div>
+                                <div style={{ fontSize: "16px", color: headerColor, fontFamily: pretendardSemiBold }}>{summary.mealCount}</div>
+                            </div>
+                            <div style={{ flex: "1", padding: "0 12px", textAlign: "center" }}>
+                                <div style={{ fontSize: "12px", color: "#999999", marginBottom: "6px", fontFamily: "Pretendard Regular" }}>신랑측</div>
+                                <div style={{ fontSize: "16px", color: groomSideColor, fontFamily: pretendardSemiBold }}>{summary.groomMealCount}</div>
+                            </div>
+                            <div style={{ flex: "1", padding: "0 12px", textAlign: "center" }}>
+                                <div style={{ fontSize: "12px", color: "#999999", marginBottom: "6px", fontFamily: "Pretendard Regular" }}>신부측</div>
+                                <div style={{ fontSize: "16px", color: brideSideColor, fontFamily: pretendardSemiBold }}>{summary.brideMealCount}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             );
 
             // 목록 탭은 JSX를 사용하므로 그대로 유지
@@ -822,7 +822,7 @@ function generateRSVPHTML(pageId) {
                         <p style={{ fontFamily: pretendardRegular, fontWeight: 400, color: "#8c8c8c", fontSize: "15px", margin: 0 }}>결과 페이지</p>
                     </div>
 
-                    <div style={{ width: "100%", maxWidth: "430px", display: "flex", justifyContent: "flex-start", alignItems: "center", marginBottom: "20px" }}>
+                    <div style={{ width: "100%", maxWidth: "430px", display: "flex", justifyContent: "flex-start", alignItems: "center", margin-bottom: "20px" }}>
                         <button
                             onClick={() => setActiveTab("statistics")}
                             style={{
