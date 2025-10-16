@@ -1,5 +1,6 @@
 const { createClient } = require('@supabase/supabase-js')
 const bcrypt = require('bcryptjs')
+const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3')
 
 // 환경 변수에서 Supabase 설정 가져오기
 const supabaseUrl = process.env.SUPABASE_URL
@@ -10,6 +11,16 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 const supabase = createClient(supabaseUrl, supabaseKey)
+
+// RSVP 전용 R2 클라이언트 (HTML 정적 페이지 업로드/삭제)
+const rsvpR2Client = new S3Client({
+  region: 'auto',
+  endpoint: process.env.R2_ENDPOINT_RSVP,
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID_RSVP,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY_RSVP,
+  },
+})
 
 // 보안 토큰 생성 함수
 function generateSecureToken(user) {
@@ -142,6 +153,10 @@ async function handlePostRequest(req, res) {
       return handleCreateUser(req, res, body)
     case 'approveUser':
       return handleApproveUser(req, res, body)
+    case 'generateRSVPHTML':
+      return handleGenerateRSVPHTML(req, res, body)
+    case 'deleteRSVPHTML':
+      return handleDeleteRSVPHTML(req, res, body)
     default:
       // action이 없는 경우 기본 사용자 생성 (users.js 호환성)
       if (!action) {
@@ -938,6 +953,279 @@ async function handleApproveUser(req, res, body) {
       error: '사용자 승인 처리 중 오류가 발생했습니다'
     })
   }
+}
+
+// RSVP HTML 페이지 생성 (관리자용)
+async function handleGenerateRSVPHTML(req, res, body) {
+  const authResult = checkAuth(req, res)
+  if (authResult.error) {
+    return res.status(authResult.error.status).json({
+      success: false,
+      error: authResult.error.message,
+    })
+  }
+
+  const { pageId } = body || {}
+
+  if (!pageId) {
+    return res.status(400).json({ success: false, error: 'pageId is required' })
+  }
+
+  try {
+    const htmlContent = generateRSVPHTML(pageId)
+    const publicUrl = `https://admin.roarc.kr/rsvp/${pageId}`
+    const uploadCommand = new PutObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME_RSVP || 'rsvp',
+      Key: `rsvp/${pageId}/index.html`,
+      Body: htmlContent,
+      ContentType: 'text/html; charset=utf-8',
+      CacheControl: 'public, max-age=3600',
+    })
+
+    await rsvpR2Client.send(uploadCommand)
+
+    return res.status(200).json({
+      success: true,
+      message: 'RSVP page generated and uploaded successfully',
+      url: publicUrl,
+      pageId,
+    })
+  } catch (error) {
+    console.error('RSVP HTML generate error:', error)
+    return res.status(500).json({
+      success: false,
+      error: 'RSVP 페이지 업로드 중 오류가 발생했습니다',
+      details: error.message,
+    })
+  }
+}
+
+// RSVP HTML 페이지 삭제 (관리자용)
+async function handleDeleteRSVPHTML(req, res, body) {
+  const authResult = checkAuth(req, res)
+  if (authResult.error) {
+    return res.status(authResult.error.status).json({
+      success: false,
+      error: authResult.error.message,
+    })
+  }
+
+  const { pageId } = body || {}
+
+  if (!pageId) {
+    return res.status(400).json({ success: false, error: 'pageId is required' })
+  }
+
+  try {
+    const deleteCommand = new DeleteObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME_RSVP || 'rsvp',
+      Key: `rsvp/${pageId}/index.html`,
+    })
+
+    await rsvpR2Client.send(deleteCommand)
+
+    return res.status(200).json({
+      success: true,
+      message: 'RSVP page deleted successfully',
+      pageId,
+    })
+  } catch (error) {
+    console.error('RSVP HTML delete error:', error)
+    return res.status(500).json({
+      success: false,
+      error: 'RSVP 페이지 삭제 중 오류가 발생했습니다',
+      details: error.message,
+    })
+  }
+}
+
+// RSVP HTML 템플릿 (직접 이식)
+function generateRSVPHTML(pageId) {
+  return `<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RSVP 결과 - ${pageId}</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');
+
+        @font-face {
+            font-family: "P22 Late November";
+            font-style: normal;
+            font-weight: 400;
+            font-display: swap;
+            src: url("https://cdn.roarc.kr/fonts/P22-LateNovember/6f9032835db3c6c496b1c0384815d38e.woff2") format("woff2");
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #EBEBEB;
+            font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, 'Apple Color Emoji', 'Segoe UI Emoji';
+            width: 100vw;
+            min-height: 100vh;
+        }
+
+        .full-width-container { width: 100vw; min-height: 100vh; display: flex; justify-content: center; align-items: flex-start; background-color: #EBEBEB; }
+        .content-wrapper { width: 100%; max-width: 430px; height: fit-content; margin-top: 40px; margin-bottom: 40px; display: flex; align-items: center; }
+        .header-text { display: flex; flex-direction: column; align-items: center; gap: 20px; margin-bottom: 0px; width: 100%; max-width: 430px; }
+        .rsvp-title { font-family: 'P22 Late November', 'Pretendard Variable', Pretendard, serif; font-size: 25px; line-height: 0.7em; color: black; margin: 0; }
+        .rsvp-subtitle { font-family: 'Pretendard Variable', Pretendard, sans-serif; font-weight: 400; color: #8c8c8c; font-size: 15px; margin: 0; }
+        #root { width: 100%; max-width: 430px; margin: 0 auto; padding: 24px; background-color: transparent; border-radius: 0px; font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Apple SD Gothic Neo", "Noto Sans KR", "Apple Color Emoji", "Segoe UI Emoji"; height: fit-content; flex-direction: column; align-items: center; }
+    </style>
+    <script type="module" src="https://cdn.roarc.kr/fonts/typography.js?v=27c65dba30928cbbce6839678016d9ac"></script>
+    <script>
+      (function ensureTypography() {
+        var tries = 0;
+        var maxTries = 50; // ~5s
+        var timer = setInterval(function() {
+          tries++;
+          if (window.__typography && typeof window.__typography.ensure === 'function') {
+            try { window.__typography.ensure(); } catch (e) {}
+            clearInterval(timer);
+          }
+          if (tries >= maxTries) { clearInterval(timer); }
+        }, 100);
+      })();
+    </script>
+</head>
+<body>
+    <div class="full-width-container">
+        <div class="content-wrapper">
+            <div id="root"></div>
+            <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+        function RSVPAttendeeList({ pageId }) {
+            const [attendees, setAttendees] = useState([]);
+            const [filteredAttendees, setFilteredAttendees] = useState([]);
+            const [isLoading, setIsLoading] = useState(false);
+            const [error, setError] = useState("");
+            const [searchTerm, setSearchTerm] = useState("");
+            const [filterType, setFilterType] = useState("all");
+            const [currentPage, setCurrentPage] = useState(1);
+            const [itemsPerPage] = useState(10);
+            const [activeTab, setActiveTab] = useState("statistics");
+            const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+            const [summary, setSummary] = useState({ total: 0, attending: 0, notAttending: 0, groomSide: 0, brideSide: 0, groomSideAttending: 0, brideSideAttending: 0, totalGuests: 0, groomMealCount: 0, brideMealCount: 0, mealCount: 0, mealYes: 0, mealNo: 0 });
+
+            const showOnlyAttending = false;
+            const cardBackgroundColor = "white";
+            const headerColor = "#333333";
+            const borderColor = "#e0e0e0";
+            const groomSideColor = "#4a90e2";
+            const brideSideColor = "#e24a90";
+
+            const p22FontFamily = useMemo(() => {
+                try { return (window.__typography?.helpers?.stacks?.p22 || '"P22 Late November", "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'); } catch { return '"P22 Late November", "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'; }
+            }, []);
+            const pretendardRegular = useMemo(() => {
+                try { return window.__typography?.helpers?.stacks?.body || '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'; } catch { return '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'; }
+            }, []);
+            const pretendardSemiBold = useMemo(() => {
+                try { return window.__typography?.helpers?.stacks?.heading || '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'; } catch { return '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'; }
+            }, []);
+
+            const loadAttendees = async () => {
+                if (!pageId.trim()) { setError("페이지 ID를 입력해주세요."); return; }
+                setIsLoading(true); setError("");
+                try {
+                    const url = "https://wedding-admin-proxy.vercel.app/api/rsvp-unified";
+                    const requestBody = { action: "getByPageId", pageId: pageId.trim(), showOnlyAttending: showOnlyAttending };
+                    const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(requestBody) });
+                    if (!response.ok) { const errorText = await response.text(); throw new Error("HTTP " + response.status + ": " + errorText); }
+                    const result = await response.json();
+                    if (result.success) { setAttendees(result.data); setFilteredAttendees(result.data); calculateSummary(result.data); } else { throw new Error(result.error || "데이터를 가져올 수 없습니다"); }
+                } catch (error) { console.error('데이터 로드 에러:', error); setError("데이터 로드 실패: " + error.message); } finally { setIsLoading(false); }
+            };
+
+            const calculateSummary = (data) => {
+                const attendingData = data.filter((item) => item.relation_type === "참석");
+                const groomData = data.filter((item) => item.guest_type === "신랑측");
+                const brideData = data.filter((item) => item.guest_type === "신부측");
+                const groomAttendingData = attendingData.filter((item) => item.guest_type === "신랑측");
+                const brideAttendingData = attendingData.filter((item) => item.guest_type === "신부측");
+                const stats = { total: data.length, attending: attendingData.length, notAttending: data.filter((item) => item.relation_type === "미참석").length, groomSide: groomData.length, brideSide: brideData.length, groomSideAttending: groomAttendingData.length, brideSideAttending: brideAttendingData.length, totalGuests: attendingData.reduce((s, i) => s + (i.guest_count || 0), 0), groomMealCount: groomAttendingData.filter((i) => i.meal_time === "식사 가능").reduce((s, i) => s + (i.guest_count || 0), 0), brideMealCount: brideAttendingData.filter((i) => i.meal_time === "식사 가능").reduce((s, i) => s + (i.guest_count || 0), 0), mealYes: data.filter((i) => i.meal_time === "식사 가능").length, mealNo: data.filter((i) => i.meal_time === "식사 불가").length, mealCount: attendingData.filter((i) => i.meal_time === "식사 가능").reduce((s, i) => s + (i.guest_count || 0), 0) };
+                setSummary(stats);
+            };
+
+            const applyFilters = () => {
+                let filtered = [...attendees];
+                if (searchTerm.trim()) { filtered = filtered.filter((item) => (item.guest_name || "").toLowerCase().includes(searchTerm.toLowerCase()) || (item.phone_number || "").includes(searchTerm)); }
+                if (filterType !== "all") {
+                    filtered = filtered.filter((item) => {
+                        switch (filterType) {
+                            case "attending": return item.relation_type === "참석";
+                            case "notAttending": return item.relation_type === "미참석";
+                            case "groomSide": return item.guest_type === "신랑측";
+                            case "brideSide": return item.guest_type === "신부측";
+                            case "mealYes": return item.meal_time === "식사 가능";
+                            case "mealNo": return item.meal_time === "식사 불가";
+                            default: return true;
+                        }
+                    });
+                }
+                setFilteredAttendees(filtered); setCurrentPage(1);
+            };
+
+            useEffect(() => { if (pageId.trim()) { loadAttendees(); } }, [pageId, showOnlyAttending]);
+            useEffect(() => { applyFilters(); }, [searchTerm, filterType, attendees]);
+
+            const totalPages = Math.ceil(filteredAttendees.length / itemsPerPage);
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const endIndex = startIndex + itemsPerPage;
+            const currentItems = filteredAttendees.slice(startIndex, endIndex);
+
+            const renderStatisticsTab = () => (
+                React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: "12px", marginTop: "20px" } },
+                    React.createElement("div", { style: { backgroundColor: cardBackgroundColor, padding: "24px" } },
+                        React.createElement("h3", { style: { fontSize: "14px", color: headerColor, marginBottom: "12px", textAlign: "center" } }, "참석 여부"),
+                        React.createElement("div", { style: { width: "100%", height: "1px", backgroundColor: borderColor, marginBottom: "16px" } }),
+                        React.createElement("div", { style: { display: "flex", gap: "6px" } },
+                            React.createElement("div", { style: { flex: "1", padding: "0 12px", textAlign: "center" } },
+                                React.createElement("div", { style: { fontSize: "12px", color: "#666666", marginBottom: "8px" } }, "참석가능"),
+                                React.createElement("div", { style: { fontSize: "16px", color: headerColor } }, summary.attending)
+                            ),
+                            React.createElement("div", { style: { flex: "1", padding: "0 12px", textAlign: "center" } },
+                                React.createElement("div", { style: { fontSize: "12px", color: "#999999", marginBottom: "8px" } }, "신랑측"),
+                                React.createElement("div", { style: { fontSize: "16px", color: groomSideColor } }, summary.groomSideAttending)
+                            ),
+                            React.createElement("div", { style: { flex: "1", padding: "0 12px", textAlign: "center" } },
+                                React.createElement("div", { style: { fontSize: "12px", color: "#999999", marginBottom: "8px" } }, "신부측"),
+                                React.createElement("div", { style: { fontSize: "16px", color: brideSideColor } }, summary.brideSideAttending)
+                            )
+                        )
+                    )
+                )
+            );
+
+            const renderListTab = () => (
+                <div></div>
+            );
+
+            return (
+                <div>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "20px", marginBottom: "20px", width: "100%" }}>
+                        <h1 style={{ fontFamily: p22FontFamily, fontSize: "25px", lineHeight: "0.7em", color: "black", margin: 0 }}>RSVP</h1>
+                        <p style={{ fontWeight: 400, color: "#8c8c8c", fontSize: "15px", margin: 0 }}>결과 페이지</p>
+                    </div>
+                    <div style={{ backgroundColor: "transparent", padding: 0 }}>
+                        {activeTab === 'statistics' ? renderStatisticsTab() : renderListTab()}
+                    </div>
+                </div>
+            );
+        }
+
+            const root = ReactDOM.createRoot(document.getElementById('root'));
+            root.render(React.createElement(RSVPAttendeeList, { pageId: "${pageId}" }));
+            </script>
+        </div>
+    </div>
+</body>
+</html>`
 }
 
 async function seedPageSettingsForUser(pageId, weddingInfo = {}) {
