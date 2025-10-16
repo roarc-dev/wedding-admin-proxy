@@ -1352,9 +1352,9 @@ function generateRSVPHTML(pageId) {
 
                 const csvContent = [headers, ...csvData]
                     .map((row) => row.map((cell) => '"' + cell + '"').join(","))
-                    .join("\n");
+                    .join("\\n");
 
-                const BOM = "\uFEFF";
+                const BOM = "\\uFEFF";
                 const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });
 
                 const link = document.createElement("a");
