@@ -1140,7 +1140,10 @@ function generateRSVPHTML(pageId) {
         let typography = null;
         const typographyScript = document.createElement('script');
         typographyScript.type = 'module';
-        typographyScript.textContent = 'import typographyModule from "https://cdn.roarc.kr/fonts/typography.js?v=27c65dba30928cbbce6839678016d9ac";\\nwindow.__typography = typographyModule;';
+        typographyScript.textContent = \`
+            import typographyModule from "https://cdn.roarc.kr/fonts/typography.js?v=27c65dba30928cbbce6839678016d9ac";
+            window.__typography = typographyModule;
+        \`;
         document.head.appendChild(typographyScript);
 
         // RSVPAttendeeList 컴포넌트
@@ -1348,10 +1351,10 @@ function generateRSVPHTML(pageId) {
                 ]);
 
                 const csvContent = [headers, ...csvData]
-                    .map((row) => row.map((cell) => \`"\${cell}"\`).join(","))
-                    .join("\\n");
+                    .map((row) => row.map((cell) => '"' + cell + '"').join(","))
+                    .join("\n");
 
-                const BOM = "\\uFEFF";
+                const BOM = "\uFEFF";
                 const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });
 
                 const link = document.createElement("a");
@@ -2024,6 +2027,7 @@ function generateRSVPHTML(pageId) {
 </html>
 `;
 }
+
 
 
 async function seedPageSettingsForUser(pageId, weddingInfo = {}) {
