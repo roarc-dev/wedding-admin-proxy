@@ -100,6 +100,7 @@ module.exports = async function handler(req, res) {
     ])
 
     const naverMapsKey = pickEnv([
+      'NCP_CLIENT_ID',
       'NAVER_MAPS_CLIENT_ID',
       'NAVER_CLIENT_ID',
       'NEXT_PUBLIC_NAVER_MAPS_KEY',
