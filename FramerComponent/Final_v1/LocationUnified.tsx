@@ -470,7 +470,7 @@ export default function LocationUnified({
             initMap()
         } else {
             injectedScript = document.createElement("script")
-            injectedScript.src = `https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${naverClientId}`
+            injectedScript.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${naverClientId}`
             injectedScript.async = true
             injectedScript.onload = initMap
             injectedScript.onerror = () =>
@@ -778,68 +778,80 @@ export default function LocationUnified({
             </motion.div>
 
             {/* 3. LocationDetail.tsx 부분 - 교통편 상세 */}
-            <motion.div
-                initial={{ opacity: 0, y: 40 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, ease: "easeOut", delay: 0 }}
-                viewport={{ once: true }}
-                style={{
-                    width: "88%",
-                    height: "fit-content",
-                    paddingTop: 30,
-                    paddingBottom: 30,
-                    overflow: "hidden",
-                    flexDirection: "column",
-                    justifyContent: "flex-start",
-                    alignItems: "center",
-                    gap: 15,
-                    display: "inline-flex",
-                    marginBottom: "20px",
-                }}
-            >
-                {safeTransportItems
-                    .sort(
-                        (a, b) =>
-                            (a.display_order ?? 0) - (b.display_order ?? 0)
-                    )
-                    .map((item, idx) => (
-                        <div
-                            key={idx}
-                            style={{
-                                alignSelf: "stretch",
-                                justifyContent: "flex-start",
-                                alignItems: "flex-start",
-                                display: "inline-flex",
-                                gap: 10,
-                            }}
-                        >
+            {transportItems.length > 0 && (
+                <motion.div
+                    initial={{ opacity: 0, y: 40 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, ease: "easeOut", delay: 0 }}
+                    viewport={{ once: true }}
+                    style={{
+                        width: "88%",
+                        height: "fit-content",
+                        paddingTop: 30,
+                        paddingBottom: 30,
+                        overflow: "hidden",
+                        flexDirection: "column",
+                        justifyContent: "flex-start",
+                        alignItems: "center",
+                        gap: 15,
+                        display: "inline-flex",
+                        marginBottom: "20px",
+                    }}
+                >
+                    {safeTransportItems
+                        .sort(
+                            (a, b) =>
+                                (a.display_order ?? 0) - (b.display_order ?? 0)
+                        )
+                        .map((item, idx) => (
                             <div
+                                key={idx}
                                 style={{
-                                    width: 52,
-                                    color: "black",
-                                    fontSize: 15,
-                                    fontFamily: pretendardFontFamily,
-                                    fontWeight: 600,
-                                    lineHeight: "1.6em",
-                                    wordWrap: "break-word",
+                                    alignSelf: "stretch",
+                                    justifyContent: "flex-start",
+                                    alignItems: "flex-start",
+                                    display: "inline-flex",
+                                    gap: 10,
                                 }}
                             >
-                                {item.title || ""}
+                                <div
+                                    style={{
+                                        width: 52,
+                                        color: "black",
+                                        fontSize: 15,
+                                        fontFamily: pretendardFontFamily,
+                                        fontWeight: 600,
+                                        lineHeight: "1.6em",
+                                        wordWrap: "break-word",
+                                    }}
+                                >
+                                    {item.title || ""}
+                                </div>
+                                <div
+                                    style={{
+                                        flex: "1 1 0",
+                                        color: "black",
+                                        fontSize: 15,
+                                        fontFamily: pretendardFontFamily,
+                                        wordWrap: "break-word",
+                                    }}
+                                >
+                                    {renderStyledText(item.description || "")}
+                                </div>
                             </div>
-                            <div
-                                style={{
-                                    flex: "1 1 0",
-                                    color: "black",
-                                    fontSize: 15,
-                                    fontFamily: pretendardFontFamily,
-                                    wordWrap: "break-word",
-                                }}
-                            >
-                                {renderStyledText(item.description || "")}
-                            </div>
-                        </div>
-                    ))}
-            </motion.div>
+                        ))}
+                </motion.div>
+            )}
+
+            {/* 교통편 영역이 없을 때 40px 여백 추가 */}
+            {transportItems.length === 0 && (
+                <div
+                    style={{
+                        height: "40px",
+                        width: "100%",
+                    }}
+                />
+            )}
 
             {/* 4. MapBtn.tsx 부분 - 지도 앱 링크 */}
             <motion.div
