@@ -117,22 +117,28 @@ async function getMapConfig(): Promise<{
 }> {
     try {
         const response = await fetch(`${PROXY_BASE_URL}/api/map-config`)
-        if (!response.ok) return { naverClientId: "3cxftuac0e", tmapApiKey: "" }
-        const result = await response.json()
-        if (result.success) {
-            return {
-                naverClientId:
-                    result.data.naverClientId ||
-                    result.data.naverMapsKey ||
-                    "3cxftuac0e",
-                tmapApiKey:
-                    result.data.tmapApiKey || result.data.tmapAppKey || "",
-            }
+        if (!response.ok) {
+            console.error('Map config API 호출 실패:', response.status)
+            return { naverClientId: "", tmapApiKey: "" }
         }
-    } catch (_) {
-        return { naverClientId: "3cxftuac0e", tmapApiKey: "" }
+        const result = await response.json()
+        if (result.success && result.data) {
+            const naverClientId = result.data.naverClientId || result.data.naverMapsKey || ""
+            if (!naverClientId) {
+                console.warn('NAVER 클라이언트 ID가 설정되지 않았습니다. 환경변수 NCP_CLIENT_ID를 확인해주세요.')
+            }
+            return {
+                naverClientId,
+                tmapApiKey: result.data.tmapApiKey || result.data.tmapAppKey || "",
+            }
+        } else {
+            console.error('Map config API 응답 형식이 올바르지 않습니다:', result)
+            return { naverClientId: "", tmapApiKey: "" }
+        }
+    } catch (error) {
+        console.error('Map config API 호출 중 에러:', error)
+        return { naverClientId: "", tmapApiKey: "" }
     }
-    return { naverClientId: "3cxftuac0e", tmapApiKey: "" }
 }
 
 async function getPageCoordinates(pageId: string): Promise<Coordinates | null> {
