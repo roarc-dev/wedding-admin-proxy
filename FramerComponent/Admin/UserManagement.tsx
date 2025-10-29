@@ -35,11 +35,50 @@ function validateSessionToken(token: string): AdminTokenPayload | null {
 }
 
 // 페이지 타입 목록 (확장 가능)
-const PAGE_TYPES = ["papillon", "eternal", "fiore"] as const
+const PAGE_TYPES = ["papillon", "eternal", "fiore", "mobile"] as const
 type PageType = (typeof PAGE_TYPES)[number]
+const DEFAULT_PAGE_TYPE: PageType = PAGE_TYPES[0]
+
+function isPageType(value: unknown): value is PageType {
+    return (
+        typeof value === "string" &&
+        (PAGE_TYPES as readonly string[]).includes(value)
+    )
+}
+
+async function fetchPageType(pageId: string): Promise<PageType | null> {
+    if (!pageId) return null
+    try {
+        const response = await fetch(
+            `${PROXY_BASE_URL}/api/page-settings?pageId=${pageId}`,
+            {
+                method: "GET",
+                headers: {
+                    Authorization: `Bearer ${getAuthToken()}`,
+                },
+            }
+        )
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`)
+        }
+
+        const result = await response.json()
+        const typeValue = result?.data?.type
+        if (isPageType(typeValue)) {
+            return typeValue
+        }
+    } catch (e) {
+        console.warn("Fetch page type error:", e)
+    }
+    return null
+}
 
 // 페이지 설정 타입 업데이트 함수
 async function updatePageType(pageId: string, type: PageType) {
+    if (!pageId) {
+        return { success: false, error: "pageId is required" }
+    }
     try {
         const response = await fetch(`${PROXY_BASE_URL}/api/page-settings`, {
             method: "PUT",
@@ -47,10 +86,11 @@ async function updatePageType(pageId: string, type: PageType) {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${getAuthToken()}`,
             },
-            body: JSON.stringify({ settings: { type } }),
+            body: JSON.stringify({ pageId, settings: { type } }),
         })
         return await response.json()
     } catch (e) {
+        console.error("Update page type error:", e)
         return { success: false, error: "네트워크 오류" }
     }
 }
@@ -314,14 +354,14 @@ async function updatePageSettingsWithWeddingInfo(
 // RSVP HTML 페이지 생성 함수
 async function generateRSVPPage(pageId: string): Promise<any> {
     try {
-        const response = await fetch(`${PROXY_BASE_URL}/api/rsvp-unified`, {
+        const response = await fetch(`${PROXY_BASE_URL}/api/user-management`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${getAuthToken()}`,
             },
             body: JSON.stringify({
-                action: "generateHTML",
+                action: "generateRSVPHTML",
                 pageId: pageId,
             }),
         })
@@ -343,14 +383,14 @@ async function generateRSVPPage(pageId: string): Promise<any> {
 // RSVP HTML 페이지 삭제 함수
 async function deleteRSVPPage(pageId: string): Promise<any> {
     try {
-        const response = await fetch(`${PROXY_BASE_URL}/api/rsvp-unified`, {
+        const response = await fetch(`${PROXY_BASE_URL}/api/user-management`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${getAuthToken()}`,
             },
             body: JSON.stringify({
-                action: "deleteHTML",
+                action: "deleteRSVPHTML",
                 pageId: pageId,
             }),
         })
@@ -411,6 +451,8 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
     const [showApprovalModal, setShowApprovalModal] = useState<boolean>(false)
     const [approvingUser, setApprovingUser] = useState<User | null>(null)
     const [pageIdInput, setPageIdInput] = useState<string>("")
+    const [approvalPageType, setApprovalPageType] =
+        useState<PageType>(DEFAULT_PAGE_TYPE)
 
     const [userForm, setUserForm] = useState({
         username: "",
@@ -419,7 +461,7 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
         is_active: true,
         newPassword: "",
         page_id: "",
-        type: "papillon" as PageType,
+        type: DEFAULT_PAGE_TYPE,
         expiry_date: "",
         role: "user",
     })
@@ -452,6 +494,43 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
     useEffect(() => {
         setCurrentPage(1)
     }, [activeTab])
+
+    useEffect(() => {
+        if (!showApprovalModal || !approvingUser?.page_id) return
+        const pageIdToLoad = approvingUser.page_id
+        let isCancelled = false
+
+        fetchPageType(pageIdToLoad).then((fetchedType) => {
+            if (!isCancelled && fetchedType) {
+                setApprovalPageType(fetchedType)
+            }
+        })
+
+        return () => {
+            isCancelled = true
+        }
+    }, [showApprovalModal, approvingUser?.page_id])
+
+    useEffect(() => {
+        if (!showAddModal || !editingUser?.page_id) return
+        const pageIdToLoad = editingUser.page_id
+        let isCancelled = false
+
+        fetchPageType(pageIdToLoad).then((fetchedType) => {
+            if (!isCancelled && fetchedType) {
+                setUserForm((prev) => {
+                    if (prev.page_id !== pageIdToLoad) {
+                        return prev
+                    }
+                    return { ...prev, type: fetchedType }
+                })
+            }
+        })
+
+        return () => {
+            isCancelled = true
+        }
+    }, [showAddModal, editingUser?.page_id])
 
     // 로그인
     const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -500,14 +579,14 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
         setUserForm({
             username: "",
             password: "",
-            name: "",
-            is_active: true,
-            newPassword: "",
-            page_id: "",
-            type: "papillon",
-            expiry_date: "",
-            role: "user",
-        })
+        name: "",
+        is_active: true,
+        newPassword: "",
+        page_id: "",
+        type: DEFAULT_PAGE_TYPE,
+        expiry_date: "",
+        role: "user",
+    })
         setEditingUser(null)
         setShowAddModal(true)
     }
@@ -517,22 +596,23 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
         setUserForm({
             username: user.username,
             password: "",
-            name: user.name,
-            is_active: user.is_active,
-            newPassword: "",
-            page_id: user.page_id || "",
-            type: "papillon",
-            expiry_date: user.expiry_date || "",
-            role: user.role || "user",
-        })
-        setEditingUser(user)
-        setShowAddModal(true)
+        name: user.name,
+        is_active: user.is_active,
+        newPassword: "",
+        page_id: user.page_id || "",
+        type: DEFAULT_PAGE_TYPE,
+        expiry_date: user.expiry_date || "",
+        role: user.role || "user",
+    })
+    setEditingUser(user)
+    setShowAddModal(true)
     }
 
     // 사용자 승인 모달 열기
     const handleShowApprovalModal = (user: User) => {
         setApprovingUser(user)
         setPageIdInput(user.page_id || "")
+        setApprovalPageType(DEFAULT_PAGE_TYPE)
         setShowApprovalModal(true)
     }
 
@@ -545,58 +625,79 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
             const result = await approveUser(
                 approvingUser.id,
                 status,
-                status === "approved" ? pageIdInput : null
+                status === "approved" ? pageIdInput.trim() : null
             )
 
             if (result.success) {
                 // 승인 시 page_settings에 웨딩 정보 복사
                 if (status === "approved" && approvingUser) {
                     // Page ID 우선순위: 입력된 pageIdInput > 사용자의 page_id
-                    const finalPageId = pageIdInput.trim() || approvingUser.page_id
-                    
+                    const finalPageId =
+                        (pageIdInput.trim() || approvingUser.page_id || "").trim()
+
                     if (finalPageId) {
                         // 먼저 page_settings에 초기 row 생성 (웨딩 정보 포함)
                         try {
-                            const initialPageSettingsResponse = await fetch(`${PROXY_BASE_URL}/api/page-settings`, {
-                                method: "POST",
-                                headers: {
-                                    "Content-Type": "application/json",
-                                    Authorization: `Bearer ${getAuthToken()}`,
-                                },
-                                body: JSON.stringify({
-                                    pageId: finalPageId,
-                                    settings: {
-                                        type: "papillon",
-                                        wedding_date: approvingUser.wedding_date || null,
-                                        groom_name_en: approvingUser.groom_name_en || null,
-                                        bride_name_en: approvingUser.bride_name_en || null,
-                                        venue_name_kr: "",
-                                        bgm: "off", // NOT NULL 제약조건 해결
-                                        bgm_type: "none",
-                                        bgm_autoplay: false,
-                                        bgm_vol: 50,
-                                        highlight_shape: "circle",
-                                        highlight_color: "#e0e0e0",
-                                        highlight_text_color: "black",
-                                        gallery_type: "thumbnail",
-                                        photo_section_overlay_position: "bottom",
-                                        photo_section_overlay_color: "#ffffff",
-                                        photo_section_locale: "en",
-                                        rsvp: "off",
-                                        comments: "off",
-                                        wedding_hour: "14",
-                                        wedding_minute: "00",
+                            const initialPageSettingsResponse = await fetch(
+                                `${PROXY_BASE_URL}/api/page-settings`,
+                                {
+                                    method: "POST",
+                                    headers: {
+                                        "Content-Type": "application/json",
+                                        Authorization: `Bearer ${getAuthToken()}`,
                                     },
-                                }),
-                            })
+                                    body: JSON.stringify({
+                                        pageId: finalPageId,
+                                        settings: {
+                                            type: approvalPageType,
+                                            wedding_date:
+                                                approvingUser.wedding_date || null,
+                                            groom_name_en:
+                                                approvingUser.groom_name_en || null,
+                                            bride_name_en:
+                                                approvingUser.bride_name_en || null,
+                                            venue_name_kr: "",
+                                            bgm: "off", // NOT NULL 제약조건 해결
+                                            bgm_type: "none",
+                                            bgm_autoplay: false,
+                                            bgm_vol: 50,
+                                            highlight_shape: "circle",
+                                            highlight_color: "#e0e0e0",
+                                            highlight_text_color: "black",
+                                            gallery_type: "thumbnail",
+                                            photo_section_overlay_position: "bottom",
+                                            photo_section_overlay_color: "#ffffff",
+                                            photo_section_locale: "en",
+                                            rsvp: "off",
+                                            comments: "off",
+                                            wedding_hour: "14",
+                                            wedding_minute: "00",
+                                        },
+                                    }),
+                                }
+                            )
 
                             if (initialPageSettingsResponse.ok) {
                                 console.log("Initial page settings created successfully")
                             } else {
-                                console.warn("Initial page settings creation failed:", await initialPageSettingsResponse.text())
+                                console.warn(
+                                    "Initial page settings creation failed:",
+                                    await initialPageSettingsResponse.text()
+                                )
                             }
                         } catch (error) {
                             console.warn("Initial page settings creation error:", error)
+                        }
+
+                        const typeUpdateResult = await updatePageType(
+                            finalPageId,
+                            approvalPageType
+                        )
+                        if (!typeUpdateResult?.success) {
+                            console.warn(
+                                "Page type update failed:",
+                                typeUpdateResult?.error
+                            )
                         }
 
                         // RSVP HTML 페이지 생성
@@ -616,6 +717,7 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
                 setShowApprovalModal(false)
                 setApprovingUser(null)
                 setPageIdInput("")
+                setApprovalPageType(DEFAULT_PAGE_TYPE)
                 loadUsers()
             } else {
                 setError(result.error)
@@ -631,6 +733,8 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
     const handleSaveUser = async () => {
         setLoading(true)
         try {
+            const trimmedPageId = userForm.page_id.trim()
+
             let result
             if (editingUser) {
                 // 수정
@@ -639,7 +743,7 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
                     username: userForm.username,
                     name: userForm.name,
                     is_active: userForm.is_active,
-                    page_id: userForm.page_id,
+                    page_id: trimmedPageId,
                     expiry_date: userForm.expiry_date || null,
                     role: userForm.role,
                 }
@@ -662,14 +766,23 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
                     username: userForm.username,
                     password: userForm.password,
                     name: userForm.name,
-                    page_id: userForm.page_id,
+                    page_id: trimmedPageId,
                     role: userForm.role,
                 })
             }
 
             // page_settings.type 저장 (Page ID가 있고 타입이 선택된 경우)
-            if (userForm.page_id) {
-                await updatePageType(userForm.page_id, userForm.type)
+            if (trimmedPageId) {
+                const typeUpdateResult = await updatePageType(
+                    trimmedPageId,
+                    userForm.type
+                )
+                if (!typeUpdateResult?.success) {
+                    console.warn(
+                        "Page type update failed:",
+                        typeUpdateResult?.error
+                    )
+                }
             }
 
             if (result.success) {
@@ -2131,6 +2244,54 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
                                     }}
                                 >
                                     회원가입 시 생성된 Page ID가 자동 입력됩니다. 필요시 수정 가능합니다.
+                                </p>
+                            </div>
+
+                            <div style={{ marginBottom: "25px" }}>
+                                <label
+                                    style={{
+                                        display: "block",
+                                        fontSize: "14px",
+                                        fontWeight: "500",
+                                        color: "#374151",
+                                        marginBottom: "5px",
+                                    }}
+                                >
+                                    타입
+                                </label>
+                                <select
+                                    value={approvalPageType}
+                                    onChange={(e) => {
+                                        const nextType = e.target.value
+                                        if (isPageType(nextType)) {
+                                            setApprovalPageType(nextType)
+                                        }
+                                    }}
+                                    style={{
+                                        width: "100%",
+                                        padding: "10px",
+                                        border: "1px solid #d1d5db",
+                                        borderRadius: "6px",
+                                        fontSize: "14px",
+                                        outline: "none",
+                                        boxSizing: "border-box",
+                                        background: "white",
+                                    }}
+                                >
+                                    {PAGE_TYPES.map((type) => (
+                                        <option key={type} value={type}>
+                                            {type}
+                                        </option>
+                                    ))}
+                                </select>
+                                <p
+                                    style={{
+                                        fontSize: "12px",
+                                        color: "#6b7280",
+                                        margin: "5px 0 0 0",
+                                    }}
+                                >
+                                    선택한 타입은 승인 시 페이지 설정에 저장되며 이후 편집에서도 변경할 수 있습니다.
                                 </p>
                             </div>
 

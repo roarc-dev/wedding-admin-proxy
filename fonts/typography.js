@@ -92,7 +92,8 @@ function getStacks() {
     pretendardVariable: `"Pretendard Variable", Pretendard, ${systemSans}`,
     pretendard: `Pretendard, ${systemSans}`,
     p22: `"P22 Late November", "Pretendard", ${systemSans}`,
-    goldenbook: `"goldenbook", ${systemSans}`,
+    goldenbook: `"goldenbook", serif`,
+    sloopScriptPro: `"sloop-script-pro", sans-serif`,
   }
 }
 
@@ -105,6 +106,8 @@ function makeFontStyle({ family, weight, size, lineHeight }) {
     familyName = stacks.pretendardVariable
   } else if (family === 'goldenbook') {
     familyName = stacks.goldenbook
+  } else if (family === 'sloopScriptPro') {
+    familyName = stacks.sloopScriptPro
   } else {
     familyName = stacks.pretendard
   }
@@ -148,7 +151,8 @@ function createTypography(options) {
   const helpers = {
     fontPretendard: (weight = 400, size, lineHeight) => makeFontStyle({ family: 'pretendardVariable', weight, size, lineHeight }),
     fontP22: (size, lineHeight) => makeFontStyle({ family: 'p22', weight: 400, size, lineHeight }),
-    fontGoldenbook: (size, lineHeight) => makeFontStyle({ family: 'goldenbook', weight: 400, size, lineHeight }),
+    fontGoldenbook: (weight = 600, size, lineHeight) => makeFontStyle({ family: 'goldenbook', weight, size, lineHeight }),
+    fontSloopScriptPro: (size, lineHeight) => makeFontStyle({ family: 'sloopScriptPro', weight: 400, size, lineHeight }),
     stacks: getStacks(),
     merge: (...s) => (typeof mergeStyles === 'function' ? mergeStyles(...s) : Object.assign({}, ...s.filter(Boolean))),
   }

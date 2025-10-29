@@ -15,11 +15,18 @@ interface InfoItem {
     display_order: number
 }
 
+interface PageSettingsResp {
+    data?: { type?: string }
+    type?: string
+    success?: boolean
+}
+
 // 텍스트 포맷팅 유틸리티
 function processBoldAndBreak(
     text: string,
     isSmall: boolean,
-    keyPrefix: string
+    keyPrefix: string,
+    pretendardStack: string
 ): JSX.Element[] {
     const segments: JSX.Element[] = []
     const src = (text || "").replace(/\r\n?/g, "\n")
@@ -37,8 +44,7 @@ function processBoldAndBreak(
                 <span
                     key={`${keyPrefix}-t-${index}`}
                     style={{
-                        fontFamily:
-                            typography.helpers.stacks.pretendardVariable,
+                        fontFamily: pretendardStack,
                         fontWeight: 400,
                         lineHeight: isSmall ? "1.8em" : "1.8em",
                     }}
@@ -54,8 +60,7 @@ function processBoldAndBreak(
                 <span
                     key={`${keyPrefix}-b-${start}`}
                     style={{
-                        fontFamily:
-                            typography.helpers.stacks.pretendardVariable,
+                        fontFamily: pretendardStack,
                         fontWeight: 600,
                         lineHeight: isSmall ? "1.8em" : "1.8em",
                     }}
@@ -83,7 +88,7 @@ function processBoldAndBreak(
             <span
                 key={`${keyPrefix}-t-${index}`}
                 style={{
-                    fontFamily: typography.helpers.stacks.pretendardVariable,
+                    fontFamily: pretendardStack,
                     fontWeight: 400,
                     lineHeight: isSmall ? "1.8em" : "1.8em",
                 }}
@@ -96,7 +101,10 @@ function processBoldAndBreak(
     return segments
 }
 
-function renderInfoStyledText(text: string): JSX.Element[] {
+function renderInfoStyledText(
+    text: string,
+    pretendardStack: string
+): JSX.Element[] {
     const src = (text || "").replace(/\r\n?/g, "\n")
     const segments: JSX.Element[] = []
     let index = 0
@@ -111,7 +119,12 @@ function renderInfoStyledText(text: string): JSX.Element[] {
             const before = src.slice(index, start)
             segments.push(
                 <span key={`pre-${index}`}>
-                    {processBoldAndBreak(before, false, `pre-${start}`)}
+                    {processBoldAndBreak(
+                        before,
+                        false,
+                        `pre-${start}`,
+                        pretendardStack
+                    )}
                 </span>
             )
         }
@@ -125,12 +138,16 @@ function renderInfoStyledText(text: string): JSX.Element[] {
                         fontSize: 13,
                         lineHeight: "1.8em",
                         color: "#757575",
-                        fontFamily:
-                            typography.helpers.stacks.pretendardVariable,
+                        fontFamily: pretendardStack,
                         fontWeight: 400,
                     }}
                 >
-                    {processBoldAndBreak(inner, true, `small-${start}`)}
+                    {processBoldAndBreak(
+                        inner,
+                        true,
+                        `small-${start}`,
+                        pretendardStack
+                    )}
                 </span>
             )
         } else if (match[3]) {
@@ -148,7 +165,12 @@ function renderInfoStyledText(text: string): JSX.Element[] {
         const tail = src.slice(index)
         segments.push(
             <span key={`tail-${index}`}>
-                {processBoldAndBreak(tail, false, `tail-${index}`)}
+                {processBoldAndBreak(
+                    tail,
+                    false,
+                    `tail-${index}`,
+                    pretendardStack
+                )}
             </span>
         )
     }
@@ -166,6 +188,7 @@ function Info({
 }) {
     const [infoItems, setInfoItems] = useState<InfoItem[]>([])
     const [loading, setLoading] = useState(false)
+    const [pageType, setPageType] = useState("")
 
     // 데이터 로딩
     useEffect(() => {
@@ -204,6 +227,28 @@ function Info({
         }
     }, [pageId])
 
+    useEffect(() => {
+        let cancelled = false
+        async function fetchPageType() {
+            if (!pageId) return
+            try {
+                const url = `${PROXY_BASE_URL}/api/page-settings?pageId=${encodeURIComponent(pageId)}`
+                const res = await fetch(url, { cache: "no-store" })
+                if (!res.ok) return
+                const json = (await res.json()) as PageSettingsResp
+                const fetchedType =
+                    (json && json.data && json.data.type) || json?.type || ""
+                if (!cancelled) {
+                    setPageType(fetchedType)
+                }
+            } catch (_) {}
+        }
+        fetchPageType()
+        return () => {
+            cancelled = true
+        }
+    }, [pageId])
+
     // P22 폰트 로딩
     useEffect(() => {
         try {
@@ -213,7 +258,52 @@ function Info({
         } catch (_) {}
     }, [])
 
-    const p22Stack = typography.helpers.stacks.p22
+    const pretendardFontFamily = useMemo(() => {
+        try {
+            return (
+                typography?.helpers?.stacks?.pretendardVariable ||
+                '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Apple SD Gothic Neo", "Noto Sans KR", "Apple Color Emoji", "Segoe UI Emoji"'
+            )
+        } catch {
+            return '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Apple SD Gothic Neo", "Noto Sans KR", "Apple Color Emoji", "Segoe UI Emoji"'
+        }
+    }, [])
+
+    const p22FontFamily = useMemo(() => {
+        try {
+            return (
+                typography?.helpers?.stacks?.p22 ||
+                '"P22 Late November", "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Apple SD Gothic Neo", "Noto Sans KR", "Apple Color Emoji", "Segoe UI Emoji"'
+            )
+        } catch {
+            return '"P22 Late November", "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Apple SD Gothic Neo", "Noto Sans KR", "Apple Color Emoji", "Segoe UI Emoji"'
+        }
+    }, [])
+
+    const goldenbookFontFamily = useMemo(() => {
+        try {
+            return (
+                typography?.helpers?.stacks?.goldenbook ||
+                '"Goldenbook", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Apple SD Gothic Neo", "Noto Sans KR", "Apple Color Emoji", "Segoe UI Emoji"'
+            )
+        } catch {
+            return '"Goldenbook", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Apple SD Gothic Neo", "Noto Sans KR", "Apple Color Emoji", "Segoe UI Emoji"'
+        }
+    }, [])
+
+    const titleFontFamily = useMemo(() => {
+        const normalizedType = (pageType || "").toLowerCase().trim()
+        if (normalizedType.includes("eternal")) {
+            return goldenbookFontFamily
+        }
+        if (
+            normalizedType.includes("papillon") ||
+            normalizedType.includes("fiore")
+        ) {
+            return p22FontFamily
+        }
+        return p22FontFamily
+    }, [pageType, goldenbookFontFamily, p22FontFamily])
 
     // 슬라이드 상태 관리
     const [currentIndex, setCurrentIndex] = useState(0)
@@ -314,7 +404,7 @@ function Info({
                     justifyContent: "center",
                     overflow: "visible",
                     boxSizing: "border-box",
-                    fontFamily: p22Stack,
+                    fontFamily: titleFontFamily,
                     fontSize: "25px",
                     letterSpacing: "0.05em",
                     lineHeight: "0.7em",
@@ -429,9 +519,7 @@ function Info({
                                     textAlign: "center",
                                     color: "#000",
                                     fontSize: 18,
-                                    fontFamily:
-                                        typography.helpers.stacks
-                                            .pretendardVariable,
+                                    fontFamily: pretendardFontFamily,
                                     fontWeight: 600,
                                     lineHeight: "1.8em",
                                     marginBottom: 20,
@@ -447,9 +535,7 @@ function Info({
                                     height: "100%",
                                     color: "#000",
                                     fontSize: 15,
-                                    fontFamily:
-                                        typography.helpers.stacks
-                                            .pretendardVariable,
+                                    fontFamily: pretendardFontFamily,
                                     lineHeight: "1.8em",
                                     display: "flex",
                                     alignItems: "center",
@@ -464,7 +550,8 @@ function Info({
                                 >
                                     {renderInfoStyledText(
                                         sortedInfoItems[currentIndex]
-                                            ?.description || ""
+                                            ?.description || "",
+                                        pretendardFontFamily
                                     )}
                                 </div>
                             </div>

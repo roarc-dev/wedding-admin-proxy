@@ -1,7 +1,7 @@
 module.exports = async function handler(req, res) {
   // CORS 설정
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
   // 캐시 방지
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate')
@@ -10,10 +10,43 @@ module.exports = async function handler(req, res) {
     return res.status(200).end()
   }
 
+  // Naver 지오코딩 API 프록시 처리
+  if (req.method === 'POST') {
+    try {
+      const { query } = req.body
+
+      if (!query) {
+        return res.status(400).json({ error: 'Query parameter is required' })
+      }
+
+      // 네이버 지오코딩 API 호출 (서버에서 호출하니까 CORS 안 걸림)
+      const naverRes = await fetch(
+        `https://maps.apigw.ntruss.com/map-geocode/v2/geocode?query=${encodeURIComponent(
+          query
+        )}`,
+        {
+          headers: {
+            "X-NCP-APIGW-API-KEY-ID": process.env.NCP_CLIENT_ID,
+            "X-NCP-APIGW-API-KEY": process.env.NCP_CLIENT_SECRET,
+          },
+        }
+      )
+
+      const data = await naverRes.json()
+
+      // 프론트로 그대로 전달
+      res.status(200).json(data)
+    } catch (err) {
+      console.error(err)
+      res.status(500).json({ error: "geocoding failed" })
+    }
+    return
+  }
+
   if (req.method !== 'GET') {
-    return res.status(405).json({ 
-      success: false, 
-      error: 'Method not allowed' 
+    return res.status(405).json({
+      success: false,
+      error: 'Method not allowed'
     })
   }
 
