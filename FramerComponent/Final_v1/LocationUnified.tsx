@@ -352,7 +352,7 @@ export default function LocationUnified({
     })
     const [coordinates, setCoordinates] = useState<Coordinates | null>(null)
     const [transportItems, setTransportItems] = useState<TransportItem[]>([])
-    const [naverClientId, setNaverClientId] = useState("3cxftuac0e")
+    const [naverClientId, setNaverClientId] = useState("")
     const [isLoading, setIsLoading] = useState(true)
     const [tmapAppKey, setTmapAppKey] = useState("")
     const [showCopyMessage, setShowCopyMessage] = useState(false)
