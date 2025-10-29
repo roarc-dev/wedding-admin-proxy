@@ -19,6 +19,23 @@ module.exports = async function handler(req, res) {
         return res.status(400).json({ error: 'Query parameter is required' })
       }
 
+      // 환경 변수 확인
+      const clientId = process.env.NCP_CLIENT_ID
+      const clientSecret = process.env.NCP_CLIENT_SECRET
+
+      if (!clientId || !clientSecret) {
+        console.error('Naver API 환경 변수가 설정되지 않았습니다')
+        return res.status(500).json({
+          error: "Naver API credentials not configured",
+          details: {
+            hasClientId: !!clientId,
+            hasClientSecret: !!clientSecret
+          }
+        })
+      }
+
+      console.log('Naver API 호출 시도:', query)
+
       // 네이버 지오코딩 API 호출 (서버에서 호출하니까 CORS 안 걸림)
       const naverRes = await fetch(
         `https://maps.apigw.ntruss.com/map-geocode/v2/geocode?query=${encodeURIComponent(
@@ -26,19 +43,34 @@ module.exports = async function handler(req, res) {
         )}`,
         {
           headers: {
-            "X-NCP-APIGW-API-KEY-ID": process.env.NCP_CLIENT_ID,
-            "X-NCP-APIGW-API-KEY": process.env.NCP_CLIENT_SECRET,
+            "X-NCP-APIGW-API-KEY-ID": clientId,
+            "X-NCP-APIGW-API-KEY": clientSecret,
           },
         }
       )
 
+      console.log('Naver API 응답 상태:', naverRes.status)
+
+      if (!naverRes.ok) {
+        const errorText = await naverRes.text()
+        console.error('Naver API 에러:', errorText)
+        return res.status(naverRes.status).json({
+          error: "Naver API request failed",
+          details: errorText
+        })
+      }
+
       const data = await naverRes.json()
+      console.log('Naver API 응답 데이터:', data)
 
       // 프론트로 그대로 전달
       res.status(200).json(data)
     } catch (err) {
-      console.error(err)
-      res.status(500).json({ error: "geocoding failed" })
+      console.error('Naver 지오코딩 API 호출 중 에러:', err)
+      res.status(500).json({
+        error: "geocoding failed",
+        details: err.message
+      })
     }
     return
   }
