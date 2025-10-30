@@ -2690,6 +2690,49 @@ function InlinePhotoSection({
     )
 }
 
+function formatWeddingDateTime({
+    date,
+    hour,
+    minute,
+}: {
+    date?: string
+    hour?: string
+    minute?: string
+}): string {
+    if (!date) return ""
+
+    const parsedDate = new Date(date)
+    if (Number.isNaN(parsedDate.getTime())) return ""
+
+    const parsedHour = Number.parseInt(hour ?? "0", 10)
+    const parsedMinute = Number.parseInt(minute ?? "0", 10)
+    const safeHour = Number.isNaN(parsedHour) ? 0 : parsedHour
+    const safeMinute = Number.isNaN(parsedMinute) ? 0 : parsedMinute
+
+    const dateWithTime = new Date(parsedDate.getTime())
+    dateWithTime.setHours(safeHour, safeMinute)
+
+    const dayNames = [
+        "일요일",
+        "월요일",
+        "화요일",
+        "수요일",
+        "목요일",
+        "금요일",
+        "토요일",
+    ]
+
+    const ampm = safeHour < 12 ? "오전" : "오후"
+    const hours12 = safeHour === 0 ? 12 : safeHour > 12 ? safeHour - 12 : safeHour
+    const minuteText = safeMinute !== 0 ? ` ${safeMinute}분` : ""
+
+    return `${dateWithTime.getFullYear()}년 ${
+        dateWithTime.getMonth() + 1
+    }월 ${dateWithTime.getDate()}일 ${
+        dayNames[dateWithTime.getDay()]
+    } ${ampm} ${hours12}시${minuteText}`
+}
+
 // 캘린더 미리보기 (단독 미리보기용, 외부 의존 없음)
 function InlineCalendarPreview({
     date,
@@ -2755,36 +2798,11 @@ function InlineCalendarPreview({
         weeks.push(colDays)
     }
 
-    const formatDateTime = (): string => {
-        // pageSettings에서 값 가져오기 (캘린더 미리보기용)
-        const weddingDate = pageSettings?.wedding_date
-        const weddingHour = pageSettings?.wedding_hour || "14"
-        const weddingMinute = pageSettings?.wedding_minute || "0"
-
-        if (!weddingDate) return ""
-
-        try {
-            const d = new Date(weddingDate)
-            const h24 = parseInt(weddingHour)
-            const mm = parseInt(weddingMinute)
-            d.setHours(h24, mm)
-            const dayNames = [
-                "일요일",
-                "월요일",
-                "화요일",
-                "수요일",
-                "목요일",
-                "금요일",
-                "토요일",
-            ]
-            const ampm = h24 < 12 ? "오전" : "오후"
-            const h12 = h24 === 0 ? 12 : h24 > 12 ? h24 - 12 : h24
-            const minuteText = mm !== 0 ? ` ${mm}분` : ""
-            return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${dayNames[d.getDay()]} ${ampm} ${h12}시${minuteText}`
-        } catch (error) {
-            return ""
-        }
-    }
+    const formattedDateTime = formatWeddingDateTime({
+        date,
+        hour,
+        minute,
+    })
 
     const dayNamesShort = ["S", "M", "T", "W", "T", "F", "S"]
 
@@ -2833,7 +2851,7 @@ function InlineCalendarPreview({
                     marginBottom: 20,
                 }}
             >
-                {formatDateTime()}
+                {formattedDateTime}
             </div>
             <div
                 style={{
@@ -3015,7 +3033,7 @@ function InlineCalendarPreview({
                         marginBottom: 10,
                     }}
                 >
-                    {groomName || ""} ♥ {brideName || ""}의 결혼식
+                    {pageSettings.cal_txt || `${groomName || ""} ♥ ${brideName || ""}의 결혼식`}
                 </div>
                 <div
                     style={{
@@ -13909,7 +13927,14 @@ function AdminMainContent(props: any) {
                                         })
                                     }
                                     rows={3}
-                                    placeholder={formatDateTime() || "예: 2026년 1월 1일 토요일 12시 30분"}
+                                    placeholder={
+                                        formatWeddingDateTime({
+                                            date: pageSettings.wedding_date,
+                                            hour: pageSettings.wedding_hour,
+                                            minute: pageSettings.wedding_minute,
+                                        }) ||
+                                        "예: 2026년 1월 1일 토요일 12시 30분"
+                                    }
                                     disabled={settingsLoading}
                                     style={{
                                         width: "calc(100% * 1.1429)",
