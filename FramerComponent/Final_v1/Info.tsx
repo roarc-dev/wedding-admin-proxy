@@ -31,7 +31,8 @@ function processBoldAndBreak(
     const segments: JSX.Element[] = []
     const src = (text || "").replace(/\r\n?/g, "\n")
     let index = 0
-    const regex = /(\*\*([^*]+)\*\*)|(\n\n)|(\n)/g
+    let key = 0
+    const regex = /(\*([^*]+)\*)|(\n\n)|(\n)/g
     let match: RegExpExecArray | null
 
     while ((match = regex.exec(src)) !== null) {
@@ -42,7 +43,7 @@ function processBoldAndBreak(
             const normal = src.slice(index, start)
             segments.push(
                 <span
-                    key={`${keyPrefix}-t-${index}`}
+                    key={`${keyPrefix}-t-${key++}`}
                     style={{
                         fontFamily: pretendardStack,
                         fontWeight: 400,
@@ -58,7 +59,7 @@ function processBoldAndBreak(
             const inner = match[2] || ""
             segments.push(
                 <span
-                    key={`${keyPrefix}-b-${start}`}
+                    key={`${keyPrefix}-b-${key++}`}
                     style={{
                         fontFamily: pretendardStack,
                         fontWeight: 600,
@@ -71,12 +72,12 @@ function processBoldAndBreak(
         } else if (match[3]) {
             segments.push(
                 <div
-                    key={`${keyPrefix}-dbl-${start}`}
+                    key={`${keyPrefix}-dbl-${key++}`}
                     style={{ height: "0.6em" }}
                 />
             )
         } else if (match[4]) {
-            segments.push(<br key={`${keyPrefix}-br-${start}`} />)
+            segments.push(<br key={`${keyPrefix}-br-${key++}`} />)
         }
 
         index = end
@@ -86,7 +87,7 @@ function processBoldAndBreak(
         const tail = src.slice(index)
         segments.push(
             <span
-                key={`${keyPrefix}-t-${index}`}
+                key={`${keyPrefix}-t-${key++}`}
                 style={{
                     fontFamily: pretendardStack,
                     fontWeight: 400,
@@ -108,6 +109,7 @@ function renderInfoStyledText(
     const src = (text || "").replace(/\r\n?/g, "\n")
     const segments: JSX.Element[] = []
     let index = 0
+    let key = 0
     const regex = /(\{([^}]*)\})|(\n\n)|(\n)/g
     let match: RegExpExecArray | null
 
@@ -118,11 +120,11 @@ function renderInfoStyledText(
         if (start > index) {
             const before = src.slice(index, start)
             segments.push(
-                <span key={`pre-${index}`}>
+                <span key={`pre-${key++}`}>
                     {processBoldAndBreak(
                         before,
                         false,
-                        `pre-${start}`,
+                        `pre-${key}`,
                         pretendardStack
                     )}
                 </span>
@@ -133,7 +135,7 @@ function renderInfoStyledText(
             const inner = match[2] || ""
             segments.push(
                 <span
-                    key={`small-${start}`}
+                    key={`small-${key++}`}
                     style={{
                         fontSize: 13,
                         lineHeight: "1.8em",
@@ -145,17 +147,17 @@ function renderInfoStyledText(
                     {processBoldAndBreak(
                         inner,
                         true,
-                        `small-${start}`,
+                        `small-${key}`,
                         pretendardStack
                     )}
                 </span>
             )
         } else if (match[3]) {
             segments.push(
-                <div key={`dbl-${start}`} style={{ height: "0.6em" }} />
+                <div key={`dbl-${key++}`} style={{ height: "0.6em" }} />
             )
         } else if (match[4]) {
-            segments.push(<br key={`br-${start}`} />)
+            segments.push(<br key={`br-${key++}`} />)
         }
 
         index = end
@@ -164,11 +166,11 @@ function renderInfoStyledText(
     if (index < src.length) {
         const tail = src.slice(index)
         segments.push(
-            <span key={`tail-${index}`}>
+            <span key={`tail-${key++}`}>
                 {processBoldAndBreak(
                     tail,
                     false,
-                    `tail-${index}`,
+                    `tail-${key}`,
                     pretendardStack
                 )}
             </span>

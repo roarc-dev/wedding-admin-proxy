@@ -1,6 +1,8 @@
-import React, { useState, useCallback, useEffect } from "react"
+import React, { useState, useCallback, useEffect, useMemo } from "react"
 import { motion } from "framer-motion"
 import { addPropertyControls, ControlType } from "framer"
+// @ts-ignore
+import typography from "https://cdn.roarc.kr/fonts/typography.js?v=6fdc95bcc8fd197d879c051a8c2d5a03"
 
 // API 기본 엔드포인트 (배포 환경 기준)
 const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app"
@@ -25,8 +27,9 @@ interface RSVPClientProps {
 }
 
 interface PageSettingsResp {
-    data?: { rsvp?: string }
+    data?: { rsvp?: string; type?: string }
     rsvp?: string
+    type?: string
     success?: boolean
 }
 
@@ -34,41 +37,24 @@ interface ErrorsShape {
     [key: string]: string | undefined
 }
 
-const defaultProps: Required<Omit<RSVPClientProps, "style" | "pageId">> = {
-    backgroundColor: "transparent",
-    buttonColor: "#e0e0e0",
-    buttonTextColor: "#000",
-    borderColor: "#99999933",
-    accentColor: "#000",
-    textColor: "#999999",
-    selectionTextColor: "#000000",
-    selectionButtonBgColor: "#bbbbbb26",
-    selectionButtonBorderColor: "#88888819",
-    selectionButtonActiveBgColor: "#99999966",
-    selectionButtonActiveBorderColor: "#00000088",
-    checkboxBorderColor: "#88888833",
-    checkboxCheckedBgColor: "#000",
-    checkboxCheckedBorderColor: "#000",
-}
-
 export default function RSVPClient(props: RSVPClientProps) {
     const {
         pageId = "",
         style,
-        backgroundColor = defaultProps.backgroundColor,
-        buttonColor = defaultProps.buttonColor,
-        buttonTextColor = defaultProps.buttonTextColor,
-        borderColor = defaultProps.borderColor,
-        accentColor = defaultProps.accentColor,
-        textColor = defaultProps.textColor,
-        selectionTextColor = defaultProps.selectionTextColor,
-        selectionButtonBgColor = defaultProps.selectionButtonBgColor,
-        selectionButtonBorderColor = defaultProps.selectionButtonBorderColor,
-        selectionButtonActiveBgColor = defaultProps.selectionButtonActiveBgColor,
-        selectionButtonActiveBorderColor = defaultProps.selectionButtonActiveBorderColor,
-        checkboxBorderColor = defaultProps.checkboxBorderColor,
-        checkboxCheckedBgColor = defaultProps.checkboxCheckedBgColor,
-        checkboxCheckedBorderColor = defaultProps.checkboxCheckedBorderColor,
+        backgroundColor = "transparent",
+        buttonColor = "#e0e0e0",
+        buttonTextColor = "#000",
+        borderColor = "#99999933",
+        accentColor = "#000",
+        textColor = "#999999",
+        selectionTextColor = "#000000",
+        selectionButtonBgColor = "#bbbbbb26",
+        selectionButtonBorderColor = "#88888819",
+        selectionButtonActiveBgColor = "#99999966",
+        selectionButtonActiveBorderColor = "#00000088",
+        checkboxBorderColor = "#88888833",
+        checkboxCheckedBgColor = "#000",
+        checkboxCheckedBorderColor = "#000",
     } = props || {}
 
     const [formData, setFormData] = useState({
@@ -86,6 +72,64 @@ export default function RSVPClient(props: RSVPClientProps) {
     const [errors, setErrors] = useState<ErrorsShape>({})
     const [isPrivacyExpanded, setIsPrivacyExpanded] = useState(false)
     const [displayStyle, setDisplayStyle] = useState<"none" | "block">("none")
+    const [pageType, setPageType] = useState("")
+
+    useEffect(() => {
+        try {
+            if (typography && typeof typography.ensure === "function") {
+                typography.ensure()
+            }
+        } catch (error) {
+            console.warn("[RSVPClient] Failed to ensure typography fonts:", error)
+        }
+    }, [])
+
+    const pretendardFontFamily = useMemo(() => {
+        try {
+            return (
+                typography?.helpers?.stacks?.pretendardVariable ||
+                '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Apple SD Gothic Neo", "Noto Sans KR", "Apple Color Emoji", "Segoe UI Emoji"'
+            )
+        } catch {
+            return '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Apple SD Gothic Neo", "Noto Sans KR", "Apple Color Emoji", "Segoe UI Emoji"'
+        }
+    }, [])
+
+    const p22FontFamily = useMemo(() => {
+        try {
+            return (
+                typography?.helpers?.stacks?.p22 ||
+                '"P22 Late November", "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Apple SD Gothic Neo", "Noto Sans KR", "Apple Color Emoji", "Segoe UI Emoji"'
+            )
+        } catch {
+            return '"P22 Late November", "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Apple SD Gothic Neo", "Noto Sans KR", "Apple Color Emoji", "Segoe UI Emoji"'
+        }
+    }, [])
+
+    const goldenbookFontFamily = useMemo(() => {
+        try {
+            return (
+                typography?.helpers?.stacks?.goldenbook ||
+                '"Goldenbook", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Apple SD Gothic Neo", "Noto Sans KR", "Apple Color Emoji", "Segoe UI Emoji"'
+            )
+        } catch {
+            return '"Goldenbook", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Apple SD Gothic Neo", "Noto Sans KR", "Apple Color Emoji", "Segoe UI Emoji"'
+        }
+    }, [])
+
+    const titleFontFamily = useMemo(() => {
+        const normalizedType = (pageType || "").toLowerCase().trim()
+        if (normalizedType.includes("eternal")) {
+            return goldenbookFontFamily
+        }
+        if (
+            normalizedType.includes("papillon") ||
+            normalizedType.includes("fiore")
+        ) {
+            return p22FontFamily
+        }
+        return p22FontFamily
+    }, [pageType, goldenbookFontFamily, p22FontFamily])
 
     // 서버에서 page_settings.rsvp 값을 조회해 표시 상태를 동기화
     useEffect(() => {
@@ -99,11 +143,13 @@ export default function RSVPClient(props: RSVPClientProps) {
                 const json = (await res.json()) as PageSettingsResp
                 const serverRsvp =
                     (json && json.data && json.data.rsvp) || json?.rsvp
-                if (
-                    !cancelled &&
-                    (serverRsvp === "on" || serverRsvp === "off")
-                ) {
-                    setDisplayStyle(serverRsvp === "on" ? "block" : "none")
+                const settingsType =
+                    (json && json.data && json.data.type) || json?.type || ""
+                if (!cancelled) {
+                    if (serverRsvp === "on" || serverRsvp === "off") {
+                        setDisplayStyle(serverRsvp === "on" ? "block" : "none")
+                    }
+                    setPageType(settingsType)
                 }
             } catch (_) {}
         }
@@ -279,11 +325,18 @@ export default function RSVPClient(props: RSVPClientProps) {
                                 fontWeight: "bold",
                                 color: "#1f2937",
                                 marginBottom: "8px",
+                                fontFamily: pretendardFontFamily,
                             }}
                         >
                             참석 의사 전달 완료
                         </h2>
-                        <p style={{ color: "#6b7280", marginBottom: "24px" }}>
+                        <p
+                            style={{
+                                color: "#6b7280",
+                                marginBottom: "24px",
+                                fontFamily: pretendardFontFamily,
+                            }}
+                        >
                             소중한 시간을 내어 참석해 주셔서 감사합니다.
                         </p>
                         <button
@@ -296,6 +349,8 @@ export default function RSVPClient(props: RSVPClientProps) {
                                 border: `1px solid ${buttonColor}`,
                                 cursor: "pointer",
                                 transition: "background-color 0.2s",
+                                fontFamily: pretendardFontFamily,
+                                fontWeight: 500,
                             }}
                         >
                             다시 작성하기
@@ -330,7 +385,7 @@ export default function RSVPClient(props: RSVPClientProps) {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    fontFamily: "P22 Late November, serif",
+                    fontFamily: titleFontFamily,
                     fontSize: "25px",
                     letterSpacing: "0.05em",
                     lineHeight: "0.7em",
@@ -347,7 +402,7 @@ export default function RSVPClient(props: RSVPClientProps) {
                 transition={{ duration: 0.5, ease: "easeOut", delay: 0 }}
                 viewport={{ once: true, amount: 0.3 }}
                 style={{
-                    fontFamily: "Pretendard Regular",
+                    fontFamily: pretendardFontFamily,
                     fontSize: "15px",
                     color: "#8c8c8c",
                     lineHeight: "1.8em",
@@ -416,7 +471,7 @@ export default function RSVPClient(props: RSVPClientProps) {
                                     padding: "10px",
                                     borderRadius: "0px",
                                     fontSize: "12px",
-                                    fontFamily: "Pretendard Regular",
+                                    fontFamily: pretendardFontFamily,
                                     border:
                                         formData.guestType === "신랑측"
                                             ? `1px solid ${selectionButtonActiveBorderColor}`
@@ -447,7 +502,7 @@ export default function RSVPClient(props: RSVPClientProps) {
                                     padding: "10px",
                                     borderRadius: "0px",
                                     fontSize: "12px",
-                                    fontFamily: "Pretendard Regular",
+                                    fontFamily: pretendardFontFamily,
                                     border:
                                         formData.guestType === "신부측"
                                             ? `1px solid ${selectionButtonActiveBorderColor}`
@@ -506,7 +561,7 @@ export default function RSVPClient(props: RSVPClientProps) {
                                     padding: "10px",
                                     borderRadius: "0px",
                                     fontSize: "12px",
-                                    fontFamily: "Pretendard Regular",
+                                    fontFamily: pretendardFontFamily,
                                     border:
                                         formData.relationType === "참석"
                                             ? `1px solid ${selectionButtonActiveBorderColor}`
@@ -537,7 +592,7 @@ export default function RSVPClient(props: RSVPClientProps) {
                                     padding: "10px",
                                     borderRadius: "0px",
                                     fontSize: "12px",
-                                    fontFamily: "Pretendard Regular",
+                                    fontFamily: pretendardFontFamily,
                                     border:
                                         formData.relationType === "미참석"
                                             ? `1px solid ${selectionButtonActiveBorderColor}`
@@ -596,7 +651,7 @@ export default function RSVPClient(props: RSVPClientProps) {
                                     padding: "10px",
                                     borderRadius: "0px",
                                     fontSize: "12px",
-                                    fontFamily: "Pretendard Regular",
+                                    fontFamily: pretendardFontFamily,
                                     border:
                                         formData.mealTime === "식사 가능"
                                             ? `1px solid ${selectionButtonActiveBorderColor}`
@@ -627,7 +682,7 @@ export default function RSVPClient(props: RSVPClientProps) {
                                     padding: "10px",
                                     borderRadius: "0px",
                                     fontSize: "12px",
-                                    fontFamily: "Pretendard Regular",
+                                    fontFamily: pretendardFontFamily,
                                     border:
                                         formData.mealTime === "식사 불가"
                                             ? `1px solid ${selectionButtonActiveBorderColor}`
@@ -679,20 +734,20 @@ export default function RSVPClient(props: RSVPClientProps) {
                                     name="guestName"
                                     value={formData.guestName}
                                     onChange={handleInputChange}
-                                    style={{
-                                        width: "100%",
-                                        height: "40px",
-                                        padding: "0 12px",
-                                        border: errors.guestName
-                                            ? "1px solid #dc2626"
-                                            : `1px solid ${borderColor}`,
-                                        borderRadius: "0px",
-                                        fontFamily: "Pretendard Regular",
-                                        fontSize: "16px",
-                                        outline: "none",
-                                        transition: "border-color 0.2s",
-                                        backgroundColor: "#bbbbbb26",
-                                        color: "transparent",
+                                style={{
+                                    width: "100%",
+                                    height: "40px",
+                                    padding: "0 12px",
+                                    border: errors.guestName
+                                        ? "1px solid #dc2626"
+                                        : `1px solid ${borderColor}`,
+                                    borderRadius: "0px",
+                                    fontFamily: pretendardFontFamily,
+                                    fontSize: "16px",
+                                    outline: "none",
+                                    transition: "border-color 0.2s",
+                                    backgroundColor: "#bbbbbb26",
+                                    color: "transparent",
                                         WebkitTextSizeAdjust: "100%",
                                     }}
                                     required
@@ -707,7 +762,7 @@ export default function RSVPClient(props: RSVPClientProps) {
                                         display: "flex",
                                         alignItems: "center",
                                         fontSize: "14px",
-                                        fontFamily: "Pretendard Regular",
+                                        fontFamily: pretendardFontFamily,
                                         color: "#000000",
                                         pointerEvents: "none",
                                         whiteSpace: "nowrap",
@@ -727,7 +782,7 @@ export default function RSVPClient(props: RSVPClientProps) {
                                             display: "flex",
                                             alignItems: "center",
                                             fontSize: "14px",
-                                            fontFamily: "Pretendard Regular",
+                                            fontFamily: pretendardFontFamily,
                                             color: "#999999",
                                             pointerEvents: "none",
                                         }}
@@ -741,7 +796,7 @@ export default function RSVPClient(props: RSVPClientProps) {
                                     style={{
                                         color: "#dc2626",
                                         fontSize: "12px",
-                                        fontFamily: "Pretendard Regular",
+                                        fontFamily: pretendardFontFamily,
                                     }}
                                 >
                                     {errors.guestName}
@@ -774,14 +829,14 @@ export default function RSVPClient(props: RSVPClientProps) {
                                     name="guestCount"
                                     value={formData.guestCount}
                                     onChange={handleInputChange}
-                                    style={{
-                                        width: "100%",
-                                        height: "40px",
-                                        padding: "0 35px 0 12px",
-                                        border: `1px solid ${borderColor}`,
-                                        borderRadius: "0px",
-                                        fontFamily: "Pretendard Regular",
-                                        fontSize: "14px",
+                                style={{
+                                    width: "100%",
+                                    height: "40px",
+                                    padding: "0 35px 0 12px",
+                                    border: `1px solid ${borderColor}`,
+                                    borderRadius: "0px",
+                                    fontFamily: pretendardFontFamily,
+                                    fontSize: "14px",
                                         outline: "none",
                                         backgroundColor: "#bbbbbb26",
                                         color: "#000",
@@ -861,7 +916,7 @@ export default function RSVPClient(props: RSVPClientProps) {
                                         ? "1px solid #dc2626"
                                         : `1px solid ${borderColor}`,
                                     borderRadius: "0px",
-                                    fontFamily: "Pretendard Regular",
+                                    fontFamily: pretendardFontFamily,
                                     fontSize: "16px",
                                     outline: "none",
                                     transition: "border-color 0.2s",
@@ -881,7 +936,7 @@ export default function RSVPClient(props: RSVPClientProps) {
                                     display: "flex",
                                     alignItems: "center",
                                     fontSize: "14px",
-                                    fontFamily: "Pretendard Regular",
+                                    fontFamily: pretendardFontFamily,
                                     color: "#000000",
                                     pointerEvents: "none",
                                     whiteSpace: "nowrap",
@@ -901,7 +956,7 @@ export default function RSVPClient(props: RSVPClientProps) {
                                         display: "flex",
                                         alignItems: "center",
                                         fontSize: "14px",
-                                        fontFamily: "Pretendard Regular",
+                                        fontFamily: pretendardFontFamily,
                                         color: "#999999",
                                         pointerEvents: "none",
                                     }}
@@ -998,7 +1053,8 @@ export default function RSVPClient(props: RSVPClientProps) {
                                     style={{
                                         fontSize: "11px",
                                         color: "#888888",
-                                        fontFamily: "Pretendard Semibold",
+                                        fontFamily: pretendardFontFamily,
+                                        fontWeight: 600,
                                         marginBottom: "4px",
                                     }}
                                 >
@@ -1008,7 +1064,7 @@ export default function RSVPClient(props: RSVPClientProps) {
                                     style={{
                                         fontSize: "11px",
                                         color: "#888888",
-                                        fontFamily: "Pretendard Regular",
+                                        fontFamily: pretendardFontFamily,
                                     }}
                                 >
                                     참석여부 전달을 위한 개인정보 수집 및 이용에
@@ -1019,7 +1075,7 @@ export default function RSVPClient(props: RSVPClientProps) {
                                         style={{
                                             fontSize: "11px",
                                             color: "#888888",
-                                            fontFamily: "Pretendard Regular",
+                                            fontFamily: pretendardFontFamily,
                                             lineHeight: "1.5",
                                             padding: "4px 0",
                                             marginTop: "4px",
@@ -1094,7 +1150,7 @@ export default function RSVPClient(props: RSVPClientProps) {
                             marginTop: "30px",
                             borderRadius: "0px",
                             fontSize: "14px",
-                            fontFamily: "Pretendard Regular",
+                            fontFamily: pretendardFontFamily,
                             fontWeight: 500,
                             border: `1px solid ${isSubmitting ? "#9ca3af" : buttonColor}`,
                             cursor: isSubmitting ? "not-allowed" : "pointer",

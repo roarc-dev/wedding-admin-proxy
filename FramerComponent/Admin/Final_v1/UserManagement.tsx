@@ -670,7 +670,7 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
                                             photo_section_locale: "en",
                                             rsvp: "off",
                                             comments: "off",
-                                            wedding_hour: "14",
+                                            wedding_hour: "12",
                                             wedding_minute: "00",
                                         },
                                     }),

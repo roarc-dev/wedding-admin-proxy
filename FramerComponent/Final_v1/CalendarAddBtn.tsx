@@ -57,7 +57,10 @@ export default function CalendarAddBtn({
     // Pretendard 폰트 스택을 안전하게 가져오기
     const pretendardFontFamily = useMemo(() => {
         try {
-            return typography?.helpers?.stacks?.pretendardVariable || '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
+            return (
+                typography?.helpers?.stacks?.pretendardVariable ||
+                '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
+            )
         } catch {
             return '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
         }
@@ -147,8 +150,8 @@ export default function CalendarAddBtn({
                 ? pageSettings.bride_name_kr.slice(-2)
                 : "신부"
 
-            const eventName = `${groomFirstName}과 ${brideFirstName}의 결혼식`
-            const eventDetails = `${groomFirstName}과 ${brideFirstName}의 새로운 출발을 축하해 주세요`
+            const eventName = `${groomFirstName} ♥︎ ${brideFirstName}의 결혼식`
+            const eventDetails = `${groomFirstName} ♥︎ ${brideFirstName}의 새로운 출발을 축하해 주세요`
             const eventLocation = pageSettings.transport_location_name || ""
 
             const url = `https://calendar.google.com/calendar/u/0/r/eventedit?text=${encodeURIComponent(

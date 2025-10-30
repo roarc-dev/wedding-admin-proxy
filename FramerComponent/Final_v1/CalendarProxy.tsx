@@ -2,7 +2,7 @@ import { addPropertyControls, ControlType } from "framer"
 import { motion } from "framer-motion"
 import { useState, useEffect, useMemo } from "react"
 // @ts-ignore
-import typography from "https://cdn.roarc.kr/fonts/typography.js?v=27c65dba30928cbbce6839678016d9ac"
+import typography from "https://cdn.roarc.kr/fonts/typography.js"
 
 // 프록시 서버 URL (고정된 Production URL)
 const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app"
@@ -20,6 +20,8 @@ interface PageSettings {
     highlight_shape?: "circle" | "heart"
     highlight_color?: string
     highlight_text_color?: string
+    type?: string
+    cal_txt?: string
     created_at?: string
     updated_at?: string
 }
@@ -87,6 +89,8 @@ async function getPageSettings(pageId: string): Promise<PageSettings | null> {
                 highlight_shape: data.highlight_shape || "circle",
                 highlight_color: data.highlight_color || "#e0e0e0",
                 highlight_text_color: data.highlight_text_color || "black",
+                type: data.type || "",
+                cal_txt: data.cal_txt || "",
                 created_at: data.created_at,
                 updated_at: data.updated_at,
             }
@@ -242,6 +246,15 @@ export default function CalendarComponentProxy({
             return typography?.helpers?.stacks?.p22 || '"P22 Late November", "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
         } catch {
             return '"P22 Late November", "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
+        }
+    }, [])
+
+    // Goldenbook 폰트 스택을 안전하게 가져오기
+    const goldenbookFontFamily = useMemo(() => {
+        try {
+            return typography?.helpers?.stacks?.goldenbook || '"Goldenbook", "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
+        } catch {
+            return '"Goldenbook", "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
         }
     }, [])
 
@@ -555,7 +568,7 @@ export default function CalendarComponentProxy({
                 style={{
                     fontSize: "50px",
                     lineHeight: "1.8em",
-                    fontFamily: p22FontFamily,
+                    fontFamily: pageSettings?.type === "papillon" ? p22FontFamily : pageSettings?.type === "eternal" ? goldenbookFontFamily : p22FontFamily,
                     fontWeight: 400,
                     textAlign: "center",
                     marginBottom: "20px",
@@ -733,8 +746,7 @@ export default function CalendarComponentProxy({
                         marginBottom: "10px",
                     }}
                 >
-                    {pageSettings?.groom_name || "신랑"} ♥{" "}
-                    {pageSettings?.bride_name || "신부"}의 결혼식
+                    {pageSettings?.cal_txt || `${pageSettings?.groom_name || "신랑"} ♥ ${pageSettings?.bride_name || "신부"}의 결혼식`}
                 </div>
 
                 {/* D-day 카운터 */}

@@ -3870,58 +3870,7 @@ const createInitialPageSettings = () => ({
     vid_url: "",
 })
 
-interface PageSettingsState {
-    groomName: string
-    groom_name_kr: string
-    groom_name_en: string
-    last_groom_name_kr: string
-    last_groom_name_en: string
-    brideName: string
-    bride_name_kr: string
-    bride_name_en: string
-    last_bride_name_kr: string
-    last_bride_name_en: string
-    wedding_date: string
-    wedding_hour: string
-    wedding_minute: string
-    venue_name: string
-    venue_name_kr: string
-    transport_location_name: string
-    venue_address: string
-    venue_lat: number | null
-    venue_lng: number | null
-    photo_section_image_url: string
-    photo_section_image_path: string
-    photo_section_location: string
-    photo_section_overlay_position: string
-    photo_section_overlay_color: string
-    photo_section_locale: string
-    photo_section_overlay_opacity: number
-    bgm_url: string
-    bgm_volume: number
-    bgm_title: string
-    bgm_artist: string
-    bgm_duration: number
-    bgm_start_time: number
-    bgm_end_time: number
-    bgm_loop: boolean
-    bgm_id: string | null
-    bgm_file_name: string
-    kko_title: string
-    kko_date: string
-    kko_description: string
-    kko_image_url: string
-    kko_image_path: string
-    kko_locale: string
-    kko_type: string
-    comments_enabled: boolean
-    rsvp_enabled: boolean
-    gallery_enabled: boolean
-    calendar_enabled: boolean
-    toggle_states: Record<string, boolean>
-    info_items: any[]
-    vid_url: string
-}
+type PageSettingsState = ReturnType<typeof createInitialPageSettings>
 
 // 메인 Admin 컴포넌트 (내부 로직)
 function AdminMainContent(props: any) {
@@ -4305,7 +4254,6 @@ function AdminMainContent(props: any) {
     ) // 업로드된 파일명
     const kakaoImageInputRef = useRef<HTMLInputElement | null>(null)
     const [kakaoUploadLoading, setKakaoUploadLoading] = useState(false)
-    const [kkoDefaultsApplied, setKkoDefaultsApplied] = useState(false)
     const addressLayerCleanupRef = React.useRef<(() => void) | null>(null)
 
     React.useEffect(() => {
@@ -4358,7 +4306,6 @@ function AdminMainContent(props: any) {
     }, [])
 
     useEffect(() => {
-        setKkoDefaultsApplied(false)
         setHasLoadedSettings(false)
     }, [currentPageId])
     React.useEffect(() => {
@@ -4511,142 +4458,9 @@ function AdminMainContent(props: any) {
         inviteData.brideName,
     ])
 
-    const buildKakaoDefaultTitle = useCallback(() => {
-        const { groom, bride } = getKakaoShareNames()
-        if (!groom || !bride) return ""
-        return `${groom} ♥ ${bride} 결혼합니다`
-    }, [getKakaoShareNames])
 
-    const buildKakaoDefaultDate = useCallback(() => {
-        const dateStr = pageSettings.wedding_date
-        if (!dateStr) return ""
-        const parts = dateStr.split("-")
-        if (parts.length !== 3) return ""
-        const [yearStr, monthStr, dayStr] = parts
-        const year = Number(yearStr)
-        const month = Number(monthStr)
-        const day = Number(dayStr)
-        if (!year || !month || !day) return ""
 
-        const hourRaw = pageSettings.wedding_hour ?? ""
-        const minuteRaw = pageSettings.wedding_minute ?? ""
 
-        const hour = Number(hourRaw)
-        const minute = Number(minuteRaw)
-
-        const hasHour = hourRaw !== "" && !Number.isNaN(hour)
-        const hasMinute = minuteRaw !== "" && !Number.isNaN(minute)
-
-        const hourText = hasHour ? `${hour}시` : ""
-        const minuteText =
-            hasMinute && minute > 0
-                ? ` ${minute.toString().padStart(2, "0")}분`
-                : ""
-
-        const timeText = hourText ? ` ${hourText}${minuteText}` : ""
-        return `${year}년 ${month}월 ${day}일${timeText}`.trim()
-    }, [
-        pageSettings.wedding_date,
-        pageSettings.wedding_hour,
-        pageSettings.wedding_minute,
-    ])
-
-    useEffect(() => {
-        if (!currentPageId || kkoDefaultsApplied || !hasLoadedSettings) return
-
-        const defaults: Partial<typeof pageSettings> = {}
-
-        if (!pageSettings.kko_title) {
-            const title = buildKakaoDefaultTitle()
-            if (title) {
-                defaults.kko_title = title
-            }
-        }
-
-        if (!pageSettings.kko_date) {
-            const dateText = buildKakaoDefaultDate()
-            if (dateText) {
-                defaults.kko_date = dateText
-            }
-        }
-
-        if (Object.keys(defaults).length > 0) {
-            setPageSettings((prev) => ({ ...prev, ...defaults }))
-            // 초기 로딩 이전에는 기본값만 부분 저장하여 공백 병합을 방지
-            void savePageSettings(defaults)
-            const nextTitle = defaults.kko_title ?? pageSettings.kko_title
-            const nextDate = defaults.kko_date ?? pageSettings.kko_date
-            if (nextTitle && nextDate) {
-                setKkoDefaultsApplied(true)
-            }
-        } else if (pageSettings.kko_title && pageSettings.kko_date) {
-            setKkoDefaultsApplied(true)
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [
-        currentPageId,
-        kkoDefaultsApplied,
-        pageSettings.kko_title,
-        pageSettings.kko_date,
-        pageSettings.groomName,
-        pageSettings.brideName,
-        pageSettings.wedding_date,
-        pageSettings.wedding_hour,
-        pageSettings.wedding_minute,
-        inviteData.groomName,
-        inviteData.brideName,
-        hasLoadedSettings,
-    ])
-
-    // 카카오톡 공유 정보 변경 시 자동으로 기본값 업데이트
-    useEffect(() => {
-        if (!currentPageId || !hasLoadedSettings) return
-
-        // 이름 정보가 변경되면 제목 업데이트
-        const shouldUpdateTitle =
-            (pageSettings.groom_name_kr ||
-                pageSettings.groomName ||
-                inviteData.groomName) &&
-            (pageSettings.bride_name_kr ||
-                pageSettings.brideName ||
-                inviteData.brideName) &&
-            !pageSettings.kko_title // 사용자가 직접 설정하지 않은 경우만
-
-        if (shouldUpdateTitle) {
-            const newTitle = buildKakaoDefaultTitle()
-            if (newTitle && newTitle !== pageSettings.kko_title) {
-                setPageSettings((prev) => ({ ...prev, kko_title: newTitle }))
-                void savePageSettings({ kko_title: newTitle })
-            }
-        }
-
-        // 날짜/시간 정보가 변경되면 날짜 업데이트
-        const shouldUpdateDate =
-            pageSettings.wedding_date && !pageSettings.kko_date // 사용자가 직접 설정하지 않은 경우만
-
-        if (shouldUpdateDate) {
-            const newDate = buildKakaoDefaultDate()
-            if (newDate && newDate !== pageSettings.kko_date) {
-                setPageSettings((prev) => ({ ...prev, kko_date: newDate }))
-                void savePageSettings({ kko_date: newDate })
-            }
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [
-        currentPageId,
-        hasLoadedSettings,
-        pageSettings.groom_name_kr,
-        pageSettings.groomName,
-        pageSettings.bride_name_kr,
-        pageSettings.brideName,
-        pageSettings.wedding_date,
-        pageSettings.wedding_hour,
-        pageSettings.wedding_minute,
-        inviteData.groomName,
-        inviteData.brideName,
-        pageSettings.kko_title,
-        pageSettings.kko_date,
-    ])
 
     // 초대글 텍스트 포맷팅(볼드/인용) 삽입
     const insertInviteFormat = (format: "bold" | "quote") => {
@@ -5730,7 +5544,6 @@ function AdminMainContent(props: any) {
         setSelectedBgmId(null)
         setPlayingBgmId(null)
         setKakaoUploadLoading(false)
-        setKkoDefaultsApplied(false)
         setLoginForm({ username: "", password: "" })
         setLoginError("")
     }
@@ -14004,7 +13817,7 @@ function AdminMainContent(props: any) {
 
                             <FormField
                                 label="제목"
-                                helpText="카카오톡 공유 카드에 굵은 글씨로 표시됩니다. 설정하지 않아도 신랑 신부의 이름이 표시됩니다."
+                                helpText="카카오톡 공유 카드에 굵은 글씨로 표시됩니다."
                             >
                                 <InputBase
                                     value={pageSettings.kko_title || ""}
@@ -14046,7 +13859,7 @@ function AdminMainContent(props: any) {
 
                             <FormField
                                 label="본문"
-                                helpText="카카오톡 공유 카드에 작은 글씨로 표시됩니다. 설정하지 않아도 날짜가 표시됩니다."
+                                helpText="카카오톡 공유 카드에 작은 글씨로 표시됩니다."
                             >
                                 <textarea
                                     value={pageSettings.kko_date || ""}
@@ -14062,7 +13875,7 @@ function AdminMainContent(props: any) {
                                         })
                                     }
                                     rows={3}
-                                    placeholder="예: 2026년 1월 1일 12시 30분"
+                                    placeholder="예: 2026년 1월 1일 토요일 12시 30분"
                                     disabled={settingsLoading}
                                     style={{
                                         width: "calc(100% * 1.1429)",

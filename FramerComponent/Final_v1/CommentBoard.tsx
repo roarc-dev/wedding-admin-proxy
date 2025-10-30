@@ -620,7 +620,7 @@ export default function CommentBoard({
                         fontWeight: 400,
                     }}
                 >
-                    신랑 신부에게 축하의 한 마디를 남겨보세요.
+                    아직 댓글이 없습니다. 축하의 한 마디를 남겨보세요.
                 </div>
             )}
 
@@ -683,6 +683,7 @@ export default function CommentBoard({
                                 padding: 24,
                                 borderRadius: 0,
                                 width: "min(720px, 96vw)",
+                                maxWidth: "420px",
                                 border: "none",
                                 WebkitTextSizeAdjust: "100%",
                                 textSizeAdjust: "100%",
@@ -863,6 +864,7 @@ export default function CommentBoard({
                                 borderRadius: 0,
                                 boxShadow: "0 20px 60px rgba(0, 0, 0, 0.22)",
                                 width: "min(520px, 94vw)",
+                                maxWidth: "420px",
                                 border: "none",
                             }}
                             onClick={(e) => e.stopPropagation()}

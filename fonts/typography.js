@@ -1,4 +1,5 @@
 /**
+ * v1.1.3
  * Typography utilities for Admin (CDN-hosted fonts)
  * - Pretendard: inject via upstream dynamic-subset CSS (recommended by project)
  * - P22 Late November: @font-face (self-host via cdn.roarc.kr)
@@ -55,7 +56,16 @@ function injectTypekitOnce(id, href) {
   link.id = id
   link.rel = 'stylesheet'
   link.href = href
+  // crossOrigin 제거 - Typekit은 crossOrigin이 필요없음
   document.head.appendChild(link)
+  
+  // 디버깅: 로드 완료 확인
+  link.onload = () => {
+    console.log('[Typography] Typekit loaded successfully:', href)
+  }
+  link.onerror = (e) => {
+    console.error('[Typography] Typekit load failed:', href, e)
+  }
 }
 
 function buildFontFaceCss(cdnBase, fontPaths) {
@@ -92,8 +102,9 @@ function getStacks() {
     pretendardVariable: `"Pretendard Variable", Pretendard, ${systemSans}`,
     pretendard: `Pretendard, ${systemSans}`,
     p22: `"P22 Late November", "Pretendard", ${systemSans}`,
-    goldenbook: `"goldenbook", serif`,
-    sloopScriptPro: `"sloop-script-pro", sans-serif`,
+    // Typekit 폰트명 수정 (Adobe Fonts에서 제공하는 정확한 이름)
+    goldenbook: `"goldenbook", "Goldenbook", serif`,
+    sloopScriptPro: `"sloop-script-pro", "Sloop Script Pro", cursive, sans-serif`,
   }
 }
 
@@ -161,12 +172,21 @@ function createTypography(options) {
     cdnBase,
     fontPaths,
     ensure: (override) => {
-      // 1) Pretendard upstream CSS link injection (recommended)
+      // 1) Typekit 먼저 로드 (가장 중요)
+      injectTypekitOnce('typekit-fonts', 'https://use.typekit.net/szb6mar.css')
+      
+      // 2) Pretendard upstream CSS link injection (recommended)
       injectLinkOnce('pretendard-upstream-css', override?.pretendardHref || pretendardHref)
-      // 2) P22 self-hosted @font-face
+      
+      // 3) P22 self-hosted @font-face
       injectFontFacesOnce({ cdnBase: override?.cdnBase || cdnBase, fontPaths: override?.fontPaths || fontPaths })
-      // 3) Goldenbook via Typekit
-      injectTypekitOnce('goldenbook-typekit', 'https://use.typekit.net/szb6mar.css')
+      
+      // 디버깅: 로드된 폰트 확인
+      if (typeof window !== 'undefined' && window.document && document.fonts) {
+        document.fonts.ready.then(() => {
+          console.log('[Typography] Available fonts:', Array.from(document.fonts.values()).map(f => f.family))
+        })
+      }
     },
     buildFontFaceCss: (override) => buildFontFaceCss(override?.cdnBase || cdnBase, override?.fontPaths || fontPaths),
     styles,
@@ -192,5 +212,3 @@ export {
 }
 
 export default typography
-
-

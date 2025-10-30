@@ -1,15 +1,66 @@
 import React, { useEffect, useRef, useState } from "react"
 import { addPropertyControls, ControlType } from "framer"
-import typography from "https://cdn.roarc.kr/fonts/typography.js?v=6fdc95bcc8fd197d879c051a8c2d5a03"
+import typography from "https://cdn.roarc.kr/fonts/typography.js"
+
+// 프록시 서버 URL (고정된 Production URL)
+const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app"
+
+// API 호출 함수들
+async function getInviteNamesByPageId(pageId: string) {
+    if (!pageId) return { groom_name: "", bride_name: "" }
+    try {
+        const response = await fetch(
+            `${PROXY_BASE_URL}/api/invite?pageId=${encodeURIComponent(pageId)}`,
+            { method: "GET", headers: { "Content-Type": "application/json" } }
+        )
+        if (!response.ok) {
+            return { groom_name: "", bride_name: "" }
+        }
+        const result = await response.json()
+        if (result && result.success && result.data) {
+            return {
+                groom_name: result.data.groom_name || "",
+                bride_name: result.data.bride_name || "",
+            }
+        }
+        return { groom_name: "", bride_name: "" }
+    } catch {
+        return { groom_name: "", bride_name: "" }
+    }
+}
+
+async function getPageSettingsNames(pageId: string) {
+    if (!pageId) return { groom_name_en: "", bride_name_en: "" }
+    try {
+        const res = await fetch(
+            `${PROXY_BASE_URL}/api/page-settings?pageId=${encodeURIComponent(pageId)}`,
+            { method: 'GET', headers: { 'Content-Type': 'application/json' } }
+        )
+        if (!res.ok) return { groom_name_en: "", bride_name_en: "" }
+        const json = await res.json()
+        const data = json && json.data ? json.data : {}
+        return {
+            groom_name_en: data.groom_name_en || "",
+            bride_name_en: data.bride_name_en || "",
+        }
+    } catch {
+        return { groom_name_en: "", bride_name_en: "" }
+    }
+}
 
 interface EternalNameSectionProps {
     groomName: string
     brideName: string
+    pageId?: string
     style?: React.CSSProperties
 }
 
 export default function EternalNameSection(props: EternalNameSectionProps) {
-    const { groomName, brideName, style } = props
+    const { groomName, brideName, pageId, style } = props
+
+    // 이름 상태 (props 우선, 없으면 페이지에서 로드)
+    const [resolvedGroomName, setResolvedGroomName] = useState(groomName)
+    const [resolvedBrideName, setResolvedBrideName] = useState(brideName)
 
     const nameContainerRef = useRef<HTMLDivElement | null>(null)
     const groomRef = useRef<HTMLDivElement | null>(null)
@@ -57,15 +108,54 @@ export default function EternalNameSection(props: EternalNameSectionProps) {
         setNameFontSize(fontSize)
     }
 
+    // Typography 폰트 로딩
     useEffect(() => {
         try {
             typography && typeof typography.ensure === "function" && typography.ensure()
-        } catch {}
+        } catch (error) {
+            console.warn("[EternalNameSection] Typography loading failed:", error)
+        }
+    }, [])
+
+    // 페이지에서 신랑/신부 이름 로드 (props 값이 비어있을 때만)
+    useEffect(() => {
+        let mounted = true
+        ;(async () => {
+            const hasCustomGroom = !!(groomName && groomName.trim() && groomName !== "GROOM NAME")
+            const hasCustomBride = !!(brideName && brideName.trim() && brideName !== "BRIDE NAME")
+            if (hasCustomGroom || hasCustomBride) {
+                return // 사용자가 이름을 명시한 경우 API 호출 생략
+            }
+
+            // 1) page_settings에서 EN 이름 우선 사용
+            const settingsNames = await getPageSettingsNames(pageId || "")
+            if (!mounted) return
+            let updated = false
+            if (settingsNames.groom_name_en) {
+                setResolvedGroomName(settingsNames.groom_name_en)
+                updated = true
+            }
+            if (settingsNames.bride_name_en) {
+                setResolvedBrideName(settingsNames.bride_name_en)
+                updated = true
+            }
+            if (updated) return
+
+            // 2) 폴백: invite에서 이름 사용
+            const names = await getInviteNamesByPageId(pageId || "")
+            if (!mounted) return
+            if (names.groom_name && !groomName) setResolvedGroomName(names.groom_name)
+            if (names.bride_name && !brideName) setResolvedBrideName(names.bride_name)
+        })()
+        return () => { mounted = false }
+    }, [pageId, groomName, brideName])
+
+    useEffect(() => {
         adjustTextSize()
         const handleResize = () => setTimeout(adjustTextSize, 100)
         window.addEventListener("resize", handleResize)
         return () => window.removeEventListener("resize", handleResize)
-    }, [groomName, brideName])
+    }, [resolvedGroomName, resolvedBrideName])
 
     // Goldenbook 폰트 스택을 안전하게 가져오기
     const goldenbookFontFamily = React.useMemo(() => {
@@ -106,7 +196,7 @@ export default function EternalNameSection(props: EternalNameSectionProps) {
                     overflow: "hidden",
                 }}
             >
-                {groomName.toUpperCase().replace(/\s+/g, '  ')}
+                {resolvedGroomName.toUpperCase().replace(/\s+/g, '  ')}
             </div>
 
             {/* 이름 and */}
@@ -144,7 +234,7 @@ export default function EternalNameSection(props: EternalNameSectionProps) {
                     overflow: "hidden",
                 }}
             >
-                {brideName.toUpperCase().replace(/\s+/g, '  ')}
+                {resolvedBrideName.toUpperCase().replace(/\s+/g, '  ')}
             </div>
         </div>
     )
@@ -167,5 +257,11 @@ addPropertyControls(EternalNameSection, {
         title: "신부 이름",
         defaultValue: "BRIDE NAME",
         placeholder: "신부 이름을 입력하세요 (자동 대문자 변환)",
+    },
+    pageId: {
+        type: ControlType.String,
+        title: "페이지 ID",
+        defaultValue: "",
+        placeholder: "페이지 ID를 입력하세요 (API에서 이름을 가져옵니다)",
     },
 })

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react"
 import { addPropertyControls, ControlType } from "framer"
 // @ts-ignore
-import typography from "https://cdn.roarc.kr/fonts/typography.js?v=27c65dba30928cbbce6839678016d9ac"
+import typography from "https://cdn.roarc.kr/fonts/typography.js"
 
 const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app"
 
@@ -44,6 +44,41 @@ function formatWeddingDate(weddingDate?: string): string {
         return `${year}${month}${day}`
     } catch {
         return ""
+    }
+}
+
+function formatWeddingDateTime(settings: PageSettings): string {
+    const { wedding_date, wedding_hour, wedding_minute } = settings
+
+    if (!wedding_date) return "결혼식 정보를 확인해 주세요"
+
+    try {
+        const date = new Date(wedding_date)
+        const year = date.getFullYear()
+        const month = date.getMonth() + 1
+        const day = date.getDate()
+
+        // 요일 계산
+        const dayNames = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"]
+        const dayOfWeek = dayNames[date.getDay()]
+
+        // 시간 포맷팅 (12시간제)
+        const hour = wedding_hour ? parseInt(wedding_hour) : null
+        const minute = wedding_minute ? parseInt(wedding_minute) : null
+
+        let timeText = ""
+        if (hour !== null) {
+            const period = hour >= 12 ? "오후" : "오전"
+            const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
+            timeText = `${period} ${displayHour}시`
+            if (minute && minute > 0) {
+                timeText += ` ${minute.toString().padStart(2, "0")}분`
+            }
+        }
+
+        return `${year}년 ${month}월 ${day}일 ${dayOfWeek}${timeText ? ` ${timeText}` : ""}`.trim()
+    } catch {
+        return "결혼식 정보를 확인해 주세요"
     }
 }
 
@@ -116,7 +151,7 @@ export default function KakaoShare(props: KakaoShareProps) {
             `${settings.groom_name_kr || "신랑"} ♥ ${settings.bride_name_kr || "신부"} 결혼합니다`
 
         const customBody =
-            settings.kko_date?.trim() || "결혼식 정보를 확인해 주세요"
+            settings.kko_date?.trim() || formatWeddingDateTime(settings)
 
         const imageUrl =
             settings.kko_img?.trim() || settings.photo_section_image_url || ""

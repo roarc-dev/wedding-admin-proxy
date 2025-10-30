@@ -1,10 +1,10 @@
 -- BGM 볼륨 컬럼 추가
 ALTER TABLE page_settings 
-ADD COLUMN bgm_vol INTEGER DEFAULT 5;
+ADD COLUMN bgm_vol INTEGER DEFAULT 3;
 
--- 기존 데이터에 기본값 설정 (1-10 범위, 기본값 5)
+-- 기존 데이터에 기본값 설정 (1-10 범위, 기본값 3)
 UPDATE page_settings 
-SET bgm_vol = 5 
+SET bgm_vol = 3 
 WHERE bgm_vol IS NULL;
 
 -- 컬럼에 NOT NULL 제약조건 추가
