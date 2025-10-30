@@ -2756,24 +2756,34 @@ function InlineCalendarPreview({
     }
 
     const formatDateTime = (): string => {
-        if (!targetDate) return ""
-        const d = new Date(targetDate)
-        const h24 = parseInt(hour || "0")
-        const mm = parseInt(minute || "0")
-        d.setHours(h24, mm)
-        const dayNames = [
-            "일요일",
-            "월요일",
-            "화요일",
-            "수요일",
-            "목요일",
-            "금요일",
-            "토요일",
-        ]
-        const ampm = h24 < 12 ? "오전" : "오후"
-        const h12 = h24 === 0 ? 12 : h24 > 12 ? h24 - 12 : h24
-        const minuteText = mm !== 0 ? ` ${mm}분` : ""
-        return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${dayNames[d.getDay()]} ${ampm} ${h12}시${minuteText}`
+        // pageSettings에서 값 가져오기 (캘린더 미리보기용)
+        const weddingDate = pageSettings?.wedding_date
+        const weddingHour = pageSettings?.wedding_hour || "14"
+        const weddingMinute = pageSettings?.wedding_minute || "0"
+
+        if (!weddingDate) return ""
+
+        try {
+            const d = new Date(weddingDate)
+            const h24 = parseInt(weddingHour)
+            const mm = parseInt(weddingMinute)
+            d.setHours(h24, mm)
+            const dayNames = [
+                "일요일",
+                "월요일",
+                "화요일",
+                "수요일",
+                "목요일",
+                "금요일",
+                "토요일",
+            ]
+            const ampm = h24 < 12 ? "오전" : "오후"
+            const h12 = h24 === 0 ? 12 : h24 > 12 ? h24 - 12 : h24
+            const minuteText = mm !== 0 ? ` ${mm}분` : ""
+            return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${dayNames[d.getDay()]} ${ampm} ${h12}시${minuteText}`
+        } catch (error) {
+            return ""
+        }
     }
 
     const dayNamesShort = ["S", "M", "T", "W", "T", "F", "S"]
