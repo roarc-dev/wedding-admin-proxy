@@ -3868,6 +3868,7 @@ const createInitialPageSettings = () => ({
     bgm_vol: 3,
     type: "papillon",
     vid_url: "",
+    cal_txt: "",
 })
 
 type PageSettingsState = ReturnType<typeof createInitialPageSettings>
@@ -10619,6 +10620,29 @@ function AdminMainContent(props: any) {
                                         marginTop: 12,
                                     }}
                                 >
+                                    {/* 예식일 표시 텍스트 */}
+                                    <FormField
+                                    label="캘린더 텍스트"
+                                    style={{ marginTop: 12 }}
+                                >
+                                    <InputBase
+                                        type="text"
+                                        value={pageSettings.cal_txt || ""}
+                                        onChange={(e) =>
+                                            setPageSettings({
+                                                ...pageSettings,
+                                                cal_txt: e.target.value,
+                                            })
+                                        }
+                                        onBlur={(e) =>
+                                            void savePageSettings({
+                                                cal_txt: e.target.value,
+                                            })
+                                        }
+                                        placeholder={`${inviteData.groomName || ""} ♥ ${inviteData.brideName || ""}의 결혼식`}
+                                    />
+                                </FormField>
+
                                     {/* 예식일 표시 모양 */}
                                     <div
                                         style={{
@@ -13832,7 +13856,7 @@ function AdminMainContent(props: any) {
                                             kko_title: e.target.value,
                                         })
                                     }
-                                    placeholder={`예: ${pageSettings.groom_name_kr || "민준"} ♥ ${pageSettings.bride_name_kr || "서윤"} 결혼합니다`}
+                                    placeholder={`${inviteData.groomName || ""} ♥ ${inviteData.brideName || ""}의 결혼식`}
                                     disabled={settingsLoading}
                                     style={{
                                         width: "calc(100% * 1.1429)",
@@ -13875,7 +13899,7 @@ function AdminMainContent(props: any) {
                                         })
                                     }
                                     rows={3}
-                                    placeholder="예: 2026년 1월 1일 토요일 12시 30분"
+                                    placeholder={formatDateTime() || "예: 2026년 1월 1일 토요일 12시 30분"}
                                     disabled={settingsLoading}
                                     style={{
                                         width: "calc(100% * 1.1429)",
