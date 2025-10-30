@@ -3870,7 +3870,58 @@ const createInitialPageSettings = () => ({
     vid_url: "",
 })
 
-type PageSettingsState = ReturnType<typeof createInitialPageSettings>
+interface PageSettingsState {
+    groomName: string
+    groom_name_kr: string
+    groom_name_en: string
+    last_groom_name_kr: string
+    last_groom_name_en: string
+    brideName: string
+    bride_name_kr: string
+    bride_name_en: string
+    last_bride_name_kr: string
+    last_bride_name_en: string
+    wedding_date: string
+    wedding_hour: string
+    wedding_minute: string
+    venue_name: string
+    venue_name_kr: string
+    transport_location_name: string
+    venue_address: string
+    venue_lat: number | null
+    venue_lng: number | null
+    photo_section_image_url: string
+    photo_section_image_path: string
+    photo_section_location: string
+    photo_section_overlay_position: string
+    photo_section_overlay_color: string
+    photo_section_locale: string
+    photo_section_overlay_opacity: number
+    bgm_url: string
+    bgm_volume: number
+    bgm_title: string
+    bgm_artist: string
+    bgm_duration: number
+    bgm_start_time: number
+    bgm_end_time: number
+    bgm_loop: boolean
+    bgm_id: string | null
+    bgm_file_name: string
+    kko_title: string
+    kko_date: string
+    kko_description: string
+    kko_image_url: string
+    kko_image_path: string
+    kko_locale: string
+    kko_type: string
+    comments_enabled: boolean
+    rsvp_enabled: boolean
+    gallery_enabled: boolean
+    calendar_enabled: boolean
+    toggle_states: Record<string, boolean>
+    info_items: any[]
+    vid_url: string
+}
 
 // 메인 Admin 컴포넌트 (내부 로직)
 function AdminMainContent(props: any) {
