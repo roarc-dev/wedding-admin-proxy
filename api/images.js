@@ -244,8 +244,15 @@ async function handleImageOperation(req, res) {
       })
 
     } else if (action === 'upload') {
-      // 기존 Base64 업로드 (호환성 유지)
+      // Base64 업로드 -> 워커 업로드 방식으로 전환
       const { pageId, fileData, originalName, fileSize, displayOrder } = req.body
+
+      if (!pageId || !fileData) {
+        return res.status(400).json({
+          success: false,
+          error: 'pageId와 fileData가 필요합니다'
+        })
+      }
 
       // Base64 데이터에서 실제 파일 데이터 추출
       const matches = fileData.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/)
@@ -259,35 +266,48 @@ async function handleImageOperation(req, res) {
       const mimeType = matches[1]
       const base64Data = matches[2]
       const buffer = Buffer.from(base64Data, 'base64')
+      const filenameForUpload = originalName || `${pageId}-${Date.now()}`
 
-      // 파일명 생성
-      const fileName = `${pageId}/${Date.now()}_${Math.random().toString(36).substring(2)}.jpg`
+      // 워커 업로드
+      const formData = new FormData()
+      const blob = new Blob([buffer], { type: mimeType })
+      formData.append('image', blob, filenameForUpload)
+      formData.append('page_id', pageId)
 
-      // Supabase 스토리지에 업로드
-      const { error: uploadError } = await supabase.storage
-        .from('images')
-        .upload(fileName, buffer, {
-          contentType: mimeType,
-          cacheControl: '3600'
-        })
+      const workerResponse = await fetch('https://upload.roarc.kr/upload', {
+        method: 'POST',
+        body: formData
+      })
 
-      if (uploadError) throw uploadError
+      if (!workerResponse.ok) {
+        const errorText = await workerResponse.text().catch(() => '')
+        throw new Error(`Worker upload failed (${workerResponse.status}): ${errorText}`)
+      }
 
-      // 공개 URL 생성
-      const { data: { publicUrl } } = supabase.storage
-        .from('images')
-        .getPublicUrl(fileName)
+      let workerResult
+      try {
+        workerResult = await workerResponse.json()
+      } catch (jsonError) {
+        throw new Error(`Worker upload response parsing failed: ${jsonError instanceof Error ? jsonError.message : 'Unknown error'}`)
+      }
+
+      const uploadedUrl = workerResult?.url
+      if (!uploadedUrl) {
+        throw new Error('Worker upload did not return a URL')
+      }
+
+      const storageKey = workerResult?.key || extractStorageKeyFromUrl(uploadedUrl) || filenameForUpload
 
       // 데이터베이스에 메타데이터 저장
       const { data, error } = await supabase
         .from('images')
         .insert({
           page_id: pageId,
-          filename: fileName,
-          original_name: originalName,
-          file_size: fileSize,
+          filename: storageKey,
+          original_name: originalName || filenameForUpload,
+          file_size: fileSize || buffer.length,
           mime_type: mimeType,
-          public_url: publicUrl,
+          public_url: uploadedUrl,
           display_order: displayOrder
         })
         .select()
@@ -512,6 +532,27 @@ async function handleDeleteImage(req, res) {
       success: false, 
       error: '이미지 삭제 중 오류가 발생했습니다' 
     })
+  }
+}
+
+function extractStorageKeyFromUrl(url) {
+  if (!url || typeof url !== 'string') {
+    return null
+  }
+
+  try {
+    const parsed = new URL(url)
+    const pathname = parsed.pathname || ''
+    return pathname.replace(/^\/+/, '')
+  } catch (err) {
+    // URL 파싱 실패 시 수동으로 처리
+    try {
+      const withoutProtocol = url.replace(/^https?:\/\//, '')
+      const pathOnly = withoutProtocol.split('/').slice(1).join('/')
+      return pathOnly.split('?')[0]
+    } catch {
+      return null
+    }
   }
 }
 

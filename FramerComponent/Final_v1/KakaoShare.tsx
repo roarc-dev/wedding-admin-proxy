@@ -18,6 +18,11 @@ interface PageSettings {
     wedding_minute?: string
 }
 
+interface InviteData {
+    groomName?: string
+    brideName?: string
+}
+
 async function fetchPageSettings(pageId: string): Promise<PageSettings | null> {
     if (!pageId) return null
     try {
@@ -29,6 +34,27 @@ async function fetchPageSettings(pageId: string): Promise<PageSettings | null> {
         if (json?.success && json?.data) return json.data as PageSettings
     } catch (error) {
         console.error("카카오 공유 설정 로딩 실패", error)
+    }
+    return null
+}
+
+async function fetchInviteData(pageId: string): Promise<InviteData | null> {
+    if (!pageId) return null
+    try {
+        const res = await fetch(
+            `${PROXY_BASE_URL}/api/invite?pageId=${encodeURIComponent(pageId)}`
+        )
+        if (!res.ok) return null
+        const json = await res.json()
+        if (json?.success && json?.data) {
+            const data = json.data
+            return {
+                groomName: data.groom_name || "",
+                brideName: data.bride_name || ""
+            }
+        }
+    } catch (error) {
+        console.error("초대장 데이터 로딩 실패", error)
     }
     return null
 }
@@ -106,6 +132,7 @@ export default function KakaoShare(props: KakaoShareProps) {
     const { pageId = "", templateId = "", style } = props
 
     const [settings, setSettings] = useState<PageSettings | null>(null)
+    const [inviteData, setInviteData] = useState<InviteData | null>(null)
 
     // Typography 폰트 로딩
     useEffect(() => {
@@ -131,12 +158,21 @@ export default function KakaoShare(props: KakaoShareProps) {
     useEffect(() => {
         if (!pageId) {
             setSettings(null)
+            setInviteData(null)
             return
         }
         let cancelled = false
+
+        // page-settings 데이터 가져오기
         fetchPageSettings(pageId).then((data) => {
             if (!cancelled) setSettings(data)
         })
+
+        // invite 데이터 가져오기
+        fetchInviteData(pageId).then((data) => {
+            if (!cancelled) setInviteData(data)
+        })
+
         return () => {
             cancelled = true
         }
@@ -148,7 +184,7 @@ export default function KakaoShare(props: KakaoShareProps) {
         // Admin.tsx에서 이미 포맷팅된 정보를 그대로 사용
         const customTitle =
             settings.kko_title?.trim() ||
-            `${settings.groom_name_kr || "신랑"} ♥ ${settings.bride_name_kr || "신부"} 결혼합니다`
+            `${inviteData?.groomName || ""} ♥ ${inviteData?.brideName || ""} 결혼합니다`
 
         const customBody =
             settings.kko_date?.trim() || formatWeddingDateTime(settings)

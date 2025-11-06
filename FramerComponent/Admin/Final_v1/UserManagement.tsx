@@ -658,9 +658,9 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
                                                 approvingUser.bride_name_en || null,
                                             venue_name_kr: "",
                                             bgm: "off", // NOT NULL 제약조건 해결
-                                            bgm_type: "none",
+                                            bgm_type: "",
                                             bgm_autoplay: false,
-                                            bgm_vol: 50,
+                                            bgm_vol: 3,
                                             highlight_shape: "circle",
                                             highlight_color: "#e0e0e0",
                                             highlight_text_color: "black",
@@ -671,7 +671,7 @@ export default function UserManagement(props: { style?: React.CSSProperties }) {
                                             rsvp: "off",
                                             comments: "off",
                                             wedding_hour: "12",
-                                            wedding_minute: "00",
+                                            wedding_minute: "30",
                                         },
                                     }),
                                 }

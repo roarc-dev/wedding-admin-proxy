@@ -565,7 +565,7 @@ export default function LocationUnified({
                     justifyContent: "flex-start",
                     alignItems: "center",
                     gap: 10,
-                    overflow: "hidden",
+                    overflow: "visible",
                     position: "relative",
                 }}
             >

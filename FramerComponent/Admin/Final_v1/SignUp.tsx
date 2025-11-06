@@ -73,7 +73,7 @@ export default function UserSignup(props: { style?: React.CSSProperties }) {
         password: "",
         confirmPassword: "",
         name: "",
-        wedding_date: "",
+        wedding_date: new Date().toISOString().split('T')[0],
         groom_name_en: "",
         bride_name_en: "",
     })

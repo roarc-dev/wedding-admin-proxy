@@ -1946,16 +1946,29 @@ function Section({
             </div>
 
             {/* 콘텐츠 영역 */}
-            {isOpen && (
-                <div
-                    style={{
-                        padding: theme.space(4),
-                        background: theme.color.roarc.white,
-                    }}
-                >
-                    {children}
-                </div>
-            )}
+            <AnimatePresence initial={false}>
+                {isOpen && (
+                    <motion.div
+                        key="section-content"
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.25, ease: "easeInOut" }}
+                        style={{
+                            overflow: "hidden",
+                            background: theme.color.roarc.white,
+                        }}
+                    >
+                        <div
+                            style={{
+                                padding: theme.space(4),
+                            }}
+                        >
+                            {children}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     )
 }
@@ -2723,7 +2736,8 @@ function formatWeddingDateTime({
     ]
 
     const ampm = safeHour < 12 ? "오전" : "오후"
-    const hours12 = safeHour === 0 ? 12 : safeHour > 12 ? safeHour - 12 : safeHour
+    const hours12 =
+        safeHour === 0 ? 12 : safeHour > 12 ? safeHour - 12 : safeHour
     const minuteText = safeMinute !== 0 ? ` ${safeMinute}분` : ""
 
     return `${dateWithTime.getFullYear()}년 ${
@@ -2740,6 +2754,7 @@ function InlineCalendarPreview({
     minute,
     groomName,
     brideName,
+    calendarText,
     highlightColor = "#e0e0e0",
     highlightShape = "circle",
     highlightTextColor = "black",
@@ -2749,6 +2764,7 @@ function InlineCalendarPreview({
     minute?: string
     groomName?: string
     brideName?: string
+    calendarText?: string
     highlightColor?: string
     highlightShape?: "circle" | "heart"
     highlightTextColor?: "black" | "white" | "#000000" | "#ffffff"
@@ -2832,6 +2848,12 @@ function InlineCalendarPreview({
         highlightTextColor === "white" || highlightTextColor === "#ffffff"
             ? "#ffffff"
             : "#000000"
+
+    const trimmedCalendarText = calendarText?.trim()
+    const displayCalendarText =
+        trimmedCalendarText && trimmedCalendarText.length > 0
+            ? calendarText
+            : `${groomName || ""} ♥ ${brideName || ""}의 결혼식`
 
     return (
         <div
@@ -3033,7 +3055,7 @@ function InlineCalendarPreview({
                         marginBottom: 10,
                     }}
                 >
-                    {pageSettings.cal_txt || `${groomName || ""} ♥ ${brideName || ""}의 결혼식`}
+                    {displayCalendarText}
                 </div>
                 <div
                     style={{
@@ -3864,8 +3886,8 @@ const createInitialPageSettings = () => ({
     last_bride_name_kr: "",
     last_bride_name_en: "",
     wedding_date: "",
-    wedding_hour: "14",
-    wedding_minute: "00",
+    wedding_hour: "12",
+    wedding_minute: "30",
     venue_name: "",
     venue_name_kr: "",
     transport_location_name: "",
@@ -3989,9 +4011,9 @@ function AdminMainContent(props: any) {
     // 탭 상태 관리
     const [activeTab, setActiveTab] = useState<"basic" | "gallery">("basic")
 
-    // 아코디언 상태 관리 (한 번에 하나의 섹션만 열림)
-    const [currentOpenSection, setCurrentOpenSection] = useState<string | null>(
-        "name"
+    // 아코디언 상태 관리 (여러 섹션 동시 열림 가능)
+    const [openSections, setOpenSections] = useState<Set<string>>(
+        new Set(["name"])
     ) // "성함" 섹션은 기본적으로 열림
     const [currentPageId, setCurrentPageId] = useState("")
     // 페이지 선택/리스트 관련 로직 제거 (사전 부여된 page_id만 사용)
@@ -4278,12 +4300,38 @@ function AdminMainContent(props: any) {
     const [selectedBgmId, setSelectedBgmId] = useState<string | null>(null)
     const [playingBgmId, setPlayingBgmId] = useState<string | null>(null)
     const [previewBgmId, setPreviewBgmId] = useState<string | null>(null) // 미리듣기용 상태
-    const [uploadedFileName, setUploadedFileName] = useState<string | null>(
-        null
-    ) // 업로드된 파일명
     const kakaoImageInputRef = useRef<HTMLInputElement | null>(null)
     const [kakaoUploadLoading, setKakaoUploadLoading] = useState(false)
     const addressLayerCleanupRef = React.useRef<(() => void) | null>(null)
+    const uploadedFileName = React.useMemo(() => {
+        if (pageSettings.bgm_type !== "custom" || !pageSettings.bgm_url) {
+            return null
+        }
+
+        const extractOriginalFileName = (rawName: string) => {
+            if (!rawName) return null
+
+            let decodedName = rawName
+            try {
+                decodedName = decodeURIComponent(rawName)
+            } catch {
+                // ignore decode errors and fallback to raw name
+            }
+
+            const withoutTimestamp = decodedName.replace(/^\d+-/, "")
+            const originalName = withoutTimestamp.replace(/^[^-]+-/, "")
+            return originalName || decodedName || null
+        }
+
+        try {
+            const url = new URL(pageSettings.bgm_url)
+            const rawName = url.pathname.split("/").pop() ?? ""
+            return extractOriginalFileName(rawName)
+        } catch {
+            const rawName = pageSettings.bgm_url.split("/").pop() ?? ""
+            return extractOriginalFileName(rawName)
+        }
+    }, [pageSettings.bgm_type, pageSettings.bgm_url])
 
     React.useEffect(() => {
         const match = FREE_BGM_LIST.find((b) => b.url === pageSettings.bgm_url)
@@ -4293,10 +4341,10 @@ function AdminMainContent(props: any) {
     // 비디오 URL 변경 시 섹션 자동 열기/닫기
     React.useEffect(() => {
         // 비디오 URL이 있으면 섹션을 자동으로 열기 (이미 열려있지 않은 경우에만)
-        if (pageSettings.vid_url && currentOpenSection !== "video") {
+        if (pageSettings.vid_url && !openSections.has("video")) {
             // 섹션을 열기 위해 상태를 업데이트하지 않음 - 토글 버튼의 isOn 상태만 변경
         }
-    }, [pageSettings.vid_url, currentOpenSection])
+    }, [pageSettings.vid_url, openSections])
 
     React.useEffect(() => {
         const el = audioRef.current
@@ -4486,10 +4534,6 @@ function AdminMainContent(props: any) {
         inviteData.groomName,
         inviteData.brideName,
     ])
-
-
-
-
 
     // 초대글 텍스트 포맷팅(볼드/인용) 삽입
     const insertInviteFormat = (format: "bold" | "quote") => {
@@ -4818,13 +4862,15 @@ function AdminMainContent(props: any) {
         // 이 함수는 TransportTab 컴포넌트 내부에서 정의되어야 함
     }
 
-    // 아코디언 토글 함수 (한 번에 하나의 섹션만 열림)
+    // 아코디언 토글 함수 (여러 섹션 동시 열림 가능)
     const toggleSection = async (sectionName: string) => {
-        // 현재 열려있는 섹션이 있다면 데이터를 저장
-        if (currentOpenSection) {
+        const isCurrentlyOpen = openSections.has(sectionName)
+
+        // 섹션이 닫힐 때만 저장 수행 (열릴 때는 저장하지 않음)
+        if (isCurrentlyOpen) {
             try {
                 // 각 섹션별 저장 로직
-                switch (currentOpenSection) {
+                switch (sectionName) {
                     case "name":
                         // 성함 섹션 저장 (페이지 설정 저장)
                         await savePageSettings(
@@ -4969,19 +5015,25 @@ function AdminMainContent(props: any) {
                         break
                 }
             } catch (error) {
-                console.error(`섹션 ${currentOpenSection} 저장 실패:`, error)
+                console.error(`섹션 ${sectionName} 저장 실패:`, error)
                 // 저장 실패 시에도 섹션을 변경 (변경사항이 없으면 조용히 넘어감)
                 // alert 제거 - savePageSettings에서 이미 변경사항 없으면 조용히 넘어가도록 처리됨
             }
         }
 
-        // 새 섹션으로 전환
-        setCurrentOpenSection(
-            currentOpenSection === sectionName ? null : sectionName
-        )
+        // 섹션 토글 (열림/닫힘)
+        setOpenSections((prev) => {
+            const newSet = new Set(prev)
+            if (isCurrentlyOpen) {
+                newSet.delete(sectionName)
+            } else {
+                newSet.add(sectionName)
+            }
+            return newSet
+        })
 
         // 초대글 섹션을 최초로 열 때 page_settings에서 기본값 설정
-        if (sectionName === "invite" && currentOpenSection !== "invite") {
+        if (sectionName === "invite" && !openSections.has("invite")) {
             // inviteData에 값이 없고 page_settings에 값이 있으면 초기화
             if (!inviteData.groomName && pageSettings.groom_name_kr) {
                 setInviteData((prev) => ({
@@ -5537,7 +5589,7 @@ function AdminMainContent(props: any) {
 
     const resetAdminSessionState = () => {
         setActiveTab("basic")
-        setCurrentOpenSection("name")
+        setOpenSections(new Set(["name"]))
         setCurrentPageId("")
         setAssignedPageId(null)
         setExistingImages([])
@@ -5749,23 +5801,6 @@ function AdminMainContent(props: any) {
                 setPageSettings(result.data)
                 setOriginalPageSettings(result.data)
                 setHasLoadedSettings(true)
-
-                // 커스텀 BGM이 업로드되어 있다면 파일명 표시
-                if (result.data.bgm_type === "custom" && result.data.bgm_url) {
-                    // URL에서 파일명 추출
-                    try {
-                        const url = new URL(result.data.bgm_url)
-                        const pathParts = url.pathname.split("/")
-                        const fileName = pathParts[pathParts.length - 1]
-                        // 타임스탬프와 페이지ID 제거하여 원본 파일명 추출
-                        const originalFileName = fileName
-                            .replace(/^\d+-/, "")
-                            .replace(/^[^-]+-/, "")
-                        setUploadedFileName(originalFileName)
-                    } catch (error) {
-                        console.warn("파일명 추출 실패:", error)
-                    }
-                }
             }
         } catch (err) {
             console.error("페이지 설정 로드 실패:", err)
@@ -6465,7 +6500,6 @@ function AdminMainContent(props: any) {
             console.log(`[BGM] 페이지 설정 저장 결과:`, saveResult)
 
             setPageSettings(updatedSettings)
-            setUploadedFileName(file.name) // 업로드된 파일명 저장
             console.log(`[BGM] 로컬 상태 업데이트 완료`)
 
             console.log("음원이 성공적으로 업로드되었습니다!")
@@ -6526,7 +6560,6 @@ function AdminMainContent(props: any) {
         // 미리듣기만 재생 (저장하지 않음)
         setPreviewBgmId(bgmId)
         setPlayingBgmId(bgmId)
-        setUploadedFileName(null) // 무료 음원 선택 시 업로드된 파일명 초기화
 
         // 즉시 재생을 위한 새로운 오디오 요소 생성
         const audio = new Audio(selectedBgm.url)
@@ -7288,18 +7321,24 @@ function AdminMainContent(props: any) {
                     >
                         내 링크 복사
                     </button>
-                    {showCopyPopup && (
-                        <span
-                            style={{
-                                fontSize: "12px",
-                                color: "#3F3F3F",
-                                fontFamily: theme.font.body,
-                                fontWeight: 500,
-                            }}
-                        >
-                            복사 완료!
-                        </span>
-                    )}
+                    <AnimatePresence>
+                        {showCopyPopup && (
+                            <motion.span
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: -10 }}
+                                transition={{ duration: 0.3 }}
+                                style={{
+                                    fontSize: "12px",
+                                    color: "#3F3F3F",
+                                    fontFamily: theme.font.body,
+                                    fontWeight: 500,
+                                }}
+                            >
+                                복사 완료!
+                            </motion.span>
+                        )}
+                    </AnimatePresence>
                 </div>
 
                 {/* 중앙 영역 */}
@@ -7422,7 +7461,7 @@ function AdminMainContent(props: any) {
                     <AccordionSection
                         title="성함"
                         sectionKey="name"
-                        isOpen={currentOpenSection === "name"}
+                        isOpen={openSections.has("name")}
                         onToggle={async () => await toggleSection("name")}
                     >
                         <div
@@ -7897,7 +7936,7 @@ function AdminMainContent(props: any) {
                     <AccordionSection
                         title="메인 사진"
                         sectionKey="photo"
-                        isOpen={currentOpenSection === "photo"}
+                        isOpen={openSections.has("photo")}
                         onToggle={async () => await toggleSection("photo")}
                     >
                         <div
@@ -8745,7 +8784,7 @@ function AdminMainContent(props: any) {
                     <AccordionSection
                         title="초대글"
                         sectionKey="invite"
-                        isOpen={currentOpenSection === "invite"}
+                        isOpen={openSections.has("invite")}
                         onToggle={async () => await toggleSection("invite")}
                     >
                         <div
@@ -9592,7 +9631,7 @@ function AdminMainContent(props: any) {
                     <AccordionSection
                         title="연락처"
                         sectionKey="contacts"
-                        isOpen={currentOpenSection === "contacts"}
+                        isOpen={openSections.has("contacts")}
                         onToggle={async () => await toggleSection("contacts")}
                     >
                         <div
@@ -10553,7 +10592,7 @@ function AdminMainContent(props: any) {
                     <AccordionSection
                         title="캘린더"
                         sectionKey="calendar"
-                        isOpen={currentOpenSection === "calendar"}
+                        isOpen={openSections.has("calendar")}
                         onToggle={async () => await toggleSection("calendar")}
                     >
                         <div
@@ -10606,6 +10645,7 @@ function AdminMainContent(props: any) {
                                             minute={pageSettings.wedding_minute}
                                             groomName={inviteData.groomName}
                                             brideName={inviteData.brideName}
+                                            calendarText={pageSettings.cal_txt}
                                             highlightColor={
                                                 pageSettings.highlight_color ||
                                                 "#e0e0e0"
@@ -10650,26 +10690,26 @@ function AdminMainContent(props: any) {
                                 >
                                     {/* 예식일 표시 텍스트 */}
                                     <FormField
-                                    label="캘린더 텍스트"
-                                    style={{ marginTop: 12 }}
-                                >
-                                    <InputBase
-                                        type="text"
-                                        value={pageSettings.cal_txt || ""}
-                                        onChange={(e) =>
-                                            setPageSettings({
-                                                ...pageSettings,
-                                                cal_txt: e.target.value,
-                                            })
-                                        }
-                                        onBlur={(e) =>
-                                            void savePageSettings({
-                                                cal_txt: e.target.value,
-                                            })
-                                        }
-                                        placeholder={`${inviteData.groomName || ""} ♥ ${inviteData.brideName || ""}의 결혼식`}
-                                    />
-                                </FormField>
+                                        label="캘린더 텍스트"
+                                        style={{ marginTop: 12 }}
+                                    >
+                                        <InputBase
+                                            type="text"
+                                            value={pageSettings.cal_txt || ""}
+                                            onChange={(e) =>
+                                                setPageSettings({
+                                                    ...pageSettings,
+                                                    cal_txt: e.target.value,
+                                                })
+                                            }
+                                            onBlur={(e) =>
+                                                void savePageSettings({
+                                                    cal_txt: e.target.value,
+                                                })
+                                            }
+                                            placeholder={`${inviteData.groomName || ""} ♥ ${inviteData.brideName || ""}의 결혼식`}
+                                        />
+                                    </FormField>
 
                                     {/* 예식일 표시 모양 */}
                                     <div
@@ -11088,7 +11128,7 @@ function AdminMainContent(props: any) {
                     <AccordionSection
                         title="교통 안내"
                         sectionKey="transport"
-                        isOpen={currentOpenSection === "transport"}
+                        isOpen={openSections.has("transport")}
                         onToggle={async () => await toggleSection("transport")}
                     >
                         <div
@@ -11139,7 +11179,7 @@ function AdminMainContent(props: any) {
                     <AccordionSection
                         title="비디오"
                         sectionKey="video"
-                        isOpen={currentOpenSection === "video"}
+                        isOpen={openSections.has("video")}
                         onToggle={async () => await toggleSection("video")}
                         toggleButton={
                             <ToggleButton
@@ -11312,7 +11352,7 @@ function AdminMainContent(props: any) {
                     <AccordionSection
                         title="안내 사항"
                         sectionKey="info"
-                        isOpen={currentOpenSection === "info"}
+                        isOpen={openSections.has("info")}
                         onToggle={async () => await toggleSection("info")}
                         toggleButton={
                             <ToggleButton
@@ -11366,7 +11406,7 @@ function AdminMainContent(props: any) {
                     <AccordionSection
                         title="계좌 안내"
                         sectionKey="account"
-                        isOpen={currentOpenSection === "account"}
+                        isOpen={openSections.has("account")}
                         onToggle={async () => await toggleSection("account")}
                         toggleButton={
                             <ToggleButton
@@ -12534,7 +12574,7 @@ function AdminMainContent(props: any) {
                     <AccordionSection
                         title="참석여부 RSVP"
                         sectionKey="rsvp"
-                        isOpen={currentOpenSection === "rsvp"}
+                        isOpen={openSections.has("rsvp")}
                         onToggle={async () => await toggleSection("rsvp")}
                         toggleButton={
                             <ToggleButton
@@ -12631,7 +12671,7 @@ function AdminMainContent(props: any) {
                     <AccordionSection
                         title="방명록"
                         sectionKey="comments"
-                        isOpen={currentOpenSection === "comments"}
+                        isOpen={openSections.has("comments")}
                         onToggle={async () => await toggleSection("comments")}
                         toggleButton={
                             <ToggleButton
@@ -12671,7 +12711,7 @@ function AdminMainContent(props: any) {
                     <AccordionSection
                         title="배경음악"
                         sectionKey="bgm"
-                        isOpen={currentOpenSection === "bgm"}
+                        isOpen={openSections.has("bgm")}
                         onToggle={async () => await toggleSection("bgm")}
                         toggleButton={
                             <ToggleButton
@@ -12878,7 +12918,7 @@ function AdminMainContent(props: any) {
                                     }}
                                 >
                                     {/* 업로드된 파일명 표시 */}
-                                    {uploadedFileName && (
+                                    {hasLoadedSettings && uploadedFileName && (
                                         <div
                                             style={{
                                                 display: "flex",
@@ -12925,10 +12965,6 @@ function AdminMainContent(props: any) {
                                                             )
                                                         }
 
-                                                        // 상태 초기화
-                                                        setUploadedFileName(
-                                                            null
-                                                        )
                                                         const updatedSettings =
                                                             {
                                                                 ...pageSettings,
@@ -13673,7 +13709,6 @@ function AdminMainContent(props: any) {
                                                 )
                                                 setPageSettings(updatedSettings)
                                                 setSelectedBgmId(previewBgmId)
-                                                setUploadedFileName(null) // 무료 음원 저장 시 업로드된 파일명 초기화
                                                 console.log(
                                                     "무료 음원이 성공적으로 저장되었습니다!"
                                                 )
@@ -13701,7 +13736,7 @@ function AdminMainContent(props: any) {
                     <AccordionSection
                         title="카카오톡 공유"
                         sectionKey="kakaoShare"
-                        isOpen={currentOpenSection === "kakaoShare"}
+                        isOpen={openSections.has("kakaoShare")}
                         onToggle={async () => await toggleSection("kakaoShare")}
                     >
                         <div
@@ -15087,383 +15122,829 @@ function TransportTab({
     const [items, setItems] = React.useState<TransportItem[]>(DEFAULT_ITEMS)
     const [locationName, setLocationName] = React.useState<string>("")
     const [venue_address, setVenue_address] = React.useState<string>("")
+    const addressButtonRef = React.useRef<HTMLButtonElement | null>(null)
+    const [modalPosition, setModalPosition] = React.useState<{
+        top: number
+        left: number
+        width: number
+    } | null>(null)
     const [baseAddress, setBaseAddress] = React.useState<string>("")
     const [detailAddress, setDetailAddress] = React.useState<string>("")
     const [addressInputUsed, setAddressInputUsed] =
         React.useState<boolean>(false)
     const [addressSearched, setAddressSearched] = React.useState<boolean>(false)
+    const [currentCoordinates, setCurrentCoordinates] = React.useState<{
+        lat: number
+        lng: number
+    } | null>(null)
+    const [selectedCoords, setSelectedCoords] = React.useState<{
+        lat: number
+        lng: number
+    } | null>(null)
+    const [isAddressModalOpen, setIsAddressModalOpen] =
+        React.useState<boolean>(false)
+    const [addressSearchQuery, setAddressSearchQuery] =
+        React.useState<string>("")
+    const [modalRoadAddress, setModalRoadAddress] = React.useState<string>("")
+    const [addressModalError, setAddressModalError] = React.useState<
+        string | null
+    >(null)
+    const [isAddressModalWorking, setIsAddressModalWorking] =
+        React.useState<boolean>(false)
+    const [isReverseGeocoding, setIsReverseGeocoding] =
+        React.useState<boolean>(false)
+    const [isApplyingAddress, setIsApplyingAddress] =
+        React.useState<boolean>(false)
     const [loading, setLoading] = React.useState(false)
     const [saving, setSaving] = React.useState(false)
     const autoSaveTimerRef = React.useRef<number | null>(null)
     const skipNextAutoSaveRef = React.useRef<boolean>(true)
     const latestSaveRef = React.useRef<() => Promise<void>>(async () => {})
+    const mapContainerRef = React.useRef<HTMLDivElement | null>(null)
+    const modalMapRef = React.useRef<any>(null)
+    const modalMarkerRef = React.useRef<any>(null)
+    const naverClientIdRef = React.useRef<string>("")
+    const naverScriptPromiseRef = React.useRef<Promise<void> | null>(null)
+    const selectedCoordinatesRef = React.useRef<{
+        lat: number
+        lng: number
+    } | null>(null)
     // 공용 알림 사용을 위해 setError/setSuccess로 변경
 
-    // 다음 Postcode API와 Google Maps API 타입 정의
-    interface DaumPostcodeData {
-        address: string
-        roadAddress: string
-        jibunAddress: string
-        zonecode: string
-        addressType: string
-        bname: string
-        buildingName: string
-    }
+    const updateModalPosition = React.useCallback(() => {
+        if (typeof window === "undefined") return
+        const buttonEl = addressButtonRef.current
+        if (!buttonEl) return
 
-    interface GoogleGeocodeResult {
-        geometry: {
-            location: {
-                lat: () => number
-                lng: () => number
-            }
+        const rect = buttonEl.getBoundingClientRect()
+        const viewportWidth =
+            window.innerWidth ||
+            (typeof document !== "undefined"
+                ? document.documentElement?.clientWidth
+                : undefined) ||
+            rect.left + rect.width
+        const horizontalMargin = 16
+        const availableWidth = viewportWidth - horizontalMargin * 2
+        const width =
+            availableWidth > 0
+                ? Math.min(rect.width, 360, availableWidth)
+                : Math.min(rect.width, 360)
+        const finalWidth = width > 0 ? width : rect.width
+        const idealLeft = rect.left + (rect.width - finalWidth) / 2
+        let maxLeft = viewportWidth - finalWidth - horizontalMargin
+        if (maxLeft < horizontalMargin) {
+            maxLeft = horizontalMargin
         }
+        const clampedLeft = Math.min(
+            Math.max(idealLeft, horizontalMargin),
+            maxLeft
+        )
+
+        const viewportHeight =
+            window.innerHeight ||
+            (typeof document !== "undefined"
+                ? document.documentElement?.clientHeight
+                : undefined) ||
+            rect.bottom + 8
+        const maxTop = viewportHeight - horizontalMargin
+        const desiredTop = rect.bottom + 8
+        const clampedTop =
+            maxTop > horizontalMargin
+                ? Math.min(
+                      Math.max(desiredTop, horizontalMargin),
+                      maxTop
+                  )
+                : desiredTop
+
+        const nextPosition = {
+            top: clampedTop,
+            left: clampedLeft,
+            width: finalWidth,
+        }
+
+        setModalPosition((prev) => {
+            if (
+                prev &&
+                Math.abs(prev.top - nextPosition.top) < 0.5 &&
+                Math.abs(prev.left - nextPosition.left) < 0.5 &&
+                Math.abs(prev.width - nextPosition.width) < 0.5
+            ) {
+                return prev
+            }
+            return nextPosition
+        })
+    }, [])
+
+    const DEFAULT_MAP_CENTER = { lat: 37.3595316, lng: 127.1052133 }
+
+    function hasArea(area: any): boolean {
+        return !!(area && area.name && area.name !== "")
     }
 
-    // 다음 Postcode API 스크립트 로드 (싱글톤 패턴 및 안전한 로딩)
-    const loadDaumPostcodeScript = (): Promise<void> => {
-        return new Promise((resolve, reject) => {
-            // 이미 로드된 경우 즉시 resolve
-            if ((window as any).daum && (window as any).daum.Postcode) {
-                resolve()
-                return
+    function hasData(data: any): boolean {
+        return !!(data && data !== "")
+    }
+
+    function checkLastString(word: string, lastString: string): boolean {
+        return new RegExp(`${lastString}$`).test(word)
+    }
+
+    function hasAddition(addition: any): boolean {
+        return !!(addition && addition.value)
+    }
+
+    function makeAddress(item: any): string {
+        if (!item) {
+            return ""
+        }
+
+        const name = item.name
+        const region = item.region || {}
+        const land = item.land || {}
+        const isRoadAddress = name === "roadaddr"
+
+        let sido = ""
+        let sigugun = ""
+        let dongmyun = ""
+        let ri = ""
+        let rest = ""
+
+        if (hasArea(region.area1)) {
+            sido = region.area1.name
+        }
+        if (hasArea(region.area2)) {
+            sigugun = region.area2.name
+        }
+        if (hasArea(region.area3)) {
+            dongmyun = region.area3.name
+        }
+        if (hasArea(region.area4)) {
+            ri = region.area4.name
+        }
+
+        if (land) {
+            if (hasData(land.number1)) {
+                if (hasData(land.type) && land.type === "2") {
+                    rest += "산"
+                }
+                rest += land.number1
+                if (hasData(land.number2)) {
+                    rest += `-${land.number2}`
+                }
             }
 
-            // 글로벌 로딩 상태 확인 (싱글톤 패턴)
-            if ((window as any).__daumPostcodeLoading) {
-                // 이미 로딩 중이면 완료될 때까지 대기
-                const checkDaumAPI = () => {
-                    if ((window as any).daum && (window as any).daum.Postcode) {
-                        resolve()
-                    } else if ((window as any).__daumPostcodeLoading) {
-                        setTimeout(checkDaumAPI, 100)
+            if (isRoadAddress) {
+                if (land.name) {
+                    if (checkLastString(dongmyun, "면")) {
+                        ri = land.name
                     } else {
-                        reject(new Error("다음 Postcode API 로드 실패"))
+                        dongmyun = land.name
+                        ri = ""
                     }
                 }
-                checkDaumAPI()
-                return
-            }
 
-            // 기존 스크립트가 있는지 확인
-            const existingScript = document.querySelector(
-                'script[src*="mapjsapi/bundle/postcode"]'
-            )
-            if (existingScript) {
-                // 기존 스크립트가 로드 완료될 때까지 대기
-                const checkDaumAPI = () => {
-                    if ((window as any).daum && (window as any).daum.Postcode) {
-                        resolve()
-                    } else {
-                        setTimeout(checkDaumAPI, 100)
-                    }
+                if (hasAddition(land.addition0)) {
+                    rest += ` ${land.addition0.value}`
                 }
-                checkDaumAPI()
-                return
             }
-
-            // 로딩 시작 플래그 설정
-            ;(window as any).__daumPostcodeLoading = true
-
-            const script = document.createElement("script")
-            script.src =
-                "https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"
-            script.async = true
-            script.defer = true
-
-            // 타임아웃 설정 (10초)
-            const timeoutId = setTimeout(() => {
-                ;(window as any).__daumPostcodeLoading = false
-                reject(new Error("다음 Postcode API 로드 타임아웃"))
-            }, 10000)
-
-            script.onload = () => {
-                clearTimeout(timeoutId)
-                // API가 완전히 초기화될 때까지 잠시 대기
-                setTimeout(() => {
-                    ;(window as any).__daumPostcodeLoading = false
-                    if ((window as any).daum && (window as any).daum.Postcode) {
-                        resolve()
-                    } else {
-                        reject(new Error("다음 Postcode API 초기화 실패"))
-                    }
-                }, 200)
-            }
-
-            script.onerror = () => {
-                clearTimeout(timeoutId)
-                ;(window as any).__daumPostcodeLoading = false
-                reject(new Error("다음 Postcode API 로드 실패"))
-            }
-
-            document.head.appendChild(script)
-        })
-    }
-
-   // 주소를 좌표로 변환 (Naver 지오코딩 API 사용)
-    const geocodeAddress = (
-        address: string
-    ): Promise<{ lat: number; lng: number }> => {
-        return new Promise((resolve, reject) => {
-            console.log("geocodeAddress 호출됨 - 주소:", address)
-
-            if (!address.trim()) {
-                reject(new Error("주소가 비어있습니다"))
-                return
-            }
-
-            console.log("Naver 지오코딩 API 호출 중...")
-
-            // 타임아웃 설정 (8초)
-            const timeoutId = setTimeout(() => {
-                console.error("주소 변환 타임아웃 (8초)")
-                reject(new Error("주소 변환 타임아웃"))
-            }, 8000)
-
-            // 서버의 Naver 지오코딩 프록시 API 호출
-            fetch("https://wedding-admin-proxy.vercel.app/api/map-config", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ query: address }),
-                signal: AbortSignal.timeout(8000),
-            })
-                .then((response) => {
-                    clearTimeout(timeoutId)
-                    console.log("Naver API 응답 상태:", response.status)
-
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-                    }
-                    return response.json()
-                })
-                .then((data) => {
-                    console.log("Naver API 응답 데이터:", data)
-
-                    if (!data.addresses || data.addresses.length === 0) {
-                        console.error("Naver 지오코딩 결과 없음 - 주소:", address)
-                        reject(new Error("검색 결과가 없습니다"))
-                        return
-                    }
-
-                    const addr = data.addresses[0]
-                    const coordinates = {
-                        lat: parseFloat(addr.y),
-                        lng: parseFloat(addr.x),
-                    }
-
-                    if (isNaN(coordinates.lat) || isNaN(coordinates.lng)) {
-                        console.error("좌표 파싱 실패:", addr)
-                        reject(new Error("좌표 변환 실패"))
-                        return
-                    }
-
-                    console.log("좌표 변환 성공:", coordinates)
-                    resolve(coordinates)
-                })
-                .catch((error) => {
-                    clearTimeout(timeoutId)
-                    console.error("Naver 지오코딩 API 호출 실패:", error)
-                    reject(new Error(`주소 변환 실패: ${error.message}`))
-                })
-        })
-    }
-
-    // 다음 주소 검색 레이어 닫기
-    const closeDaumPostcode = () => {
-        if (typeof document === "undefined") return
-        const element_layer = document.getElementById("addressLayer")
-        if (element_layer) {
-            element_layer.style.display = "none"
         }
-        if (typeof window !== "undefined") {
-            addressLayerCleanupRef.current?.()
-            addressLayerCleanupRef.current = null
-        }
+
+        return [sido, sigugun, dongmyun, ri, rest]
+            .filter((segment) => segment && segment.trim() !== "")
+            .join(" ")
+            .trim()
     }
 
-    // 레이어 위치 초기화
-    const initLayerPosition = () => {
-        const width = 300
-        const height = 400
-        const borderWidth = 5
-
-        const element_layer = document.getElementById("addressLayer")
-        if (element_layer) {
-            element_layer.style.width = width + "px"
-            element_layer.style.height = height + "px"
-            element_layer.style.border = borderWidth + "px solid"
-
-            // 모바일 환경에서 화면 크기 제한
-            const maxWidth = Math.min(width, window.innerWidth * 0.9)
-            const maxHeight = Math.min(height, window.innerHeight * 0.7)
-
-            element_layer.style.width = Math.max(maxWidth, 280) + "px"
-            element_layer.style.height = Math.max(maxHeight, 350) + "px"
-
-            // 화면 중앙에 위치
-            const left = Math.max(10, (window.innerWidth - maxWidth) / 2)
-            const top = Math.max(10, (window.innerHeight - maxHeight) / 2)
-
-            element_layer.style.left = left + "px"
-            element_layer.style.top = top + "px"
-            element_layer.style.transform = "none"
+    async function ensureNaverMapScript(): Promise<void> {
+        if (typeof window === "undefined") {
+            return
         }
-    }
 
-    // 다음 Postcode API 레이어 열기 (안전한 에러 처리)
-    const openDaumPostcode = async () => {
-        try {
-            // 타임아웃 설정 (전체 작업 30초 제한)
-            const timeoutPromise = new Promise((_, reject) => {
-                setTimeout(
-                    () => reject(new Error("주소 검색 초기화 타임아웃")),
-                    30000
-                )
-            })
+        const win = window as any
+        if (win.naver && win.naver.maps && win.naver.maps.Service) {
+            return
+        }
 
-            const initPromise = Promise.all([
-                loadDaumPostcodeScript(),
-            ]).then(() => {
-                // API 로드 완료 후 충분한 대기 시간 (안정성 확보)
-                return new Promise((resolve) => setTimeout(resolve, 1500))
-            })
+        if (naverScriptPromiseRef.current) {
+            await naverScriptPromiseRef.current
+            return
+        }
 
-            await Promise.race([initPromise, timeoutPromise])
+        const loader = (async () => {
+            let clientId = naverClientIdRef.current
+            if (!clientId) {
+                try {
+                    const res = await fetch(
+                        `${PROXY_BASE_URL}/api/map-config`,
+                        {
+                            method: "GET",
+                            headers: {
+                                "Content-Type": "application/json",
+                            },
+                        }
+                    )
 
-            console.log("주소 검색 API 로드 완료 확인됨")
-
-            const element_layer = document.getElementById("addressLayer")
-            if (!element_layer) {
-                console.error("주소 검색 레이어를 찾을 수 없습니다.")
-                return
+                    if (res.ok) {
+                        const json = await res.json()
+                        clientId =
+                            json?.data?.naverMapsKey ||
+                            json?.data?.naverClientId ||
+                            ""
+                        naverClientIdRef.current = clientId
+                    }
+                } catch (error) {
+                    console.warn("네이버 지도 키 조회 실패:", error)
+                }
             }
 
-            new (window as any).daum.Postcode({
-                oncomplete: async (data: DaumPostcodeData) => {
-                    const newBaseAddress = data.roadAddress || data.jibunAddress
-                    setBaseAddress(newBaseAddress)
-                    // 상세주소는 사용자가 별도 입력 (state 유지)
-                    const fullAddress = detailAddress
-                        ? `${newBaseAddress} ${detailAddress}`.trim()
-                        : newBaseAddress
-                    setVenue_address(fullAddress)
-                    // 도로명 주소 검색 완료 시 입력 버튼 사용 가능하도록 초기화
-                    setAddressInputUsed(false)
-                    // 도로명 주소 검색 완료 표시
-                    setAddressSearched(true)
+            if (!clientId) {
+                clientId =
+                    process.env.REACT_APP_X_NCP_APIGW_API_KEY ||
+                    process.env.X_NCP_APIGW_API_KEY ||
+                    ""
+                if (!clientId) {
+                    console.warn("환경변수가 설정되지 않았습니다.")
+                }
+                naverClientIdRef.current = clientId
+            }
 
-                    try {
-                        // 주소를 좌표로 변환 (타임아웃 10초)
-                        console.log("좌표 변환 시작 - 주소:", newBaseAddress)
-                        const coordinatesPromise = geocodeAddress(newBaseAddress)
-                        const timeoutPromise = new Promise<never>(
-                            (_, reject) => {
-                                setTimeout(
-                                    () =>
-                                        reject(new Error("좌표 변환 타임아웃")),
-                                    10000
-                                )
-                            }
-                        )
+            await new Promise<void>((resolve, reject) => {
+                const existingScript =
+                    document.querySelector<HTMLScriptElement>(
+                        'script[src*="https://oapi.map.naver.com/openapi/v3/maps.js"]'
+                    )
 
-                        const coordinates = await Promise.race([
-                            coordinatesPromise,
-                            timeoutPromise,
-                        ])
-                        console.log("좌표 변환 성공:", coordinates)
-
-                        // 페이지 설정에 좌표 저장
-                        await saveCoordinatesToServer(
-                            coordinates.lat,
-                            coordinates.lng,
-                            fullAddress
-                        )
-
-                        console.log(
-                            `주소와 좌표가 모두 설정되었습니다: ${fullAddress}`
-                        )
-                    } catch (error) {
-                        // 좌표 변환 실패해도 주소는 저장
-                        console.warn("좌표 변환 실패:", error)
-                        try {
-                            await saveCoordinatesToServer(0, 0, fullAddress)
-                            console.log(
-                                `주소가 설정되었습니다: ${fullAddress} (좌표 변환 실패)`
-                            )
-                        } catch (saveError) {
-                            console.error(
-                                "주소 설정에 실패했습니다. 다시 시도해주세요.",
-                                saveError
-                            )
+                if (existingScript) {
+                    const waitForReady = () => {
+                        const ready = window as any
+                        if (
+                            ready.naver &&
+                            ready.naver.maps &&
+                            ready.naver.maps.Service
+                        ) {
+                            resolve()
+                        } else {
+                            setTimeout(waitForReady, 50)
                         }
                     }
-
-                    // 레이어 닫기
-                    closeDaumPostcode()
-                },
-                width: "100%",
-                height: "100%",
-                maxSuggestItems: 5,
-                theme: {
-                    // 가이드 권장 테마 적용 (검색창/테두리 등)
-                    borderColor: "#AEAEAE",
-                    emphTextColor: "#111827",
-                    pageBgColor: "#FFFFFF",
-                    bgColor: "#FFFFFF",
-                    queryTextColor: "#111827",
-                    outlineColor: "#AEAEAE",
-                },
-            }).embed(element_layer)
-
-            // 레이어 보이기
-            element_layer.style.display = "block"
-
-            // 레이어 위치 초기화
-            initLayerPosition()
-
-            // 브라우저 크기 변경 시 레이어 위치 재조정
-            const handleResize = () => {
-                initLayerPosition()
-            }
-
-            // 기존 리스너가 있다면 먼저 정리
-            addressLayerCleanupRef.current?.()
-
-            window.addEventListener("resize", handleResize)
-            window.addEventListener("orientationchange", handleResize)
-            addressLayerCleanupRef.current = () => {
-                window.removeEventListener("resize", handleResize)
-                window.removeEventListener("orientationchange", handleResize)
-            }
-        } catch (error) {
-            // Google Maps API 실패 시 주소만 저장하는 폴백
-            try {
-                const fallbackAddress = prompt(
-                    "지도 API 로드에 실패했습니다. 주소를 직접 입력해주세요:"
-                )
-                if (fallbackAddress && fallbackAddress.trim()) {
-                    setVenue_address(fallbackAddress.trim())
-                    await saveCoordinatesToServer(0, 0, fallbackAddress.trim())
-                    console.log(
-                        `주소가 설정되었습니다: ${fallbackAddress} (수동 입력)`
-                    )
-                } else {
-                    console.warn("주소가 입력되지 않았습니다.")
+                    waitForReady()
+                    return
                 }
-            } catch (fallbackError) {
-                console.error("주소 검색 및 입력에 실패했습니다.")
+
+                const script = document.createElement("script")
+                script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${clientId}&submodules=geocoder`
+                script.async = true
+                script.onload = () => {
+                    setTimeout(resolve, 200)
+                }
+                script.onerror = () => {
+                    reject(
+                        new Error("네이버 지도 스크립트 로드에 실패했습니다.")
+                    )
+                }
+                document.head.appendChild(script)
+            })
+
+            const winAfter = window as any
+            winAfter.navermap_authFailure = function () {
+                console.error("네이버 지도 API 인증 실패")
             }
+        })()
+
+        naverScriptPromiseRef.current = loader
+
+        try {
+            await loader
+        } finally {
+            naverScriptPromiseRef.current = null
         }
     }
- 
+
+    function closeAddressModal(): void {
+        setIsAddressModalOpen(false)
+        setIsAddressModalWorking(false)
+        setIsApplyingAddress(false)
+        setIsReverseGeocoding(false)
+        setAddressModalError(null)
+        setModalPosition(null)
+
+        if (typeof window !== "undefined") {
+            addressLayerCleanupRef.current?.()
+        }
+        addressLayerCleanupRef.current = null
+    }
+
+    // 지도 리사이즈를 통한 강제 렌더링 트리거
+    function triggerMapRefresh(): void {
+        if (!modalMapRef.current) return
+
+        requestAnimationFrame(() => {
+            try {
+                // 지도 리사이즈 이벤트를 발생시켜 전체 레이어 재렌더링
+                const win = window as any
+                if (win.naver?.maps?.Event) {
+                    win.naver.maps.Event.trigger(modalMapRef.current, "resize")
+                }
+            } catch (e) {
+                console.warn("지도 새로고침 실패:", e)
+            }
+        })
+    }
+
+    // 마커를 완전히 재생성하는 함수
+    function recreateMarker(position: any): void {
+        const win = window as any
+        if (!win?.naver?.maps || !modalMapRef.current) return
+
+        // 기존 마커 완전히 제거
+        if (modalMarkerRef.current) {
+            try {
+                modalMarkerRef.current.setMap(null)
+                modalMarkerRef.current = null
+            } catch (e) {
+                console.warn("마커 제거 실패:", e)
+            }
+        }
+
+        // 새 마커 생성
+        try {
+            modalMarkerRef.current = new win.naver.maps.Marker({
+                position: position,
+                map: modalMapRef.current,
+                clickable: false,
+                draggable: false,
+                zIndex: 1000,
+                icon: {
+                    content: [
+                        '<div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:1000;">',
+                        '<img src="https://cdn.roarc.kr/framer/LocationIcon/map-marker.svg" width="40" height="50" style="display:block;animation:float 2s ease-in-out infinite;transform-origin:left top;" />',
+                        "<style>",
+                        "@keyframes float {",
+                        "0%, 100% { transform: translateY(0px); }",
+                        "50% { transform: translateY(-3px); }",
+                        "}",
+                        "</style>",
+                        "</div>",
+                    ].join(""),
+                    anchor: new win.naver.maps.Point(0, 0),
+                },
+            })
+        } catch (e) {
+            console.error("마커 생성 실패:", e)
+        }
+
+        // 마커 생성 후 지도 새로고침
+        triggerMapRefresh()
+    }
+
+    function reverseGeocodeFromLatLng(latlng: any): void {
+        const win = window as any
+        if (!win?.naver?.maps?.Service || !latlng) {
+            return
+        }
+
+        setIsReverseGeocoding(true)
+
+        win.naver.maps.Service.reverseGeocode(
+            {
+                coords: latlng,
+                orders: [win.naver.maps.Service.OrderType.ROAD_ADDR].join(","),
+            },
+            (status: string, response: any) => {
+                setIsReverseGeocoding(false)
+
+                if (status !== win.naver.maps.Service.Status.OK) {
+                    setModalRoadAddress("")
+                    setAddressModalError("좌표에서 주소를 찾지 못했습니다.")
+                    return
+                }
+
+                const items = response?.v2?.results ?? []
+                let road = ""
+                for (const item of items) {
+                    const formatted = makeAddress(item)
+                    if (item.name === "roadaddr" && formatted) {
+                        road = formatted
+                        break
+                    }
+                }
+
+                setModalRoadAddress(road)
+                setAddressModalError(
+                    road ? null : "도로명 주소를 찾지 못했습니다."
+                )
+            }
+        )
+    }
+
+    function initializeModalMap(centerOverride?: {
+        lat: number
+        lng: number
+    }): void {
+        const win = window as any
+        if (!win?.naver?.maps) {
+            throw new Error("네이버 지도 API가 준비되지 않았습니다.")
+        }
+        if (!mapContainerRef.current) {
+            throw new Error("지도 컨테이너를 찾을 수 없습니다.")
+        }
+
+        const baseCandidate =
+            centerOverride ??
+            selectedCoords ??
+            currentCoordinates ??
+            DEFAULT_MAP_CENTER
+
+        const lat = Number.isFinite(baseCandidate.lat)
+            ? baseCandidate.lat
+            : DEFAULT_MAP_CENTER.lat
+        const lng = Number.isFinite(baseCandidate.lng)
+            ? baseCandidate.lng
+            : DEFAULT_MAP_CENTER.lng
+        const center = new win.naver.maps.LatLng(lat, lng)
+
+        // 지도 초기화
+        if (!modalMapRef.current) {
+            modalMapRef.current = new win.naver.maps.Map(
+                mapContainerRef.current,
+                {
+                    center,
+                    zoom: 17,
+                    scaleControl: false,
+                    logoControl: true,
+                    mapDataControl: false,
+                    zoomControl: true,
+                    zoomControlOptions: {
+                        position: win.naver.maps.Position.TOP_RIGHT,
+                    },
+                    draggable: true,
+                    pinchZoom: true,
+                    scrollWheel: true,
+                    keyboardShortcuts: false,
+                    disableDoubleTapZoom: false,
+                    disableDoubleClickZoom: false,
+                    disableTwoFingerTapZoom: false,
+                }
+            )
+            modalMapRef.current.setCursor("pointer")
+
+            // 지도 로드 완료 후 초기 렌더링 트리거
+            setTimeout(() => {
+                triggerMapRefresh()
+            }, 300)
+        } else {
+            modalMapRef.current.setCenter(center)
+        }
+
+        // 마커 생성
+        recreateMarker(center)
+
+        setSelectedCoords({ lat, lng })
+        selectedCoordinatesRef.current = { lat, lng }
+
+        // 기존 이벤트 리스너 정리
+        addressLayerCleanupRef.current?.()
+        const listeners: any[] = []
+
+        // idle 이벤트
+        const handleIdle = () => {
+            if (!modalMapRef.current) return
+            const idleCenter = modalMapRef.current.getCenter()
+            if (!idleCenter) return
+
+            const nextLat = idleCenter.lat()
+            const nextLng = idleCenter.lng()
+            setSelectedCoords({ lat: nextLat, lng: nextLng })
+            selectedCoordinatesRef.current = { lat: nextLat, lng: nextLng }
+
+            // 마커 재생성
+            recreateMarker(idleCenter)
+
+            // 주소 검색
+            reverseGeocodeFromLatLng(idleCenter)
+        }
+
+        // click 이벤트
+        const handleClick = (event: any) => {
+            if (!modalMapRef.current || !event?.coord) return
+            modalMapRef.current.panTo(event.coord)
+        }
+
+        // zoom_changed 이벤트 - 마커와 InfoWindow 재생성
+        const handleZoomChanged = () => {
+            setTimeout(() => {
+                const currentCenter = modalMapRef.current?.getCenter()
+                if (currentCenter) {
+                    recreateMarker(currentCenter)
+                    triggerMapRefresh()
+                }
+            }, 100)
+        }
+
+        // dragend 이벤트
+        const handleDragEnd = () => {
+            setTimeout(() => {
+                triggerMapRefresh()
+            }, 50)
+        }
+
+        // tilesloaded 이벤트 - 타일 로드 완료 후 마커 재표시
+        const handleTilesLoaded = () => {
+            const currentCenter = modalMapRef.current?.getCenter()
+            if (currentCenter && modalMarkerRef.current) {
+                // 마커 위치 재설정
+                modalMarkerRef.current.setPosition(currentCenter)
+            }
+        }
+
+        listeners.push(
+            win.naver.maps.Event.addListener(
+                modalMapRef.current,
+                "idle",
+                handleIdle
+            )
+        )
+        listeners.push(
+            win.naver.maps.Event.addListener(
+                modalMapRef.current,
+                "click",
+                handleClick
+            )
+        )
+        listeners.push(
+            win.naver.maps.Event.addListener(
+                modalMapRef.current,
+                "zoom_changed",
+                handleZoomChanged
+            )
+        )
+        listeners.push(
+            win.naver.maps.Event.addListener(
+                modalMapRef.current,
+                "dragend",
+                handleDragEnd
+            )
+        )
+        listeners.push(
+            win.naver.maps.Event.addListener(
+                modalMapRef.current,
+                "tilesloaded",
+                handleTilesLoaded
+            )
+        )
+
+        // cleanup 함수
+        addressLayerCleanupRef.current = () => {
+            listeners.forEach((listener) => {
+                try {
+                    win.naver.maps.Event.removeListener(listener)
+                } catch (e) {
+                    console.warn("이벤트 리스너 제거 실패:", e)
+                }
+            })
+            if (modalMarkerRef.current) {
+                try {
+                    modalMarkerRef.current.setMap(null)
+                } catch (e) {
+                    console.warn("마커 제거 실패:", e)
+                }
+            }
+            addressLayerCleanupRef.current = null
+        }
+
+        // 초기 주소 조회
+        setTimeout(() => {
+            reverseGeocodeFromLatLng(center)
+        }, 400)
+    }
+
+    function openAddressModal(): void {
+        setAddressModalError(null)
+        updateModalPosition()
+        setIsAddressModalOpen(true)
+    }
+
+    function handleAddressSearch(
+        event?: React.FormEvent<HTMLFormElement>
+    ): void {
+        event?.preventDefault()
+
+        const query = addressSearchQuery.trim()
+        if (!query) {
+            setAddressModalError("검색할 주소를 입력해주세요.")
+            return
+        }
+
+        const win = window as any
+        if (!win?.naver?.maps?.Service) {
+            setAddressModalError("네이버 지도 서비스가 준비되지 않았습니다.")
+            return
+        }
+
+        setIsAddressModalWorking(true)
+        setAddressModalError(null)
+
+        win.naver.maps.Service.geocode(
+            { query },
+            (status: string, response: any) => {
+                setIsAddressModalWorking(false)
+
+                if (status !== win.naver.maps.Service.Status.OK) {
+                    setAddressModalError("주소 검색에 실패했습니다.")
+                    return
+                }
+
+                if (!response?.v2?.addresses?.length) {
+                    setAddressModalError("검색 결과가 없습니다.")
+                    return
+                }
+
+                const address = response.v2.addresses[0]
+                const lat = parseFloat(address.y)
+                const lng = parseFloat(address.x)
+
+                if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+                    setAddressModalError("좌표 정보를 확인할 수 없습니다.")
+                    return
+                }
+
+                const position = new win.naver.maps.LatLng(lat, lng)
+
+                if (!modalMapRef.current) {
+                    initializeModalMap({ lat, lng })
+                } else {
+                    modalMapRef.current.setCenter(position)
+                    modalMapRef.current.setZoom(17)
+
+                    setSelectedCoords({ lat, lng })
+                    selectedCoordinatesRef.current = { lat, lng }
+
+                    // 마커 재생성
+                    recreateMarker(position)
+                }
+
+                const road = address.roadAddress || ""
+                setModalRoadAddress(road)
+                setAddressModalError(
+                    road ? null : "도로명 주소를 찾지 못했습니다."
+                )
+
+                if (road) {
+                    setAddressSearchQuery(road)
+                }
+            }
+        )
+    }
+
+    async function applyAddressSelection(): Promise<void> {
+        if (isApplyingAddress) return
+
+        const coords = selectedCoordinatesRef.current
+        const chosenAddress = modalRoadAddress || addressSearchQuery.trim()
+
+        if (!coords || !chosenAddress) {
+            setAddressModalError("주소 검색 후 지도를 위치시켜 주세요.")
+            return
+        }
+
+        setIsApplyingAddress(true)
+        try {
+            const trimmedAddress = chosenAddress.trim()
+            setBaseAddress(trimmedAddress)
+            const fullAddress = detailAddress
+                ? `${trimmedAddress} ${detailAddress}`.trim()
+                : trimmedAddress
+
+            setVenue_address(fullAddress)
+            setAddressInputUsed(false)
+            setAddressSearched(true)
+
+            await saveCoordinatesToServer(coords.lat, coords.lng, fullAddress)
+
+            setCurrentCoordinates({ lat: coords.lat, lng: coords.lng })
+            setSelectedCoords({ lat: coords.lat, lng: coords.lng })
+            selectedCoordinatesRef.current = {
+                lat: coords.lat,
+                lng: coords.lng,
+            }
+
+            closeAddressModal()
+        } catch (error) {
+            console.error("주소 저장 실패:", error)
+            setAddressModalError(
+                error instanceof Error
+                    ? error.message
+                    : "주소 저장에 실패했습니다."
+            )
+        } finally {
+            setIsApplyingAddress(false)
+        }
+    }
+
+    React.useEffect(() => {
+        if (!isAddressModalOpen) {
+            return
+        }
+
+        let cancelled = false
+
+        const init = async () => {
+            try {
+                setIsAddressModalWorking(true)
+                setAddressModalError(null)
+                await ensureNaverMapScript()
+                if (cancelled) return
+
+                await new Promise((resolve) => setTimeout(resolve, 150))
+                if (cancelled) return
+
+                initializeModalMap()
+            } catch (error) {
+                if (cancelled) return
+                console.error("주소 검색 모달 초기화 실패:", error)
+                setAddressModalError(
+                    error instanceof Error
+                        ? error.message
+                        : "주소 검색 초기화에 실패했습니다."
+                )
+            } finally {
+                if (!cancelled) {
+                    setIsAddressModalWorking(false)
+                }
+            }
+        }
+
+        void init()
+
+        return () => {
+            cancelled = true
+        }
+    }, [isAddressModalOpen])
+
+    React.useEffect(() => {
+        if (!isAddressModalOpen) return
+
+        if (baseAddress) {
+            setAddressSearchQuery(baseAddress)
+        } else if (venue_address) {
+            setAddressSearchQuery(venue_address)
+        } else {
+            setAddressSearchQuery("")
+        }
+    }, [isAddressModalOpen, baseAddress, venue_address])
+
+    React.useEffect(() => {
+        if (!isAddressModalOpen) {
+            return
+        }
+        if (typeof window === "undefined") {
+            return
+        }
+
+        const handleRelayout = () => {
+            updateModalPosition()
+        }
+
+        updateModalPosition()
+
+        window.addEventListener("scroll", handleRelayout, true)
+        window.addEventListener("resize", handleRelayout)
+
+        return () => {
+            window.removeEventListener("scroll", handleRelayout, true)
+            window.removeEventListener("resize", handleRelayout)
+        }
+    }, [isAddressModalOpen, updateModalPosition])
+
+    React.useEffect(() => {
+        if (!isAddressModalOpen || !currentCoordinates) return
+
+        const win = window as any
+        if (!win?.naver?.maps || !modalMapRef.current) return
+
+        const position = new win.naver.maps.LatLng(
+            currentCoordinates.lat,
+            currentCoordinates.lng
+        )
+
+        modalMapRef.current.setCenter(position)
+
+        setSelectedCoords(currentCoordinates)
+        selectedCoordinatesRef.current = currentCoordinates
+
+        // 마커 재생성
+        setTimeout(() => {
+            recreateMarker(position)
+            reverseGeocodeFromLatLng(position)
+        }, 200)
+    }, [isAddressModalOpen, currentCoordinates])
 
     // 서버에 좌표 저장
-    const saveCoordinatesToServer = async (
+    async function saveCoordinatesToServer(
         lat: number,
         lng: number,
         address: string
-    ) => {
+    ): Promise<void> {
         const token = tokenGetter()
         if (!token) {
             throw new Error("로그인이 필요합니다")
@@ -15509,6 +15990,9 @@ function TransportTab({
                 venue_lng: lng,
             }))
         }
+        setCurrentCoordinates({ lat, lng })
+        setSelectedCoords({ lat, lng })
+        selectedCoordinatesRef.current = { lat, lng }
     }
 
     React.useEffect(() => {
@@ -15617,15 +16101,18 @@ function TransportTab({
                         )
                         const fullAddress = String(result.venue_address || "")
                         setVenue_address(fullAddress)
-                        
+
                         // 주소를 기본 주소와 상세 주소로 분리
                         // 마지막 공백을 기준으로 분리 (일반적인 한국 주소 패턴)
-                        const addressParts = fullAddress.split(' ')
+                        const addressParts = fullAddress.split(" ")
                         if (addressParts.length > 1) {
-                            const lastPart = addressParts[addressParts.length - 1]
+                            const lastPart =
+                                addressParts[addressParts.length - 1]
                             // 마지막 부분이 숫자나 특수문자로 시작하면 상세 주소로 간주
                             if (/^[0-9\-]/.test(lastPart)) {
-                                setBaseAddress(addressParts.slice(0, -1).join(' '))
+                                setBaseAddress(
+                                    addressParts.slice(0, -1).join(" ")
+                                )
                                 setDetailAddress(lastPart)
                             } else {
                                 setBaseAddress(fullAddress)
@@ -15634,6 +16121,51 @@ function TransportTab({
                         } else {
                             setBaseAddress(fullAddress)
                             setDetailAddress("")
+                        }
+                    }
+
+                    if (mounted) {
+                        try {
+                            const settingsRes = await request(
+                                `/api/page-settings?pageId=${encodeURIComponent(pageId)}`
+                            )
+                            if (settingsRes.ok) {
+                                const settingsJson = await settingsRes.json()
+                                const data = settingsJson?.data
+                                const rawLat = data?.venue_lat
+                                const rawLng = data?.venue_lng
+                                const latValue =
+                                    rawLat === null || rawLat === undefined
+                                        ? NaN
+                                        : typeof rawLat === "number"
+                                          ? rawLat
+                                          : parseFloat(String(rawLat))
+                                const lngValue =
+                                    rawLng === null || rawLng === undefined
+                                        ? NaN
+                                        : typeof rawLng === "number"
+                                          ? rawLng
+                                          : parseFloat(String(rawLng))
+
+                                if (
+                                    mounted &&
+                                    Number.isFinite(latValue) &&
+                                    Number.isFinite(lngValue)
+                                ) {
+                                    const coords = {
+                                        lat: latValue,
+                                        lng: lngValue,
+                                    }
+                                    setCurrentCoordinates(coords)
+                                    setSelectedCoords(coords)
+                                    selectedCoordinatesRef.current = coords
+                                }
+                            }
+                        } catch (coordError) {
+                            console.warn(
+                                "좌표 정보를 불러오지 못했습니다:",
+                                coordError
+                            )
                         }
                     }
                 } else if (mounted) {
@@ -15933,12 +16465,13 @@ function TransportTab({
                         marginTop: 16,
                     }}
                 >
-                    예식장 주소
+                    예식장 주소를 입력해주세요
                 </div>
                 {/* 도로명 주소 검색 버튼 - 한 줄 전체 */}
                 <button
+                    ref={addressButtonRef}
                     type="button"
-                    onClick={openDaumPostcode}
+                    onClick={openAddressModal}
                     style={{
                         width: "calc(100% * 1.1429)",
                         height: "calc(40px * 1.1429)",
@@ -15966,106 +16499,6 @@ function TransportTab({
                     도로명 주소 검색
                 </button>
 
-                {/* 상세주소 입력 + 입력 버튼 */}
-                <div
-                    style={{
-                        width: "calc(100% * 1.1429)",
-                        height: "calc(40px * 1.1429)",
-                        transform: "scale(0.875)",
-                        transformOrigin: "left center",
-                        display: "flex",
-                        gap: 6,
-                        marginBottom: -8,
-                    }}
-                >
-                    <input
-                        style={{
-                            flex: 1,
-                            height: "100%",
-                            borderRadius: 2,
-                            padding: "calc(12px * 1.1429)",
-                            paddingLeft: "calc(12px * 0.875)",
-                            background: addressSearched ? "#ffffff" : "#f5f5f5",
-                            border: `1px solid ${theme.color.border}`,
-                            outlineOffset: -0.25,
-                            fontSize: 16,
-                            fontFamily: theme.font.body,
-                            color: addressSearched
-                                ? detailAddress
-                                    ? "black"
-                                    : "#ADADAD"
-                                : "#999",
-                            cursor: addressSearched ? "text" : "pointer",
-                        }}
-                        placeholder={
-                            addressSearched
-                                ? "상세주소 입력"
-                                : "도로명 주소를 먼저 검색하세요"
-                        }
-                        value={detailAddress || ""}
-                        onChange={(e) => {
-                            if (!addressSearched) return
-                            setDetailAddress(e.target.value)
-                        }}
-                        onBlur={() => {
-                            if (detailAddress && detailAddress.trim()) {
-                                // 상세 주소 입력 완료 시 전체 주소 업데이트하고 입력칸 초기화
-                                const combined = `${baseAddress} ${detailAddress}`.trim()
-                                setVenue_address(combined)
-                                setDetailAddress("") // 입력 완료 후 초기화
-                            }
-                        }}
-                        onClick={() => {
-                            if (!addressSearched) {
-                                openDaumPostcode()
-                            }
-                        }}
-                        readOnly={!addressSearched}
-                    />
-                    <button
-                        type="button"
-                        onClick={() => {
-                            if (addressInputUsed || !addressSearched) return // 이미 사용된 경우 또는 주소 검색 전 무시
-
-                            if (detailAddress && detailAddress.trim()) {
-                                // 상세 주소 입력 완료 시 전체 주소 업데이트하고 입력칸 초기화
-                                const combined = `${baseAddress} ${detailAddress}`.trim()
-                                setVenue_address(combined)
-                                setDetailAddress("") // 입력 완료 후 초기화
-                                setAddressInputUsed(true) // 사용됨 표시
-                            }
-                        }}
-                        style={{
-                            width: 90,
-                            height: "100%",
-                            paddingLeft: 12,
-                            paddingRight: 12,
-                            paddingTop: 0,
-                            paddingBottom: 0,
-                            background:
-                                addressInputUsed || !addressSearched
-                                    ? "#f5f5f5"
-                                    : "white",
-                            border: `1px solid ${addressInputUsed || !addressSearched ? "#ccc" : theme.color.border}`,
-                            borderRadius: 2,
-                            cursor:
-                                addressInputUsed || !addressSearched
-                                    ? "not-allowed"
-                                    : "pointer",
-                            justifyContent: "center",
-                            alignItems: "center",
-                            display: "flex",
-                            fontSize: 14,
-                            fontFamily: theme.font.body,
-                            color:
-                                addressInputUsed || !addressSearched
-                                    ? "#999"
-                                    : "#333",
-                        }}
-                    >
-                        입력
-                    </button>
-                </div>
 
                 {/* 예식장 주소 + 삭제 버튼 */}
                 <div
@@ -16084,28 +16517,54 @@ function TransportTab({
                             height: "100%",
                             padding: "calc(12px * 1.1429)",
                             paddingLeft: "calc(12px * 0.875)",
-                            background: "#f5f5f5",
+                            background: venue_address ? "#ffffff" : "#f5f5f5",
                             border: `1px solid ${theme.color.border}`,
                             outlineOffset: -0.25,
                             borderRadius: 2,
                             fontSize: 16,
                             fontFamily: theme.font.body,
                             color: venue_address ? "black" : "#ADADAD",
-                            cursor: "pointer",
+                            cursor: venue_address ? "text" : "pointer",
                         }}
-                        placeholder="예식장 주소"
-                        value={venue_address}
-                        readOnly={true}
-                        onClick={openDaumPostcode}
-                        onChange={() => {}} // 직접 입력 방지
+                        placeholder={venue_address ? "상세 주소 입력 가능" : "예식장 주소"}
+                        value={venue_address || ""}
+                        onClick={() => {
+                            if (!venue_address) {
+                                openAddressModal()
+                            }
+                        }}
+                        onChange={(e) => {
+                            if (!venue_address) return // 주소 검색 전에는 입력 불가
+
+                            const newValue = e.target.value
+                            setVenue_address(newValue)
+
+                            // 주소가 변경되면 baseAddress와 detailAddress 분리
+                            if (baseAddress && newValue.startsWith(baseAddress)) {
+                                const detailPart = newValue.substring(baseAddress.length).trim()
+                                setDetailAddress(detailPart)
+                            }
+                        }}
+                        readOnly={!venue_address} // 주소가 없으면 클릭만 가능, 있으면 편집 가능
                     />
                     <button
                         type="button"
                         onClick={() => {
                             setVenue_address("")
+                            setBaseAddress("")
                             setDetailAddress("")
                             setAddressInputUsed(false) // 삭제 시 입력 버튼 상태 초기화
                             setAddressSearched(false) // 삭제 시 주소 검색 상태 초기화
+                            setModalRoadAddress("")
+                            setCurrentCoordinates(null)
+                            setSelectedCoords(null)
+                            selectedCoordinatesRef.current = null
+                            setAddressSearchQuery("")
+
+                            // 주소 검색 모달이 열려있는 경우 모달도 닫고 초기화
+                            if (isAddressModalOpen) {
+                                closeAddressModal()
+                            }
                         }}
                         style={{
                             width: 90,
@@ -16135,61 +16594,248 @@ function TransportTab({
                         </div>
                     </button>
                 </div>
-                {/* 다음 주소 검색 레이어 */}
+                {/* 주소 검색 모달 */}
                 <div
                     id="addressLayer"
                     style={{
-                        display: "none",
+                        display: isAddressModalOpen ? "flex" : "none",
                         position: "fixed",
-                        overflow: "hidden",
                         zIndex: 1000,
-                        WebkitOverflowScrolling: "touch",
-                        left: "50%",
-                        top: "50%",
-                        transform: "translate(-50%, -50%)",
-                        width: "100%",
-                        height: "400px",
-                        backgroundColor: "white",
-                        boxShadow: "0 10px 30px rgba(0, 0, 0, 0.3)",
-                        borderRadius: "2px",
-                        maxWidth: "95vw",
-                        maxHeight: "70vh",
+                        left: modalPosition ? modalPosition.left : "50%",
+                        top: modalPosition ? modalPosition.top : "50%",
+                        transform: modalPosition
+                            ? "none"
+                            : "translate(-50%, -50%)",
+                        width: modalPosition
+                            ? modalPosition.width
+                            : "calc(100vw - 32px)",
+                        maxWidth: 360,
+                        maxHeight: "80vh",
+                        padding: 8,
+                        boxSizing: "border-box",
                     }}
                 >
                     <div
-                        id="btnCloseLayer"
-                        onClick={closeDaumPostcode}
-                        aria-label="닫기 버튼"
-                        role="button"
                         style={{
-                            cursor: "pointer",
-                            position: "absolute",
-                            right: "-3px",
-                            top: "-3px",
-                            zIndex: 1,
-                            width: 18,
-                            height: 18,
+                            position: "relative",
+                            width: "100%",
+                            background: "white",
+                            boxShadow: "0px 4px 12px rgba(0, 0, 0, 0.25)",
+                            borderRadius: 2,
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 12,
+                            paddingBottom: 12,
                         }}
                     >
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="18"
-                            height="18"
-                            viewBox="0 0 18 18"
-                            fill="none"
+                        <div
+                            style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 12,
+                                padding: "12px",
+                                flex: 1,
+                            }}
                         >
-                            <rect width="18" height="18" fill="black" />
-                            <path
-                                d="M3.85742 3.85714L14.1431 14.1429"
-                                stroke="white"
-                                strokeWidth="1.71429"
-                            />
-                            <path
-                                d="M14.1426 3.85714L3.85686 14.1429"
-                                stroke="white"
-                                strokeWidth="1.71429"
-                            />
-                        </svg>
+                            <form
+                                onSubmit={handleAddressSearch}
+                                style={{
+                                    display: "flex",
+                                    gap: 8,
+                                    width: "calc(100% * 1.1429)",
+                                    height: "calc(44px * 1.1429)",
+                                    transform: "scale(0.875)", // 14px처럼 보이도록 스케일 조정
+                                    transformOrigin: "left center",
+                                    marginBottom: -4,
+                                }}
+                            >
+                                <input
+                                    style={{
+                                        flex: 1,
+                                        height: 44,
+                                        background: "white",
+                                        padding: "0 calc(12px * 1.1429)",
+                                        border: "0.5px solid #E5E6E8",
+                                        borderRadius: 2,
+                                        fontSize: 16,
+                                        fontFamily: theme.font.body,
+                                        color: "#111827",
+                                    }}
+                                    placeholder="주소를 입력해주세요"
+                                    value={addressSearchQuery}
+                                    onChange={(event) =>
+                                        setAddressSearchQuery(
+                                            event.target.value
+                                        )
+                                    }
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={isAddressModalWorking}
+                                    style={{
+                                        height: 44,
+                                        paddingLeft: 18,
+                                        paddingRight: 18,
+                                        background: "black",
+                                        color: "white",
+                                        border: "none",
+                                        borderRadius: 2,
+                                        fontSize: 14,
+                                        fontFamily: theme.font.body,
+                                        cursor: isAddressModalWorking
+                                            ? "not-allowed"
+                                            : "pointer",
+                                        opacity: isAddressModalWorking
+                                            ? 0.6
+                                            : 1,
+                                    }}
+                                >
+                                    검색
+                                </button>
+                            </form>
+                            <div
+                                style={{
+                                    position: "relative",
+                                    width: "100%",
+                                    height: 300,
+                                    borderRadius: 2,
+                                    overflow: "hidden",
+                                    background: "#f3f3f3",
+                                }}
+                            >
+                                <div
+                                    ref={mapContainerRef}
+                                    style={{
+                                        width: "100%",
+                                        height: "100%",
+                                    }}
+                                />
+                                <div
+                                    style={{
+                                        position: "absolute",
+                                        top: "50%",
+                                        left: "50%",
+                                        width: 24,
+                                        height: 24,
+                                        borderRadius: "50%",
+                                        border: "1px solid rgba(0, 0, 0, 0.8)",
+                                        background: "rgba(255, 255, 255, 0.7)",
+                                        pointerEvents: "none",
+                                    }}
+                                />
+                                {(isAddressModalWorking ||
+                                    isReverseGeocoding) && (
+                                    <div
+                                        style={{
+                                            position: "absolute",
+                                            inset: 0,
+                                            background:
+                                                "rgba(255, 255, 255, 0.6)",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            fontSize: 12,
+                                            color: "#555",
+                                        }}
+                                    >
+                                        {isAddressModalWorking
+                                            ? "지도 준비 중..."
+                                            : "주소 확인 중..."}
+                                    </div>
+                                )}
+                            </div>
+                            {/* 도로명 주소 표시 */}
+                            <div
+                                style={{
+                                    padding: "8px 0",
+                                    fontSize: 12,
+                                    fontFamily: theme.font.body,
+                                    color: "#555",
+                                    textAlign: "center",
+                                    background: "#f9f9f9",
+                                    borderRadius: 4,
+                                    marginTop: 8,
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        fontWeight: "bold",
+                                        marginBottom: 4,
+                                    }}
+                                >
+                                    도로명 주소
+                                </div>
+                                <div>
+                                    {modalRoadAddress
+                                        ? modalRoadAddress
+                                        : "지도에서 위치를 선택해주세요."}
+                                </div>
+                            </div>
+                        </div>
+                        <div
+                            style={{
+                                display: "flex",
+                                justifyContent: "center",
+                                marginTop: -8,
+                            }}
+                        >
+                            <button
+                                type="button"
+                                onClick={applyAddressSelection}
+                                disabled={
+                                    isApplyingAddress ||
+                                    !selectedCoords ||
+                                    (!modalRoadAddress &&
+                                        !addressSearchQuery.trim())
+                                }
+                                style={{
+                                    height: 44,
+                                    paddingLeft: 24,
+                                    paddingRight: 24,
+                                    background: "black",
+                                    color: "white",
+                                    border: "none",
+                                    borderRadius: 2,
+                                    fontSize: 12,
+                                    fontFamily: theme.font.body,
+                                    cursor:
+                                        isApplyingAddress ||
+                                        !selectedCoords ||
+                                        (!modalRoadAddress &&
+                                            !addressSearchQuery.trim())
+                                            ? "not-allowed"
+                                            : "pointer",
+                                    opacity:
+                                        isApplyingAddress ||
+                                        !selectedCoords ||
+                                        (!modalRoadAddress &&
+                                            !addressSearchQuery.trim())
+                                            ? 0.6
+                                            : 1,
+                                }}
+                            >
+                                {isApplyingAddress ? "저장 중..." : "입력"}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={closeAddressModal}
+                                style={{
+                                    marginLeft: 6,
+                                    height: 44,
+                                    paddingLeft: 18,
+                                    paddingRight: 18,
+                                    background: "#ffff",
+                                    color: "#666666",
+                                    border: "1px solid #E5E6E8",
+                                    borderRadius: 2,
+                                    fontSize: 12,
+                                    fontFamily: theme.font.body,
+                                    cursor: "pointer",
+                                }}
+                            >
+                                닫기
+                            </button>
+                        </div>
                     </div>
                 </div>
 
