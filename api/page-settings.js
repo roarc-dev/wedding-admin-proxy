@@ -17,12 +17,26 @@ export default async function handler(req, res) {
     return res.status(200).end()
   }
 
-  // 공개 조회는 인증 건너뛰기
+  // 공개 조회는 인증 건너뛰기 (단, GET이라도 Authorization이 있으면 관리자 조회로 간주 가능)
   const isPublicRequest = req.method === 'GET'
 
   let validatedUser = null
 
-  if (!isPublicRequest) {
+  // GET이라도 Authorization이 있으면 검증해서 "관리자 조회"로 취급할 수 있게 함
+  if (isPublicRequest) {
+    try {
+      const authHeader = req.headers.authorization
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7)
+        const decoded = validateToken(token)
+        if (decoded) {
+          validatedUser = decoded
+        }
+      }
+    } catch (_) {}
+  }
+
+  if (!isPublicRequest && !validatedUser) {
     // 관리자 기능은 토큰 검증 필요
     const authHeader = req.headers.authorization
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -63,7 +77,7 @@ export default async function handler(req, res) {
     if (req.query.info !== undefined) {
       switch (req.method) {
         case 'GET':
-          return await handleGetInfo(req, res)
+          return await handleGetInfo(req, res, validatedUser)
         case 'POST':
           return await handleUpdateInfo(req, res, validatedUser)
         default:
@@ -538,7 +552,7 @@ async function handleUpdateTransport(req, res, validatedUser) {
   }
 }
 
-async function handleGetInfo(req, res) {
+async function handleGetInfo(req, res, validatedUser) {
   const { pageId } = req.query
 
   if (!pageId) {
@@ -560,8 +574,10 @@ async function handleGetInfo(req, res) {
       console.error('Settings query error:', settingsError)
     }
 
-    // info가 'off'인 경우 빈 배열 반환
-    if (settingsData?.info === 'off') {
+    // info가 'off'인 경우:
+    // - 공개 요청(Authorization 없음/무효)에서는 기존대로 숨김 유지
+    // - 관리자 요청(Authorization 유효)에서는 저장된 rows를 반환하여 편집 가능하게 함
+    if (settingsData?.info === 'off' && !validatedUser) {
       return res.json({
         success: true,
         data: []
