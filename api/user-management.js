@@ -157,12 +157,179 @@ async function handlePostRequest(req, res) {
       return handleGenerateRSVPHTML(req, res, body)
     case 'deleteRSVPHTML':
       return handleDeleteRSVPHTML(req, res, body)
+    case 'checkUserUrl':
+      return handleCheckUserUrl(req, res, body)
+    case 'updateUserUrl':
+      return handleUpdateUserUrl(req, res, body)
+    case 'checkUserUrl':
+      return handleCheckUserUrl(req, res, body)
+    case 'updateUserUrl':
+      return handleUpdateUserUrl(req, res, body)
     default:
       // action이 없는 경우 기본 사용자 생성 (users.js 호환성)
       if (!action) {
         return handleCreateUser(req, res, body)
       }
       return res.status(400).json({ success: false, error: "Invalid action" })
+  }
+}
+
+function normalizeUserUrlInput(raw) {
+  if (typeof raw !== 'string') return ''
+  const lowered = raw.trim().toLowerCase()
+  // 허용: a-z, 0-9, 하이픈(-)
+  const stripped = lowered.replace(/[^a-z0-9-]/g, '')
+  const collapsed = stripped.replace(/-+/g, '-').replace(/^-+/, '').replace(/-+$/, '')
+  return collapsed
+}
+
+function dateSegmentToIso(raw) {
+  if (typeof raw !== 'string') return null
+  const v = raw.trim()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v
+  if (!/^\d{6}$/.test(v)) return null
+  return `20${v.slice(0, 2)}-${v.slice(2, 4)}-${v.slice(4, 6)}`
+}
+
+async function handleCheckUserUrl(req, res, body) {
+  const authResult = checkAuth(req, res)
+  if (authResult.error) {
+    return res.status(authResult.error.status).json({
+      success: false,
+      error: authResult.error.message,
+    })
+  }
+
+  const tokenData = authResult.tokenData
+  const userUrl = normalizeUserUrlInput(body?.user_url ?? body?.userUrl ?? '')
+  const dateIso = dateSegmentToIso(body?.date ?? body?.wedding_date ?? tokenData?.wedding_date ?? '')
+
+  if (!userUrl) {
+    return res.status(400).json({ success: false, error: 'user_url is required' })
+  }
+  if (!dateIso) {
+    return res.status(400).json({ success: false, error: 'date (YYMMDD or YYYY-MM-DD) is required' })
+  }
+
+  try {
+    const currentUserId = tokenData?.userId || null
+    const currentPageId = tokenData?.page_id || null
+
+    // admin_users: 같은 날짜 + 같은 user_url, 단 본인 제외
+    const { data: adminHit, error: adminErr } = await supabase
+      .from('admin_users')
+      .select('id, page_id, user_url, wedding_date')
+      .eq('wedding_date', dateIso)
+      .eq('user_url', userUrl)
+      .limit(1)
+
+    if (adminErr) throw adminErr
+
+    const adminConflict =
+      Array.isArray(adminHit) &&
+      adminHit.length > 0 &&
+      (!currentUserId || adminHit[0].id !== currentUserId)
+
+    // naver_admin_accounts: 같은 날짜 + 같은 user_url, 단 현재 page_id와 같으면 본인으로 간주
+    const { data: naverHit, error: naverErr } = await supabase
+      .from('naver_admin_accounts')
+      .select('id, page_id, user_url, wedding_date')
+      .eq('wedding_date', dateIso)
+      .eq('user_url', userUrl)
+      .limit(1)
+
+    if (naverErr) throw naverErr
+
+    const naverConflict =
+      Array.isArray(naverHit) &&
+      naverHit.length > 0 &&
+      (!currentPageId || (naverHit[0].page_id && naverHit[0].page_id !== currentPageId))
+
+    const conflict = adminConflict || naverConflict
+
+    return res.status(200).json({
+      success: true,
+      available: !conflict,
+      normalized: userUrl,
+      date: dateIso,
+    })
+  } catch (error) {
+    console.error('Check user_url error:', error)
+    return res.status(500).json({ success: false, error: 'user_url 중복 검사 중 오류가 발생했습니다' })
+  }
+}
+
+async function handleUpdateUserUrl(req, res, body) {
+  const authResult = checkAuth(req, res)
+  if (authResult.error) {
+    return res.status(authResult.error.status).json({
+      success: false,
+      error: authResult.error.message,
+    })
+  }
+
+  const tokenData = authResult.tokenData
+  const userId = tokenData?.userId
+  if (!userId) {
+    return res.status(401).json({ success: false, error: '인증 사용자 정보를 찾을 수 없습니다' })
+  }
+
+  const userUrl = normalizeUserUrlInput(body?.user_url ?? body?.userUrl ?? '')
+  const dateIso = dateSegmentToIso(body?.date ?? body?.wedding_date ?? tokenData?.wedding_date ?? '')
+
+  if (!userUrl) {
+    return res.status(400).json({ success: false, error: 'user_url is required' })
+  }
+  if (!dateIso) {
+    return res.status(400).json({ success: false, error: 'date (YYMMDD or YYYY-MM-DD) is required' })
+  }
+
+  // 서버에서도 포맷 방어
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(userUrl)) {
+    return res.status(400).json({ success: false, error: 'user_url 형식이 올바르지 않습니다' })
+  }
+
+  try {
+    // 중복 체크 (본인 제외)
+    const { data: hits, error: hitErr } = await supabase
+      .from('admin_users')
+      .select('id')
+      .eq('wedding_date', dateIso)
+      .eq('user_url', userUrl)
+      .neq('id', userId)
+      .limit(1)
+
+    if (hitErr) throw hitErr
+    if (Array.isArray(hits) && hits.length > 0) {
+      return res.status(409).json({ success: false, error: '이미 사용 중인 URL입니다' })
+    }
+
+    // admin_users 업데이트
+    const nowIso = new Date().toISOString()
+    const { data: updated, error: updErr } = await supabase
+      .from('admin_users')
+      .update({ user_url: userUrl, updated_at: nowIso })
+      .eq('id', userId)
+      .select('id, page_id, user_url, wedding_date, naver_id')
+      .single()
+
+    if (updErr) throw updErr
+
+    // 네이버 계정도 있으면 함께 반영(선택)
+    if (updated?.naver_id) {
+      try {
+        await supabase
+          .from('naver_admin_accounts')
+          .update({ user_url: userUrl, updated_at: nowIso })
+          .eq('naver_id', updated.naver_id)
+      } catch (_) {}
+    }
+
+    return res.status(200).json({ success: true, data: updated })
+  } catch (error) {
+    console.error('Update user_url error:', error)
+    const message = error?.message || String(error)
+    return res.status(500).json({ success: false, error: 'user_url 저장 중 오류가 발생했습니다', message })
   }
 }
 
@@ -178,7 +345,7 @@ async function handleGetRequest(req, res) {
 
   const { data: users, error } = await supabase
     .from('admin_users')
-    .select('id, username, name, is_active, created_at, last_login, updated_at, role, approval_status, page_id, expiry_date, wedding_date, groom_name_en, bride_name_en')
+    .select('id, username, name, is_active, created_at, last_login, updated_at, role, approval_status, page_id, user_url, expiry_date, wedding_date, groom_name_en, bride_name_en')
     .order('created_at', { ascending: false })
 
   if (error) {
@@ -205,7 +372,7 @@ async function handlePutRequest(req, res) {
     })
   }
 
-  const { id, username: newUsername, name: newName, is_active, newPassword, page_id: newPageId, expiry_date, role } = req.body
+  const { id, username: newUsername, name: newName, is_active, newPassword, page_id: newPageId, user_url: newUserUrl, expiry_date, role } = req.body
 
   if (!id) {
     return res.status(400).json({
@@ -219,6 +386,7 @@ async function handlePutRequest(req, res) {
   if (newName) updateData.name = newName
   if (typeof is_active === 'boolean') updateData.is_active = is_active
   if (newPageId !== undefined) updateData.page_id = newPageId
+  if (newUserUrl !== undefined) updateData.user_url = newUserUrl || null
   if (expiry_date !== undefined) updateData.expiry_date = expiry_date || null
   if (role) updateData.role = role
   if (newPassword) {
@@ -230,7 +398,7 @@ async function handlePutRequest(req, res) {
     .from('admin_users')
     .update(updateData)
     .eq('id', id)
-    .select('id, username, name, is_active, updated_at, page_id, approval_status, expiry_date, role')
+    .select('id, username, name, is_active, updated_at, page_id, user_url, approval_status, expiry_date, role')
     .single()
 
   if (error) {
@@ -563,7 +731,7 @@ async function handleRegister(req, res, body) {
         groom_name_en: groom_name_en,
         bride_name_en: bride_name_en
       }])
-      .select('id, username, name, is_active, role, approval_status, page_id, wedding_date, groom_name_en, bride_name_en')
+      .select('id, username, name, is_active, role, approval_status, page_id, user_url, wedding_date, groom_name_en, bride_name_en')
       .single()
 
     if (error) {
@@ -852,7 +1020,7 @@ async function handleCreateUser(req, res, body) {
         approval_status: 'approved',
         page_id: page_id || null
       }])
-      .select('id, username, name, is_active, created_at, role, approval_status, page_id')
+      .select('id, username, name, is_active, created_at, role, approval_status, page_id, user_url')
       .single()
 
     if (error) {
@@ -918,7 +1086,7 @@ async function handleApproveUser(req, res, body) {
       .from('admin_users')
       .update(updateData)
       .eq('id', userId)
-      .select('id, username, name, is_active, approval_status, page_id, wedding_date, groom_name_en, bride_name_en')
+      .select('id, username, name, is_active, approval_status, page_id, user_url, wedding_date, groom_name_en, bride_name_en')
       .single()
 
     if (error) {
@@ -2139,6 +2307,7 @@ function buildDefaultPageSettings(pageId, weddingInfo = {}, timestamp = new Date
     highlight_color: '#e0e0e0',
     highlight_text_color: 'black',
     gallery_type: 'thumbnail',
+    gallery_zoom: 'off',
     info: null,
     account: null,
     bgm: 'off',
@@ -2159,3 +2328,95 @@ function buildDefaultPageSettings(pageId, weddingInfo = {}, timestamp = new Date
 }
 
 // Version: 2025-10-13 - Unified User Management API
+
+// URL 중복 검사
+async function handleCheckUserUrl(req, res, body) {
+  const { user_url, date } = body
+  if (!user_url || !date) {
+    return res.status(400).json({ success: false, error: 'user_url and date are required' })
+  }
+
+  try {
+    // 날짜 형식 검증 (YYMMDD)
+    if (!/^\d{6}$/.test(date)) {
+      return res.status(400).json({ success: false, error: 'Invalid date format' })
+    }
+
+    // YYYY-MM-DD로 변환
+    const yyyy = '20' + date.slice(0, 2)
+    const mm = date.slice(2, 4)
+    const dd = date.slice(4, 6)
+    const isoDate = `${yyyy}-${mm}-${dd}`
+
+    // admin_users와 naver_admin_accounts에서 중복 검사
+    const adminUsers = await supaGet(`admin_users?wedding_date=eq.${encodeURIComponent(isoDate)}&user_url=eq.${encodeURIComponent(user_url)}&select=id`)
+    const naverAccounts = await supaGet(`naver_admin_accounts?wedding_date=eq.${encodeURIComponent(isoDate)}&user_url=eq.${encodeURIComponent(user_url)}&select=id`)
+
+    const isAvailable = adminUsers.length === 0 && naverAccounts.length === 0
+
+    res.json({
+      success: true,
+      available: isAvailable
+    })
+  } catch (error) {
+    console.error('Check user URL error:', error)
+    res.status(500).json({ success: false, error: 'Server error' })
+  }
+}
+
+// URL 업데이트
+async function handleUpdateUserUrl(req, res, body) {
+  const tokenData = checkAuth(req, res)
+  if (tokenData.error) return
+
+  const { user_url, date } = body
+  if (!user_url || !date) {
+    return res.status(400).json({ success: false, error: 'user_url and date are required' })
+  }
+
+  try {
+    // 날짜 형식 검증 (YYMMDD)
+    if (!/^\d{6}$/.test(date)) {
+      return res.status(400).json({ success: false, error: 'Invalid date format' })
+    }
+
+    // YYYY-MM-DD로 변환
+    const yyyy = '20' + date.slice(0, 2)
+    const mm = date.slice(2, 4)
+    const dd = date.slice(4, 6)
+    const isoDate = `${yyyy}-${mm}-${dd}`
+
+    // 토큰에서 사용자 정보 추출
+    const userId = tokenData.tokenData.userId
+    const pageId = tokenData.tokenData.page_id
+
+    if (!userId || !pageId) {
+      return res.status(400).json({ success: false, error: 'Invalid token' })
+    }
+
+    // 먼저 중복 검사
+    const adminUsers = await supaGet(`admin_users?wedding_date=eq.${encodeURIComponent(isoDate)}&user_url=eq.${encodeURIComponent(user_url)}&id=neq.${userId}&select=id`)
+    const naverAccounts = await supaGet(`naver_admin_accounts?wedding_date=eq.${encodeURIComponent(isoDate)}&user_url=eq.${encodeURIComponent(user_url)}&page_id=neq.${encodeURIComponent(pageId)}&select=id`)
+
+    if (adminUsers.length > 0 || naverAccounts.length > 0) {
+      return res.status(400).json({ success: false, error: 'URL already exists' })
+    }
+
+    // admin_users 업데이트
+    await supaPatch(`admin_users?id=eq.${userId}`, {
+      user_url,
+      updated_at: new Date().toISOString()
+    })
+
+    // naver_admin_accounts도 업데이트 (page_id로 찾아서)
+    await supaPatch(`naver_admin_accounts?page_id=eq.${encodeURIComponent(pageId)}`, {
+      user_url,
+      updated_at: new Date().toISOString()
+    })
+
+    res.json({ success: true })
+  } catch (error) {
+    console.error('Update user URL error:', error)
+    res.status(500).json({ success: false, error: 'Server error' })
+  }
+}
