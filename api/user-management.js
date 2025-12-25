@@ -161,10 +161,6 @@ async function handlePostRequest(req, res) {
       return handleCheckUserUrl(req, res, body)
     case 'updateUserUrl':
       return handleUpdateUserUrl(req, res, body)
-    case 'checkUserUrl':
-      return handleCheckUserUrl(req, res, body)
-    case 'updateUserUrl':
-      return handleUpdateUserUrl(req, res, body)
     default:
       // action이 없는 경우 기본 사용자 생성 (users.js 호환성)
       if (!action) {
