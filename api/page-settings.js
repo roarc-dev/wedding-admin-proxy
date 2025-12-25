@@ -126,7 +126,83 @@ export default async function handler(req, res) {
 }
 
 async function handleGetSettings(req, res) {
-  let { pageId } = req.query
+  let { pageId, userUrl, date } = req.query
+
+  // userUrl 기반 조회 지원: /YYMMDD/userUrl 라우팅을 위한 공개 조회
+  // - userUrl + date(YYMMDD) -> admin_users/ navers의 (wedding_date, user_url) 매핑 -> page_id로 page_settings 조회
+  // - 매핑이 없으면 userUrl을 pageId로 취급하여 하위호환 유지
+  if (!pageId && userUrl) {
+    const normalizedUserUrl = typeof userUrl === 'string' ? userUrl.trim() : ''
+    if (!normalizedUserUrl) {
+      return res.status(400).json({
+        success: false,
+        error: 'userUrl is required'
+      })
+    }
+    const normalizedDate = typeof date === 'string' ? date.trim() : ''
+    const isoDate = normalizedDate && /^\d{6}$/.test(normalizedDate)
+      ? `20${normalizedDate.slice(0, 2)}-${normalizedDate.slice(2, 4)}-${normalizedDate.slice(4, 6)}`
+      : null
+
+    try {
+      // 1. admin_users에서 user_url 조회
+      let { data: adminUser, error: adminErr } = await supabase
+        .from('admin_users')
+        .select('page_id, user_url')
+        .eq('user_url', normalizedUserUrl)
+        .maybeSingle()
+
+      // date가 있으면 wedding_date까지 포함하여 재조회 (정확 매칭)
+      if (isoDate) {
+        const { data: datedAdminUser, error: datedErr } = await supabase
+          .from('admin_users')
+          .select('page_id, user_url')
+          .eq('user_url', normalizedUserUrl)
+          .eq('wedding_date', isoDate)
+          .maybeSingle()
+        if (!datedErr && datedAdminUser?.page_id) {
+          adminUser = datedAdminUser
+          adminErr = null
+        }
+      }
+
+      // 2. admin_users에 없으면 naver_admin_accounts에서 조회
+      if (adminErr || !adminUser?.page_id) {
+        const { data: naverUser, error: naverErr } = await supabase
+          .from('naver_admin_accounts')
+          .select('page_id, user_url')
+          .eq('user_url', normalizedUserUrl)
+          .maybeSingle()
+
+        let resolvedNaver = naverUser
+        // date가 있으면 wedding_date까지 포함하여 재조회
+        if (isoDate) {
+          const { data: datedNaverUser, error: datedNaverErr } = await supabase
+            .from('naver_admin_accounts')
+            .select('page_id, user_url')
+            .eq('user_url', normalizedUserUrl)
+            .eq('wedding_date', isoDate)
+            .maybeSingle()
+          if (!datedNaverErr && datedNaverUser?.page_id) {
+            resolvedNaver = datedNaverUser
+          }
+        }
+
+        if (!naverErr && resolvedNaver?.page_id) {
+          adminUser = resolvedNaver
+        }
+      }
+
+      if (adminUser?.page_id) {
+        pageId = adminUser.page_id
+      } else {
+        // 폴백: userUrl이 곧 pageId인 케이스(기존 링크)도 지원
+        pageId = normalizedUserUrl
+      }
+    } catch (_) {
+      pageId = normalizedUserUrl
+    }
+  }
 
   if (!pageId) {
     return res.status(400).json({
@@ -208,6 +284,7 @@ async function handleGetSettings(req, res) {
         highlight_color: '#e0e0e0',
         highlight_text_color: 'black',
         gallery_type: 'thumbnail',
+        gallery_zoom: 'off',
         bgm: 'off',
         bgm_url: '',
         bgm_type: '',
@@ -236,6 +313,18 @@ async function handleGetSettings(req, res) {
 
     // 파생 필드 계산: 포토섹션 공개 URL (path 우선), 캐시 버스팅 쿼리 포함
     const resolved = { ...data }
+
+    // user_url도 함께 내려주기(공개 URL 생성/정규화에 필요)
+    try {
+      const { data: adminUserForUrl, error: urlErr } = await supabase
+        .from('admin_users')
+        .select('user_url')
+        .eq('page_id', pageId)
+        .single()
+      if (!urlErr && adminUserForUrl?.user_url) {
+        resolved.user_url = adminUserForUrl.user_url
+      }
+    } catch (_) {}
     const storageBase = process.env.SUPABASE_URL
       ? `${process.env.SUPABASE_URL}/storage/v1/object/public/images/`
       : 'https://yjlzizakdjghpfduxcki.supabase.co/storage/v1/object/public/images/'
@@ -326,6 +415,7 @@ async function handleUpdateSettings(req, res, validatedUser) {
       'highlight_color',
       'highlight_text_color',
       'gallery_type',
+      'gallery_zoom',
       'info',
       'account',
       'bgm',
