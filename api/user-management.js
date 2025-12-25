@@ -7,6 +7,10 @@ const supabaseUrl = process.env.SUPABASE_URL
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY
 
 if (!supabaseUrl || !supabaseKey) {
+  console.error('Missing environment variables:', {
+    hasSupabaseUrl: !!supabaseUrl,
+    hasSupabaseKey: !!supabaseKey
+  })
   throw new Error('SUPABASE_URL and SUPABASE_SERVICE_KEY environment variables are required')
 }
 
@@ -117,6 +121,8 @@ module.exports = async function handler(req, res) {
 
 // POST 요청 처리 (action 기반 라우팅)
 async function handlePostRequest(req, res) {
+  console.log('handlePostRequest called - Method:', req.method, 'URL:', req.url)
+
   let body = req.body
 
   // req.body가 없는 경우 요청을 파싱 (auth.js 호환성)
@@ -139,7 +145,7 @@ async function handlePostRequest(req, res) {
 
   const { action } = body || {}
 
-  console.log('handlePostRequest - Action:', action, 'Body:', body)
+  console.log('handlePostRequest - Action:', action, 'Body keys:', Object.keys(body || {}))
 
   switch (action) {
     case 'test':
