@@ -219,7 +219,10 @@ async function handleCheckUserUrl(req, res, body) {
     const currentUserId = tokenData?.userId || null
     const currentPageId = tokenData?.page_id || null
 
+    console.log('Querying with:', { dateIso, userUrl, currentUserId, currentPageId })
+
     // admin_users: 같은 날짜 + 같은 user_url, 단 본인 제외
+    console.log('Querying admin_users...')
     const { data: adminHit, error: adminErr } = await supabase
       .from('admin_users')
       .select('id, page_id, user_url, wedding_date')
@@ -227,14 +230,22 @@ async function handleCheckUserUrl(req, res, body) {
       .eq('user_url', userUrl)
       .limit(1)
 
-    if (adminErr) throw adminErr
+    console.log('admin_users result:', { data: adminHit, error: adminErr })
+
+    if (adminErr) {
+      console.error('admin_users query error:', adminErr)
+      throw adminErr
+    }
 
     const adminConflict =
       Array.isArray(adminHit) &&
       adminHit.length > 0 &&
       (!currentUserId || adminHit[0].id !== currentUserId)
 
+    console.log('adminConflict:', adminConflict)
+
     // naver_admin_accounts: 같은 날짜 + 같은 user_url, 단 현재 page_id와 같으면 본인으로 간주
+    console.log('Querying naver_admin_accounts...')
     const { data: naverHit, error: naverErr } = await supabase
       .from('naver_admin_accounts')
       .select('id, page_id, user_url, wedding_date')
@@ -242,14 +253,23 @@ async function handleCheckUserUrl(req, res, body) {
       .eq('user_url', userUrl)
       .limit(1)
 
-    if (naverErr) throw naverErr
+    console.log('naver_admin_accounts result:', { data: naverHit, error: naverErr })
+
+    if (naverErr) {
+      console.error('naver_admin_accounts query error:', naverErr)
+      throw naverErr
+    }
 
     const naverConflict =
       Array.isArray(naverHit) &&
       naverHit.length > 0 &&
       (!currentPageId || (naverHit[0].page_id && naverHit[0].page_id !== currentPageId))
 
+    console.log('naverConflict:', naverConflict)
+
     const conflict = adminConflict || naverConflict
+
+    console.log('Final result:', { conflict, available: !conflict })
 
     return res.status(200).json({
       success: true,
