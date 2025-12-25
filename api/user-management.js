@@ -190,6 +190,9 @@ function dateSegmentToIso(raw) {
 }
 
 async function handleCheckUserUrl(req, res, body) {
+  console.log('handleCheckUserUrl called with body:', body)
+  console.log('Headers:', req.headers.authorization ? 'Auth header present' : 'No auth header')
+
   const authResult = checkAuth(req, res)
   if (authResult.error) {
     console.log('Check user_url auth failed:', authResult.error.message)
@@ -198,6 +201,8 @@ async function handleCheckUserUrl(req, res, body) {
       error: authResult.error.message,
     })
   }
+
+  console.log('Auth successful, tokenData:', authResult.tokenData)
 
   const tokenData = authResult.tokenData
   const userUrl = normalizeUserUrlInput(body?.user_url ?? body?.userUrl ?? '')
