@@ -194,6 +194,7 @@ function dateSegmentToIso(raw) {
 async function handleCheckUserUrl(req, res, body) {
   const authResult = checkAuth(req, res)
   if (authResult.error) {
+    console.log('Check user_url auth failed:', authResult.error.message)
     return res.status(authResult.error.status).json({
       success: false,
       error: authResult.error.message,
@@ -2336,7 +2337,7 @@ async function handleCheckUserUrl(req, res, body) {
     return res.status(400).json({ success: false, error: 'user_url and date are required' })
   }
 
-  try {
+  try {``
     // 날짜 형식 검증 (YYMMDD)
     if (!/^\d{6}$/.test(date)) {
       return res.status(400).json({ success: false, error: 'Invalid date format' })
