@@ -139,6 +139,8 @@ async function handlePostRequest(req, res) {
 
   const { action } = body || {}
 
+  console.log('handlePostRequest - Action:', action, 'Body:', body)
+
   switch (action) {
     case 'test':
       return handleTest(req, res, body)
@@ -252,7 +254,8 @@ async function handleCheckUserUrl(req, res, body) {
     })
   } catch (error) {
     console.error('Check user_url error:', error)
-    return res.status(500).json({ success: false, error: 'user_url 중복 검사 중 오류가 발생했습니다' })
+    console.error('Error stack:', error.stack)
+    return res.status(500).json({ success: false, error: 'user_url 중복 검사 중 오류가 발생했습니다', details: error.message })
   }
 }
 
