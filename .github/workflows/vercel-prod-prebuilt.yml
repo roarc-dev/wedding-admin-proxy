@@ -1,0 +1,45 @@
+name: Deploy roarc-admin-my (prod, prebuilt)
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: vercel-prod
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: deploy/vercel-admin-final_v1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node (20.x)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: "npm"
+          cache-dependency-path: deploy/vercel-admin-final_v1/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      # Cloud build가 불안정했던 이력을 고려해, 로컬(prebuilt) 방식으로 항상 동일한 산출물을 배포합니다.
+      - name: Vercel build (prebuilt output)
+        run: npx vercel build --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Vercel deploy (prod, prebuilt)
+        run: npx vercel deploy --prebuilt --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+

@@ -1,221 +1,229 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 import { addPropertyControls, ControlType } from "framer"
-import { motion } from "framer-motion"
-import { useState, useEffect, useMemo } from "react"
 // @ts-ignore
 import typography from "https://cdn.roarc.kr/fonts/typography.js?v=27c65dba30928cbbce6839678016d9ac"
+
+/** ------------------------------------------------------
+ * THEME & TOKENS — Local (Framer standalone)
+ * - 외부 파일 import 없이 이 컴포넌트 단독 실행을 보장
+ * - 값은 프로젝트 표준과 동일하게 유지(읽기 전용)
+ * ----------------------------------------------------- */
+const theme = {
+    color: {
+        bg: "#ffffff",
+        text: "#111827",
+        sub: "#374151",
+        muted: "#6b7280",
+        border: "#e5e7eb",
+        overlay: "rgba(0,0,0,0.04)",
+        primary: "#111827",
+        primaryText: "#ffffff",
+        danger: "#ef4444",
+        success: "#10b981",
+        surface: "#f9fafb",
+    },
+    font: {
+        body: "'Pretendard', system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
+        bodyBold:
+            "'Pretendard SemiBold', system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
+        display: "P22LateNovemberW01-Regular Regular, serif",
+    },
+    radius: { sm: 8, md: 12, lg: 16, xl: 24, pill: 999 },
+    shadow: {
+        card: "0 1px 3px rgba(0,0,0,0.08)",
+        pop: "0 8px 24px rgba(0,0,0,0.12)",
+    },
+    space: (n: number) => n * 4,
+    text: {
+        xs: 12,
+        sm: 14,
+        base: 16,
+        md: 17,
+        lg: 20,
+        xl: 24,
+        display: 48,
+    },
+} as const
+
+function mergeStyles(
+    ...styles: Array<React.CSSProperties | undefined>
+): React.CSSProperties {
+    return Object.assign({}, ...styles)
+}
+
+type ButtonVariant = "primary" | "secondary" | "ghost" | "danger"
+type ButtonSize = "sm" | "md" | "lg"
+
+function Button({
+    children,
+    variant = "primary",
+    size = "md",
+    fullWidth,
+    style,
+    disabled,
+    ...rest
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+    variant?: ButtonVariant
+    size?: ButtonSize
+    fullWidth?: boolean
+}) {
+    const base: React.CSSProperties = {
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: theme.space(1),
+        border: 0,
+        cursor: disabled ? "not-allowed" : "pointer",
+        borderRadius: theme.radius.lg,
+        fontFamily: theme.font.bodyBold,
+        transition: "transform .05s ease, opacity .2s ease",
+        width: fullWidth ? "100%" : undefined,
+        whiteSpace: "nowrap",
+        userSelect: "none",
+        minHeight: 40, // a11y touch target
+    }
+
+    const sizes: Record<ButtonSize, React.CSSProperties> = {
+        sm: { padding: "8px 12px", fontSize: theme.text.sm },
+        md: { padding: "10px 14px", fontSize: theme.text.base },
+        lg: { padding: "12px 18px", fontSize: theme.text.lg },
+    }
+
+    const variants: Record<ButtonVariant, React.CSSProperties> = {
+        primary: { background: theme.color.primary, color: theme.color.primaryText },
+        secondary: {
+            background: theme.color.surface,
+            color: theme.color.text,
+            border: `1px solid ${theme.color.border}`,
+        },
+        ghost: {
+            background: "transparent",
+            color: theme.color.text,
+            border: `1px solid ${theme.color.border}`,
+        },
+        danger: { background: theme.color.danger, color: theme.color.primaryText },
+    }
+
+    return (
+        <button
+            {...rest}
+            disabled={disabled}
+            style={mergeStyles(base, sizes[size], variants[variant], style)}
+            onMouseDown={(e) => {
+                ;(e.currentTarget as HTMLButtonElement).style.transform =
+                    "scale(0.99)"
+            }}
+            onMouseUp={(e) => {
+                ;(e.currentTarget as HTMLButtonElement).style.transform = "scale(1)"
+            }}
+        >
+            {children}
+        </button>
+    )
+}
+
+function Card({
+    children,
+    style,
+}: React.PropsWithChildren<{ style?: React.CSSProperties }>) {
+    return (
+        <div
+            style={mergeStyles(
+                {
+                    background: theme.color.bg,
+                    border: `1px solid ${theme.color.border}`,
+                    borderRadius: theme.radius.xl,
+                    boxShadow: theme.shadow.card,
+                    padding: theme.space(5),
+                },
+                style
+            )}
+        >
+            {children}
+        </div>
+    )
+}
+
+/**
+ * @framerDisableUnlink
+ * @framerIntrinsicWidth 430
+ * @framerIntrinsicHeight 600
+ */
 
 // 프록시 서버 URL (고정된 Production URL)
 const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app"
 
-// 페이지 설정 정보 타입 정의
-interface PageSettings {
-    id?: string
-    page_id: string
-    wedding_date: string
-    wedding_time: string
-    groom_name: string
-    bride_name: string
-    venue_name?: string
-    venue_address?: string
-    highlight_shape?: "circle" | "heart"
-    highlight_color?: string
-    highlight_text_color?: string
-    created_at?: string
-    updated_at?: string
-}
-
-// 캘린더 이벤트 타입 정의
-interface CalendarEvent {
+interface ImageData {
     id: string
-    page_id: string
-    date: string
-    title: string
-    created_at: string
+    src: string
+    alt: string
+    public_url?: string
+    path?: string
+    url?: string
+    original_name?: string
 }
 
-interface CalendarComponentProxyProps {
+interface UnifiedGalleryCompleteProps {
     pageId: string
+    style?: React.CSSProperties
 }
 
-// 프록시를 통한 안전한 페이지 설정 가져오기
-async function getPageSettings(pageId: string): Promise<PageSettings | null> {
-    try {
-        // invite_cards와 page_settings 데이터를 병렬로 가져오기
-        const [inviteResult, pageResult] = await Promise.all([
-            getInviteData(pageId),
-            fetch(`${PROXY_BASE_URL}/api/page-settings?pageId=${pageId}`, {
-                method: "GET",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-            }),
-        ])
-
-        if (!pageResult.ok) {
-            throw new Error(
-                `HTTP ${pageResult.status}: ${pageResult.statusText}`
-            )
+async function getImagesByPageId(pageId: string): Promise<ImageData[]> {
+    const res = await fetch(
+        `${PROXY_BASE_URL}/api/images?action=getByPageId&pageId=${encodeURIComponent(pageId)}`,
+        {
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
         }
-
-        const result = await pageResult.json()
-
-        if (result.success && result.data) {
-            // API 응답 형식을 Calendar 컴포넌트에 맞게 변환
-            const data = result.data
-
-            // invite_cards 데이터를 우선적으로 사용
-            const groom_name =
-                inviteResult?.groom_name ||
-                data.groom_name_kr ||
-                data.groom_name ||
-                ""
-            const bride_name =
-                inviteResult?.bride_name ||
-                data.bride_name_kr ||
-                data.bride_name ||
-                ""
-
-            return {
-                id: data.id,
-                page_id: data.page_id,
-                wedding_date: data.wedding_date,
-                wedding_time: `${data.wedding_hour || "14"}:${data.wedding_minute || "00"}`,
-                groom_name: groom_name,
-                bride_name: bride_name,
-                venue_name: data.venue_name || "",
-                venue_address: data.venue_address || "",
-                highlight_shape: data.highlight_shape || "circle",
-                highlight_color: data.highlight_color || "#e0e0e0",
-                highlight_text_color: data.highlight_text_color || "black",
-                created_at: data.created_at,
-                updated_at: data.updated_at,
-            }
-        } else {
-            console.warn("페이지 설정이 없습니다:", result.error)
-            return null
-        }
-    } catch (error) {
-        console.error("페이지 설정 가져오기 실패:", error)
-        return null
-    }
-}
-
-// 프록시를 통한 invite_cards 데이터 가져오기
-async function getInviteData(
-    pageId: string
-): Promise<{ groom_name?: string; bride_name?: string } | null> {
-    try {
-        const response = await fetch(
-            `${PROXY_BASE_URL}/api/invite?pageId=${pageId}`,
-            {
-                method: "GET",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-            }
-        )
-
-        if (!response.ok) {
-            console.warn(`Invite API 응답 오류: ${response.status}`)
-            return null
-        }
-
-        const result = await response.json()
-
-        if (result.success && result.data) {
-            return {
-                groom_name: result.data.groom_name,
-                bride_name: result.data.bride_name,
-            }
-        } else {
-            console.warn("초대장 데이터가 없습니다:", result.error)
-            return null
-        }
-    } catch (error) {
-        console.error("초대장 데이터 가져오기 실패:", error)
-        return null
-    }
-}
-
-// 프록시를 통한 캘린더 데이터 가져오기
-async function getCalendarData(pageId: string): Promise<CalendarEvent[]> {
-    try {
-        const response = await fetch(
-            `${PROXY_BASE_URL}/api/calendar?pageId=${pageId}`,
-            {
-                method: "GET",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-            }
-        )
-
-        if (!response.ok) {
-            console.warn(`캘린더 API 응답 오류: ${response.status}`)
-            return []
-        }
-
-        const result = await response.json()
-
-        if (result.success && result.data) {
-            return result.data
-        } else {
-            console.warn("캘린더 데이터가 없습니다:", result.error)
-            return []
-        }
-    } catch (error) {
-        console.error("캘린더 데이터 가져오기 실패:", error)
-        return []
-    }
-}
-
-// 하트 모양 SVG 컴포넌트
-const HeartShape: React.FC<{ color: string; size?: number }> = ({
-    color,
-    size = 16,
-}) => (
-    <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width={size}
-        height={size * 0.875} // 16:14 비율 유지
-        viewBox="0 0 16 14"
-        fill="none"
-        style={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -45%)", // 약간 위로 이동
-            zIndex: 0,
-        }}
-    >
-        <g clipPath="url(#clip0_31_239)">
-            <g style={{ mixBlendMode: "multiply" }}>
-                <path
-                    d="M8.21957 1.47997C8.08957 1.59997 7.99957 1.73997 7.87957 1.85997C7.75957 1.73997 7.66957 1.59997 7.53957 1.47997C3.08957 -2.76003 -2.51043 2.94997 1.21957 7.84997C2.91957 10.08 5.58957 11.84 7.86957 13.43C10.1596 11.83 12.8196 10.08 14.5196 7.84997C18.2596 2.94997 12.6596 -2.76003 8.19957 1.47997H8.21957Z"
-                    fill={color}
-                />
-            </g>
-        </g>
-        <defs>
-            <clipPath id="clip0_31_239">
-                <rect width="15.76" height="13.44" fill="white" />
-            </clipPath>
-        </defs>
-    </svg>
-)
-
-export default function CalendarComponentProxy({
-    pageId = "default",
-}: CalendarComponentProxyProps) {
-    const [calendarData, setCalendarData] = useState<CalendarEvent[]>([])
-    const [pageSettings, setPageSettings] = useState<PageSettings | null>(null)
-    const [currentMonth, setCurrentMonth] = useState<string>("")
-    const [currentYear, setCurrentYear] = useState<number>(
-        new Date().getFullYear()
     )
-    const [loading, setLoading] = useState(false)
-    const [error, setError] = useState("")
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const json = await res.json()
+    if (json && json.success) return json.data || []
+    throw new Error(
+        json && json.error ? json.error : "이미지 목록을 가져올 수 없습니다"
+    )
+}
 
+type PageSettingsMinimal = {
+    gallery_type?: string
+    vid_url?: string
+    gallery_zoom?: string
+}
+
+async function getPageSettings(
+    pageId: string
+): Promise<{ galleryType: string; videoUrl: string; galleryZoomEnabled: boolean }> {
+    const res = await fetch(
+        `${PROXY_BASE_URL}/api/page-settings?pageId=${encodeURIComponent(pageId)}`,
+        {
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
+        }
+    )
+    if (!res.ok) {
+        return {
+            galleryType: "thumbnail",
+            videoUrl: "",
+            galleryZoomEnabled: false,
+        }
+    }
+    const json = await res.json()
+    const data = (json && json.success ? json.data : null) as
+        | PageSettingsMinimal
+        | null
+        | undefined
+    return {
+        galleryType: data?.gallery_type || "thumbnail",
+        videoUrl: data?.vid_url || "",
+        galleryZoomEnabled: data?.gallery_zoom === "on",
+    }
+}
+
+export default function UnifiedGalleryComplete({
+    pageId = "default",
+    style,
+}: UnifiedGalleryCompleteProps) {
     // Typography 폰트 로딩
     useEffect(() => {
         try {
@@ -223,19 +231,10 @@ export default function CalendarComponentProxy({
                 typography.ensure()
             }
         } catch (error) {
-            console.warn("[CalendarProxy] Typography loading failed:", error)
-        }
-    }, [])
-
-    // Pretendard 폰트 스택을 안전하게 가져오기
-    const pretendardFontFamily = useMemo(() => {
-        try {
-            return (
-                typography?.helpers?.stacks?.pretendardVariable ||
-                '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
+            console.warn(
+                "[UnifiedGalleryComplete] Typography loading failed:",
+                error
             )
-        } catch {
-            return '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
         }
     }, [])
 
@@ -251,527 +250,878 @@ export default function CalendarComponentProxy({
         }
     }, [])
 
-    // 데이터 로드
-    const loadData = async () => {
-        try {
-            setLoading(true)
-            setError("")
+    const [galleryType, setGalleryType] = useState("thumbnail")
+    const [images, setImages] = useState<ImageData[]>([])
+    const [selectedIndex, setSelectedIndex] = useState(0)
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState("")
+    const [videoUrl, setVideoUrl] = useState<string>("")
+    const [galleryZoomEnabled, setGalleryZoomEnabled] = useState(false)
+    const [focusedNav, setFocusedNav] = useState<"prev" | "next" | null>(null)
 
-            // 페이지 설정과 캘린더 데이터를 병렬로 로드
-            const [settings, calendar] = await Promise.all([
-                getPageSettings(pageId),
-                getCalendarData(pageId),
-            ])
+    const rootRef = useRef<HTMLDivElement>(null)
 
-            setPageSettings(settings)
-            setCalendarData(calendar)
+    // 터치 이벤트를 위한 state (썸네일형용)
+    const [touchStart, setTouchStart] = useState<number | null>(null)
+    const [touchEnd, setTouchEnd] = useState<number | null>(null)
 
-            if (calendar.length > 0) {
-                const firstDate = new Date(calendar[0].date)
-                setCurrentMonth((firstDate.getMonth() + 1).toString())
-                setCurrentYear(firstDate.getFullYear())
-            } else if (settings && settings.wedding_date) {
-                // 캘린더 데이터가 없으면 웨딩 날짜를 기준으로 월 설정
-                const weddingDate = new Date(settings.wedding_date)
-                setCurrentMonth((weddingDate.getMonth() + 1).toString())
-                setCurrentYear(weddingDate.getFullYear())
-            }
-        } catch (error) {
-            setError(
-                error instanceof Error
-                    ? error.message
-                    : "데이터를 불러오는 중 오류가 발생했습니다"
-            )
-        } finally {
-            setLoading(false)
-        }
-    }
+    // 슬라이드형 갤러리 터치 제어를 위한 state
+    const [slideOffset, setSlideOffset] = useState(0) // 현재 드래그 오프셋
+    const [isDragging, setIsDragging] = useState(false)
+    const slideStartX = useRef<number | null>(null)
+    const slideStartOffset = useRef<number>(0)
+
+    // 그라데이션 상태
+    const [showLeftGradient, setShowLeftGradient] = useState(false)
+    const [showRightGradient, setShowRightGradient] = useState(false)
+
+    // 스크롤 컨테이너 ref
+    const scrollContainerRef = useRef<HTMLDivElement>(null)
+    const thumbnailScrollRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
-        loadData()
+        let live = true
+        ;(async () => {
+            try {
+                setLoading(true)
+                setError("")
+                const [settings, list] = await Promise.all([
+                    getPageSettings(pageId),
+                    getImagesByPageId(pageId),
+                ])
+                if (!live) return
+                // 테스트를 위해 강제로 slide 타입 설정 (pageId가 "test"일 때)
+                const finalType =
+                    pageId === "test" ? "slide" : settings.galleryType
+                setGalleryType(finalType)
+                const mapped = (list || [])
+                    .map((img, idx) => ({
+                        id: img.id || String(idx),
+                        src: img.public_url || img.path || img.url || "",
+                        alt: img.original_name || `Image ${idx + 1}`,
+                    }))
+                    .filter((x) => !!x.src)
+                setImages(mapped)
+                setVideoUrl(settings.videoUrl)
+                setGalleryZoomEnabled(settings.galleryZoomEnabled)
+                if (mapped.length === 0) setSelectedIndex(0)
+                else if (selectedIndex >= mapped.length) setSelectedIndex(0)
+            } catch (e) {
+                if (!live) return
+                setError(
+                    e instanceof Error && e.message
+                        ? e.message
+                        : "갤러리 로딩 실패"
+                )
+            } finally {
+                if (live) setLoading(false)
+            }
+        })()
+        return () => {
+            live = false
+        }
     }, [pageId])
 
-    // D-day 계산 함수
-    const calculateDday = () => {
-        try {
-            const weddingDate = pageSettings?.wedding_date
-            if (!weddingDate) {
-                return "D-00일"
-            }
+    // gallery_zoom === "on" 인 경우: 이 컴포넌트 영역에서만 document의 핀치줌 차단 리스너를 우회
+    // (document에 등록된 touchstart/gesture* preventDefault가 버블링 단계에서 실행되지 않게 stopPropagation)
+    useEffect(() => {
+        if (!galleryZoomEnabled) return
 
-            const today = new Date()
-            const targetDate = new Date(weddingDate)
+        const root = rootRef.current
+        if (!root) return
 
-            // 시간 정보 제거 (자정으로 설정)
-            today.setHours(0, 0, 0, 0)
-            targetDate.setHours(0, 0, 0, 0)
-
-            const timeDiff = targetDate.getTime() - today.getTime()
-            const dayDiff = Math.ceil(timeDiff / (1000 * 3600 * 24))
-
-            if (dayDiff > 0) {
-                return `D-${dayDiff.toString().padStart(2, "0")}일`
-            } else if (dayDiff === 0) {
-                return "D-DAY"
-            } else {
-                return `D+${Math.abs(dayDiff).toString().padStart(2, "0")}일`
-            }
-        } catch (error) {
-            return "D-00일"
-        }
-    }
-
-    // 날짜와 시간 포맷팅 함수
-    const formatDateTime = () => {
-        try {
-            const weddingDate = pageSettings?.wedding_date
-            const weddingTime = pageSettings?.wedding_time
-
-            if (!weddingDate || !weddingTime) {
-                return "날짜 정보 없음"
-            }
-
-            const date = new Date(weddingDate)
-            const [hour, minute] = weddingTime.split(":")
-            date.setHours(parseInt(hour), parseInt(minute))
-
-            const year = date.getFullYear()
-            const month = date.getMonth() + 1
-            const day = date.getDate()
-
-            const dayNames = [
-                "일요일",
-                "월요일",
-                "화요일",
-                "수요일",
-                "목요일",
-                "금요일",
-                "토요일",
-            ]
-            const dayName = dayNames[date.getDay()]
-
-            const hour24 = parseInt(hour)
-            const hour12 =
-                hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24
-            const ampm = hour24 < 12 ? "오전" : "오후"
-
-            // 분 정보 처리: 00분이 아닌 경우만 표시
-            const minuteValue = parseInt(minute)
-            const minuteText = minuteValue !== 0 ? ` ${minuteValue}분` : ""
-
-            return `${year}년 ${month}월 ${day}일 ${dayName} ${ampm} ${hour12}시${minuteText}`
-        } catch (error) {
-            return "날짜 형식이 올바르지 않습니다"
-        }
-    }
-
-    const getDaysInMonth = (year: number, month: number) => {
-        return new Date(year, month + 1, 0).getDate()
-    }
-
-    const getFirstDayOfMonth = (year: number, month: number) => {
-        return new Date(year, month, 1).getDay()
-    }
-
-    const generateCalendar = () => {
-        if (!currentMonth)
-            return {
-                weeks: [],
-                days: ["S", "M", "T", "W", "T", "F", "S"],
-                maxWeeks: 0,
-            }
-
-        const monthIndex = parseInt(currentMonth) - 1 // 숫자 월을 0-based index로 변환
-        const daysInMonth = getDaysInMonth(currentYear, monthIndex)
-        const firstDay = getFirstDayOfMonth(currentYear, monthIndex)
-
-        const weeks = []
-        const dayNames = ["S", "M", "T", "W", "T", "F", "S"]
-
-        // 실제 필요한 주 수 계산
-        const totalCells = daysInMonth + firstDay
-        const actualWeeks = Math.ceil(totalCells / 7)
-
-        // 각 요일별로 날짜 배열 생성
-        for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
-            const daysForColumn = []
-
-            // 첫 번째 주에서 해당 요일이 시작되는 날짜 계산
-            let startDate = dayIndex - firstDay + 1
-
-            // 해당 요일의 모든 날짜 추가 (실제 주 수만큼만)
-            let weekCount = 0
-            while (weekCount < actualWeeks) {
-                if (startDate > 0 && startDate <= daysInMonth) {
-                    daysForColumn.push(startDate)
-                } else {
-                    daysForColumn.push(null) // 빈 날짜는 null로 표시
-                }
-                startDate += 7
-                weekCount++
-            }
-
-            weeks.push(daysForColumn)
-        }
-
-        return { weeks, days: dayNames, maxWeeks: actualWeeks }
-    }
-
-    const isHighlighted = (day: number | null) => {
-        if (day === null) return false
-
-        const currentMonthIndex = parseInt(currentMonth) - 1 // 0-based
-
-        // 디버깅 정보 (필요시 활성화)
-        // if (day === 18) {
-        //     console.log('하이라이트 체크:', { day, currentMonth, currentYear, pageSettings, calendarData })
-        // }
-
-        // 1. 웨딩 날짜인지 확인
-        if (pageSettings?.wedding_date) {
-            const weddingDate = new Date(pageSettings.wedding_date)
-            const isWeddingDay =
-                weddingDate.getDate() === day &&
-                weddingDate.getMonth() === currentMonthIndex &&
-                weddingDate.getFullYear() === currentYear
-
-            // if (day === 18) {
-            //     console.log('웨딩 날짜 체크:', { weddingDate: pageSettings.wedding_date, isWeddingDay })
-            // }
-
-            if (isWeddingDay) {
-                return true
+        const onTouchStart = (e: TouchEvent) => {
+            // 멀티터치(핀치) 시작 시에만 document 리스너로 버블링 차단
+            if (e.touches && e.touches.length > 1) {
+                e.stopPropagation()
             }
         }
 
-        // 2. 캘린더 이벤트 날짜인지 확인
-        const isEventDay = calendarData.some((item) => {
-            const itemDate = new Date(item.date)
-            const matches =
-                itemDate.getDate() === day &&
-                itemDate.getMonth() === currentMonthIndex &&
-                itemDate.getFullYear() === currentYear
+        const onGesture = (e: Event) => {
+            // iOS Safari gesturestart/change/end 차단 우회
+            e.stopPropagation()
+        }
 
-            // if (day === 18) {
-            //     console.log('이벤트 날짜 체크:', { itemDate: item.date, matches })
-            // }
+        root.addEventListener("touchstart", onTouchStart, { passive: true })
+        root.addEventListener("gesturestart", onGesture)
+        root.addEventListener("gesturechange", onGesture)
+        root.addEventListener("gestureend", onGesture)
 
-            return matches
-        })
+        return () => {
+            root.removeEventListener("touchstart", onTouchStart as EventListener)
+            root.removeEventListener("gesturestart", onGesture as EventListener)
+            root.removeEventListener("gesturechange", onGesture as EventListener)
+            root.removeEventListener("gestureend", onGesture as EventListener)
+        }
+    }, [galleryZoomEnabled])
 
-        // if (day === 18) {
-        //     console.log('최종 하이라이트 결과:', isEventDay)
-        // }
+    const hasImages = images && images.length > 0
 
-        return isEventDay
+    // 애니메이션 설정
+    const animationVariants = {
+        initial: { opacity: 0 },
+        animate: { opacity: 1 },
+        exit: { opacity: 0 },
     }
 
-    const { weeks, days, maxWeeks } = generateCalendar()
+    // 상단 라벨(GALLERY) 스타일
+    const labelStyle = useMemo(
+        () => ({
+            width: "100%",
+            height: "fit-content",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            overflow: "visible",
+            fontFamily: p22FontFamily,
+            fontSize: "25px",
+            letterSpacing: "0.05em",
+            lineHeight: "0.7em",
+            textAlign: "center" as const,
+            whiteSpace: "nowrap",
+            color: "black",
+            marginBottom: "50px",
+        }),
+        [p22FontFamily]
+    )
 
-    // 달력 끝에서 고정 간격 40px
-    const fixedMarginTop = 40
+    // 공통 컨테이너 스타일
+    const baseContainerStyle = useMemo(
+        () => ({
+            width: "100%",
+            maxWidth: "430px",
+            margin: "0 auto", // 중앙 정렬
+            backgroundColor: "#fafafa",
+            padding: "0",
+            paddingBottom: galleryType === "slide" ? "20px" : "60px",
+        }),
+        [galleryType]
+    )
 
-    // 로딩 상태
-    if (loading) {
+    const containerStyle = useMemo(() => {
+        const display = hasImages
+            ? style && style.display
+                ? style.display
+                : "block"
+            : "none"
+        return mergeStyles(baseContainerStyle, style, { display })
+    }, [style, hasImages, baseContainerStyle])
+
+    // GALLERY 라벨 스타일에 상단 여백 포함
+    const labelStyleWithMargin = useMemo(
+        () => ({
+            ...labelStyle,
+            paddingTop: "80px", // GALLERY 글씨 위에 80px 여백 추가
+        }),
+        [labelStyle]
+    )
+
+    // YouTube URL을 embed URL로 변환하는 함수
+    const convertToEmbedUrl = useCallback((url: string) => {
+        if (!url) return ""
+
+        // YouTube URL 패턴 매칭
+        const patterns = [
+            /(?:https?:\/\/)?(?:www\.)?youtube\.com\/watch\?v=([^&\n?#]+)/,
+            /(?:https?:\/\/)?(?:www\.)?youtu\.be\/([^&\n?#]+)/,
+            /(?:https?:\/\/)?(?:www\.)?youtube\.com\/embed\/([^&\n?#]+)/,
+        ]
+
+        for (const pattern of patterns) {
+            const match = url.match(pattern)
+            if (match) {
+                const videoId = match[1]
+                return `https://www.youtube.com/embed/${videoId}?controls=0&autoplay=1&mute=1&loop=1&playlist=${videoId}&modestbranding=1&rel=0&showinfo=0&disablekb=1&fs=0&iv_load_policy=3&cc_load_policy=0&enablejsapi=0&widget_referrer=`
+            }
+        }
+
+        return url // YouTube가 아닌 경우 원본 URL 반환
+    }, [])
+
+    // 이미지 비율에 따른 표시 방식 결정
+    const handleImageLoad = useCallback(
+        (e: React.SyntheticEvent<HTMLImageElement>) => {
+        const img = e.currentTarget
+        const isLandscape = img.naturalWidth > img.naturalHeight
+
+        if (isLandscape) {
+            // 가로 사진: 가로를 100% 채우고 세로는 비율에 맞게 조정
+            img.style.objectFit = "contain"
+            img.style.objectPosition = "center"
+        } else {
+            // 세로 사진: 세로를 100% 채우고 가로는 중앙 정렬
+            img.style.objectFit = "cover"
+            img.style.objectPosition = "center"
+        }
+        },
+        []
+    )
+
+    // 슬라이드 갤러리 상수
+    const SLIDE_WIDTH = 344 // 이미지 너비
+    const SLIDE_GAP = 10 // 이미지 간격
+    const SLIDE_TOTAL = SLIDE_WIDTH + SLIDE_GAP // 슬라이드 하나의 전체 너비
+
+    // 썸네일형 갤러리 터치 이벤트 핸들러
+    const handleTouchStart = useCallback((e: React.TouchEvent) => {
+        setTouchEnd(null)
+        setTouchStart(e.targetTouches[0].clientX)
+    }, [])
+
+    const handleTouchMove = useCallback((e: React.TouchEvent) => {
+        setTouchEnd(e.targetTouches[0].clientX)
+    }, [])
+
+    const handleTouchEnd = useCallback(() => {
+        if (touchStart === null || touchEnd === null) return
+        const distance = touchStart - touchEnd
+        const minSwipeDistance = 50
+
+        if (distance > minSwipeDistance) {
+            // 왼쪽으로 스와이프 (다음 이미지) - 썸네일형에서만 사용됨
+            setSelectedIndex((prev) =>
+                Math.min(prev + 1, Math.max(images.length - 1, 0))
+            )
+        } else if (distance < -minSwipeDistance) {
+            // 오른쪽으로 스와이프 (이전 이미지) - 썸네일형에서만 사용됨
+            setSelectedIndex((prev) => Math.max(prev - 1, 0))
+        }
+    }, [images.length, touchEnd, touchStart])
+
+    // 슬라이드형 갤러리 터치 이벤트 핸들러 (직접 제어)
+    const handleSlideTouchStart = useCallback(
+        (e: React.TouchEvent) => {
+        slideStartX.current = e.targetTouches[0].clientX
+        slideStartOffset.current = slideOffset
+        setIsDragging(true)
+        },
+        [slideOffset]
+    )
+
+    const handleSlideTouchMove = useCallback(
+        (e: React.TouchEvent) => {
+        if (slideStartX.current === null || !isDragging) return
+
+        const currentX = e.targetTouches[0].clientX
+        const diff = currentX - slideStartX.current
+        const newOffset = slideStartOffset.current + diff
+
+        // 범위 제한 (첫 번째 이미지 이전, 마지막 이미지 이후로 제한)
+        const maxOffset = 0
+        const minOffset = -((images.length - 1) * SLIDE_TOTAL)
+
+        // 경계에서 저항감 추가 (elastic effect)
+        if (newOffset > maxOffset) {
+            setSlideOffset(newOffset * 0.3) // 저항감
+        } else if (newOffset < minOffset) {
+            setSlideOffset(minOffset + (newOffset - minOffset) * 0.3)
+        } else {
+            setSlideOffset(newOffset)
+        }
+        },
+        [images.length, isDragging, slideOffset, SLIDE_TOTAL]
+    )
+
+    const handleSlideTouchEnd = useCallback(() => {
+        if (slideStartX.current === null) return
+
+        setIsDragging(false)
+
+        // 드래그 거리 계산
+        const dragDistance = slideOffset - slideStartOffset.current
+
+        // 조정 가능한 수치들
+        const SNAP_THRESHOLD = 0.2 // 20%만 넘기면 다음 장 (0.15 ~ 0.35 권장)
+        const MIN_SWIPE_DISTANCE = 30 // 최소 스와이프 거리 (px)
+
+        let targetIndex = selectedIndex
+
+        // 드래그 거리가 임계값을 넘었는지 확인
+        if (
+            dragDistance < -SLIDE_TOTAL * SNAP_THRESHOLD ||
+            dragDistance < -MIN_SWIPE_DISTANCE * 2
+        ) {
+            // 왼쪽으로 드래그 → 다음 장
+            targetIndex = Math.min(selectedIndex + 1, images.length - 1)
+        } else if (
+            dragDistance > SLIDE_TOTAL * SNAP_THRESHOLD ||
+            dragDistance > MIN_SWIPE_DISTANCE * 2
+        ) {
+            // 오른쪽으로 드래그 → 이전 장
+            targetIndex = Math.max(selectedIndex - 1, 0)
+        }
+
+        // 해당 인덱스로 스냅
+        setSelectedIndex(targetIndex)
+        setSlideOffset(-targetIndex * SLIDE_TOTAL)
+
+        slideStartX.current = null
+    }, [SLIDE_TOTAL, images.length, selectedIndex, slideOffset])
+
+    // 다음/이전 이미지로 이동
+    const goToNext = useCallback(() => {
+        if (galleryType === "slide") {
+            const nextIndex =
+                selectedIndex < images.length - 1
+                    ? selectedIndex + 1
+                    : selectedIndex
+            setSelectedIndex(nextIndex)
+            setSlideOffset(-nextIndex * SLIDE_TOTAL)
+        } else {
+            setSelectedIndex((prev) =>
+                Math.min(prev + 1, Math.max(images.length - 1, 0))
+            )
+        }
+    }, [SLIDE_TOTAL, galleryType, images.length, selectedIndex])
+
+    const goToPrevious = useCallback(() => {
+        if (galleryType === "slide") {
+            const prevIndex =
+                selectedIndex > 0 ? selectedIndex - 1 : selectedIndex
+            setSelectedIndex(prevIndex)
+            setSlideOffset(-prevIndex * SLIDE_TOTAL)
+        } else {
+            setSelectedIndex((prev) => Math.max(prev - 1, 0))
+        }
+    }, [SLIDE_TOTAL, galleryType, selectedIndex])
+
+    const handlePrevFocus = useCallback(() => {
+        setFocusedNav("prev")
+    }, [])
+
+    const handleNextFocus = useCallback(() => {
+        setFocusedNav("next")
+    }, [])
+
+    const handleNavBlur = useCallback(() => {
+        setFocusedNav(null)
+    }, [])
+
+    // 썸네일 클릭 핸들러 (썸네일형용)
+    const handleThumbnailClick = useCallback((index: number) => {
+        setSelectedIndex(index)
+    }, [])
+
+    // 슬라이드 갤러리 인덱스 변경 시 오프셋 동기화
+    useEffect(() => {
+        if (galleryType === "slide" && !isDragging) {
+            setSlideOffset(-selectedIndex * SLIDE_TOTAL)
+        }
+    }, [selectedIndex, galleryType, isDragging, SLIDE_TOTAL])
+
+    // 썸네일 스크롤 상태 체크 함수
+    const checkThumbnailScrollState = useCallback(() => {
+        if (!thumbnailScrollRef.current) return
+
+        const container = thumbnailScrollRef.current
+        const scrollLeft = container.scrollLeft
+        const scrollWidth = container.scrollWidth
+        const clientWidth = container.clientWidth
+
+        // 좌측 그라데이션: 스크롤이 시작되면 표시
+        setShowLeftGradient(scrollLeft > 0)
+
+        // 우측 그라데이션: 끝에 도달하면 숨김
+        setShowRightGradient(scrollLeft < scrollWidth - clientWidth)
+    }, [])
+
+    // 썸네일 스크롤 이벤트 리스너
+    useEffect(() => {
+        const container = thumbnailScrollRef.current
+        if (!container || galleryType !== "thumbnail") return
+
+        // 초기 상태 체크
+        checkThumbnailScrollState()
+
+        // 스크롤 이벤트 리스너 추가
+        container.addEventListener("scroll", checkThumbnailScrollState)
+
+        // 리사이즈 이벤트도 추가 (반응형 대응)
+        const handleResize = () => {
+            setTimeout(checkThumbnailScrollState, 100)
+        }
+        window.addEventListener("resize", handleResize)
+
+        return () => {
+            container.removeEventListener("scroll", checkThumbnailScrollState)
+            window.removeEventListener("resize", handleResize)
+        }
+    }, [galleryType, images.length])
+
+    if (!hasImages && loading) {
         return (
-            <div
-                style={{
-                    width: "fit-content",
-                    height: "fit-content",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    padding: "40px",
-                }}
-            >
-                <div
-                    style={{
-                        fontSize: "16px",
-                        fontFamily: pretendardFontFamily,
-                        fontWeight: 400,
-                        textAlign: "center",
-                    }}
-                >
-                    로딩 중...
-                </div>
+            <div style={mergeStyles(baseContainerStyle, style)} ref={rootRef}>
+                <div style={labelStyleWithMargin}>GALLERY</div>
             </div>
         )
     }
 
-    // 에러 상태
-    if (error) {
-        return (
-            <div
-                style={{
-                    width: "fit-content",
-                    height: "fit-content",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    padding: "40px",
-                }}
-            >
-                <div
-                    style={{
-                        fontSize: "16px",
-                        fontFamily: pretendardFontFamily,
-                        fontWeight: 400,
-                        textAlign: "center",
-                        color: "#888",
-                    }}
-                >
-                    정보 없음
-                </div>
-            </div>
-        )
+    if (!hasImages && !loading) {
+        // 이미지가 없으면 완전히 숨김(display: none) 처리됨
+        return <div style={containerStyle} ref={rootRef} />
     }
 
-    return (
-        <div
-            style={{
-                width: "fit-content",
-                height: "fit-content",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-            }}
-        >
-            {/* 날짜와 시간 표시 */}
-            <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, ease: "easeOut", delay: 0 }}
-                viewport={{ once: true }}
-                style={{
-                    fontSize: "16px",
-                    lineHeight: "1.8em",
-                    fontFamily: pretendardFontFamily,
-                    fontWeight: 400,
-                    textAlign: "center",
-                    marginBottom: "20px",
-                }}
-            >
-                {formatDateTime()}
-            </motion.div>
-
-            {/* 월 표시 */}
-            <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, ease: "easeOut", delay: 0 }}
-                viewport={{ once: true }}
-                style={{
-                    fontSize: "50px",
-                    lineHeight: "1.8em",
-                    fontFamily: p22FontFamily,
-                    fontWeight: 400,
-                    textAlign: "center",
-                    marginBottom: "20px",
-                }}
-            >
-                {currentMonth}
-            </motion.div>
-
-            {/* 달력 */}
-            <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, ease: "easeOut", delay: 0 }}
-                viewport={{ once: true }}
-                style={{
-                    display: "flex",
-                    flexDirection: "row",
-                    gap: "11px",
-                    padding: "0 20px 0 20px",
-                    alignItems: "flex-start",
-                    justifyContent: "center",
-                }}
-            >
-                {weeks.map((daysInColumn, columnIndex) => (
-                    <div
-                        key={columnIndex}
-                        style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            textAlign: "center",
-                        }}
+    // 갤러리 렌더링 함수
+    const renderGallery = () => {
+        if (galleryType === "slide") {
+            // 슬라이드형 갤러리
+            return (
+                <>
+                    <motion.div
+                        style={labelStyleWithMargin}
+                        initial={{ opacity: 0, y: 50 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5, ease: "easeOut" }}
+                        viewport={{ once: true }}
                     >
-                        {/* 요일 헤더 */}
+                        GALLERY
+                    </motion.div>
+                    <motion.div
+                        style={{
+                            width: "100%",
+                            height: "529px",
+                            position: "relative",
+                            overflow: "hidden",
+                            touchAction: galleryZoomEnabled
+                                ? "pan-y pinch-zoom"
+                                : "pan-y", // 세로 스크롤만 브라우저에 위임
+                        }}
+                        initial={{ opacity: 0, y: 50 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        transition={{
+                            duration: 0.5,
+                            ease: "easeOut",
+                            delay: 0.1,
+                        }}
+                        viewport={{ once: true }}
+                        onTouchStart={handleSlideTouchStart}
+                        onTouchMove={handleSlideTouchMove}
+                        onTouchEnd={handleSlideTouchEnd}
+                    >
                         <div
+                            ref={scrollContainerRef}
                             style={{
-                                fontSize: "15px",
-                                lineHeight: "2.6em",
-                                fontFamily: pretendardFontFamily,
-                                fontWeight: 600,
-                                marginBottom: "5px",
+                                display: "flex",
+                                height: "100%",
+                                gap: `${SLIDE_GAP}px`,
+                                transform: `translateX(${slideOffset}px)`,
+                                transition: isDragging
+                                    ? "none"
+                                    : "transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
+                                willChange: "transform",
                             }}
                         >
-                            {days[columnIndex]}
+                            {images.map((image, index) => (
+                                <div
+                                    key={image.id || String(index)}
+                                    style={{
+                                        flexShrink: 0,
+                                        width: `${SLIDE_WIDTH}px`,
+                                        height: "529px",
+                                        borderRadius: "0px",
+                                        overflow: "hidden",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        position: "relative",
+                                    }}
+                                >
+                                    <img
+                                        src={image.src}
+                                        alt={image.alt}
+                                        draggable={false}
+                                        style={{
+                                            width: "100%",
+                                            height: "100%",
+                                            objectFit: "cover",
+                                            objectPosition: "center",
+                                            userSelect: "none",
+                                            pointerEvents: "none",
+                                            display: "block",
+                                        }}
+                                        onLoad={handleImageLoad}
+                                        onError={(e) => {
+                                            try {
+                                                ;(
+                                                    e.target as HTMLImageElement
+                                                ).style.display = "none"
+                                            } catch (_) {}
+                                        }}
+                                    />
+                                </div>
+                            ))}
                         </div>
 
-                        {/* 날짜들 */}
-                        {daysInColumn.map((day, dayIndex) => (
-                            <div
-                                key={dayIndex}
+                        {/* 네비게이션 버튼 */}
+                        <div
+                            style={{
+                                position: "absolute",
+                                bottom: "12px",
+                                left: "12px",
+                                display: "flex",
+                                gap: "5px",
+                            }}
+                        >
+                            {/* 이전 버튼 */}
+                            <Button
+                                onClick={goToPrevious}
+                                aria-label="이전 이미지"
+                                variant="ghost"
+                                size="sm"
+                                onFocus={handlePrevFocus}
+                                onBlur={handleNavBlur}
                                 style={{
-                                    position: "relative",
+                                    width: "28px",
+                                    height: "28px",
+                                    borderRadius: "14px",
+                                    border: "none",
+                                    backgroundColor: "rgba(0, 0, 0, 0.08)",
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "center",
-                                    width: "31px",
-                                    height: "31px",
-                                    marginBottom: "2px",
+                                    cursor: "pointer",
+                                    transition: "opacity 0.2s ease",
+                                    padding: "0",
+                                    outline:
+                                        focusedNav === "prev"
+                                            ? `2px solid ${theme.color.primary}`
+                                            : "2px solid transparent",
+                                    outlineOffset: 2,
                                 }}
                             >
-                                {day !== null ? (
-                                    <>
-                                        {/* 하이라이트 배경 (원형 또는 하트) */}
-                                        {isHighlighted(day) && (
-                                            <>
-                                                {pageSettings?.highlight_shape ===
-                                                "heart" ? (
-                                                    <motion.div
-                                                        style={{
-                                                            position:
-                                                                "absolute",
-                                                            zIndex: 0,
-                                                        }}
-                                                        animate={{
-                                                            scale: [1, 1.2, 1],
-                                                            opacity: [
-                                                                1, 0.8, 1,
-                                                            ],
-                                                        }}
-                                                        transition={{
-                                                            duration: 2,
-                                                            repeat: Infinity,
-                                                            ease: "easeInOut",
-                                                        }}
-                                                    >
-                                                        <HeartShape
-                                                            color={
-                                                                pageSettings?.highlight_color ||
-                                                                "#e0e0e0"
-                                                            }
-                                                            size={28}
-                                                        />
-                                                    </motion.div>
-                                                ) : (
-                                                    <motion.div
-                                                        style={{
-                                                            position:
-                                                                "absolute",
-                                                            width: "31px",
-                                                            height: "31px",
-                                                            borderRadius: "50%",
-                                                            backgroundColor:
-                                                                pageSettings?.highlight_color ||
-                                                                "#e0e0e0",
-                                                            zIndex: 0,
-                                                        }}
-                                                        animate={{
-                                                            scale: [1, 1.2, 1],
-                                                            opacity: [
-                                                                1, 0.8, 1,
-                                                            ],
-                                                        }}
-                                                        transition={{
-                                                            duration: 2,
-                                                            repeat: Infinity,
-                                                            ease: "easeInOut",
-                                                        }}
-                                                    />
-                                                )}
-                                            </>
-                                        )}
+                                <div
+                                    style={{
+                                        width: "7px",
+                                        height: "12px",
+                                        color: "white",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        transform: "translateX(-1px)",
+                                    }}
+                                    dangerouslySetInnerHTML={{
+                                        __html: '<svg width="7" height="12" viewBox="0 0 7 12" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6.0625 11.229L0.999769 6.11461L6.0625 1.00022" stroke="white" stroke-width="1.54982" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+                                    }}
+                                />
+                            </Button>
+                            {/* 다음 버튼 */}
+                            <Button
+                                onClick={goToNext}
+                                aria-label="다음 이미지"
+                                variant="ghost"
+                                size="sm"
+                                onFocus={handleNextFocus}
+                                onBlur={handleNavBlur}
+                                style={{
+                                    width: "28px",
+                                    height: "28px",
+                                    borderRadius: "14px",
+                                    border: "none",
+                                    backgroundColor: "rgba(0, 0, 0, 0.08)",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    cursor: "pointer",
+                                    transition: "opacity 0.2s ease",
+                                    padding: "0",
+                                    outline:
+                                        focusedNav === "next"
+                                            ? `2px solid ${theme.color.primary}`
+                                            : "2px solid transparent",
+                                    outlineOffset: 2,
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        width: "7px",
+                                        height: "12px",
+                                        color: "white",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        transform:
+                                            "scaleX(-1) translateX(-1px)",
+                                    }}
+                                    dangerouslySetInnerHTML={{
+                                        __html: '<svg width="7" height="12" viewBox="0 0 7 12" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6.0625 11.229L0.999769 6.11461L6.0625 1.00022" stroke="white" stroke-width="1.54982" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+                                    }}
+                                />
+                            </Button>
+                        </div>
+                    </motion.div>
+                    {/* 스크롤바 숨김을 위한 스타일 */}
+                    <style
+                        dangerouslySetInnerHTML={{
+                            __html: `div::-webkit-scrollbar { display: none; }`,
+                        }}
+                    />
+                </>
+            )
+        }
 
-                                        {/* 날짜 텍스트 */}
-                                        <div
-                                            style={{
-                                                fontSize: "15px",
-                                                lineHeight: "2.6em",
-                                                fontFamily:
-                                                    pretendardFontFamily,
-                                                fontWeight: isHighlighted(day)
-                                                    ? 600
-                                                    : 400,
-                                                color: isHighlighted(day)
-                                                    ? pageSettings?.highlight_text_color ||
-                                                      "black"
-                                                    : "black",
-                                                zIndex: 1,
-                                                position: "relative",
-                                            }}
-                                        >
-                                            {day}
-                                        </div>
-                                    </>
-                                ) : (
-                                    // 빈 공간
-                                    <div
-                                        style={{
-                                            width: "31px",
-                                            height: "31px",
-                                        }}
-                                    />
-                                )}
+        // 썸네일형 갤러리 (기본값) - 고정 높이
+        return (
+            <>
+                <motion.div
+                    style={labelStyleWithMargin}
+                    initial={{ opacity: 0, y: 50 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, ease: "easeOut" }}
+                    viewport={{ once: true }}
+                >
+                    GALLERY
+                </motion.div>
+                <motion.div
+                    style={{
+                        width: "100%",
+                        height: "460px", // 고정 높이
+                        position: "relative",
+                        borderRadius: 0,
+                        overflow: "hidden",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                    }}
+                    initial={{ opacity: 0, y: 50 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, ease: "easeOut", delay: 0.1 }}
+                    viewport={{ once: true }}
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                >
+                    <AnimatePresence mode="wait">
+                        <motion.img
+                            key={selectedIndex}
+                            src={
+                                images[selectedIndex] &&
+                                images[selectedIndex].src
+                            }
+                            alt={
+                                images[selectedIndex] &&
+                                images[selectedIndex].alt
+                            }
+                            style={{
+                                maxWidth: "100%",
+                                maxHeight: "100%",
+                                objectFit: "contain", // 이미지 비율 유지하면서 컨테이너에 맞춤
+                                userSelect: "none",
+                                pointerEvents: "none",
+                                display: "block",
+                            }}
+                            variants={animationVariants}
+                            initial="initial"
+                            animate="animate"
+                            exit="exit"
+                            transition={{ duration: 0.3 }}
+                            onLoad={handleImageLoad}
+                            onError={(e) => {
+                                try {
+                                    ;(
+                                        e.target as HTMLImageElement
+                                    ).style.display = "none"
+                                } catch (_) {}
+                            }}
+                        />
+                    </AnimatePresence>
+                </motion.div>
+
+                {/* 썸네일 영역(가로 스크롤) */}
+                <div
+                    style={{
+                        marginTop: "30px",
+                        marginBottom: "20px",
+                        paddingLeft: 0,
+                        paddingRight: 0,
+                        position: "relative",
+                    }}
+                >
+                    <div
+                        ref={thumbnailScrollRef}
+                        style={{
+                            display: "flex",
+                            gap: "6px",
+                            overflowX: "auto",
+                            scrollbarWidth: "none", // Firefox
+                            msOverflowStyle: "none", // IE
+                            paddingLeft: "16px",
+                            paddingBottom: "20px",
+                            paddingRight: "16px",
+                        }}
+                    >
+                        {images.map((img, idx) => (
+                            <div
+                                key={img.id || String(idx)}
+                                style={{
+                                    flexShrink: 0,
+                                    width: "60px",
+                                    height: "60px",
+                                    borderRadius: "8px",
+                                    overflow: "hidden",
+                                    cursor: "pointer",
+                                    border:
+                                        selectedIndex === idx
+                                            ? "0px solid #6366f1"
+                                            : "0px solid transparent",
+                                    transition: "border-color 0.2s ease",
+                                }}
+                                onClick={() => handleThumbnailClick(idx)}
+                            >
+                                <img
+                                    src={img.src}
+                                    alt={img.alt}
+                                    style={{
+                                        width: "100%",
+                                        height: "100%",
+                                        objectFit: "cover",
+                                        opacity:
+                                            selectedIndex === idx ? 1 : 0.5,
+                                        transition: "opacity 0.2s ease",
+                                    }}
+                                    onError={(e) => {
+                                        try {
+                                            ;(
+                                                e.target as HTMLImageElement
+                                            ).style.display = "none"
+                                            const parent = (
+                                                e.target as HTMLImageElement
+                                            ).parentNode as HTMLElement
+                                            if (parent) {
+                                                parent.innerHTML =
+                                                    '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#999;font-size:10px;">Error</div>'
+                                            }
+                                        } catch (_) {}
+                                    }}
+                                />
                             </div>
                         ))}
                     </div>
-                ))}
-            </motion.div>
 
-            {/* 하단 신랑신부 이름과 D-day */}
-            <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, ease: "easeOut", delay: 0 }}
-                viewport={{ once: true }}
+                    {/* 좌측 그라데이션 오버레이 - 동적으로 표시/숨김 */}
+                    {showLeftGradient && (
+                        <div
+                            style={{
+                                position: "absolute",
+                                left: 0,
+                                top: 0,
+                                bottom: "20px",
+                                width: "30px",
+                                background:
+                                    "linear-gradient(to right, rgba(255,255,255,0.9), transparent)",
+                                pointerEvents: "none",
+                                zIndex: 1,
+                                transition: "opacity 0.2s ease",
+                            }}
+                        />
+                    )}
+
+                    {/* 우측 그라데이션 오버레이 - 동적으로 표시/숨김 */}
+                    {showRightGradient && (
+                        <div
+                            style={{
+                                position: "absolute",
+                                right: 0,
+                                top: 0,
+                                bottom: "20px",
+                                width: "30px",
+                                background:
+                                    "linear-gradient(to left, rgba(255,255,255,0.9), transparent)",
+                                pointerEvents: "none",
+                                zIndex: 1,
+                                transition: "opacity 0.2s ease",
+                            }}
+                        />
+                    )}
+                </div>
+                {/* 스크롤바 숨김을 위한 스타일 */}
+                <style
+                    dangerouslySetInnerHTML={{
+                        __html: `.thumbnail-scroll::-webkit-scrollbar { display: none; }`,
+                    }}
+                />
+            </>
+        )
+    }
+
+    // 비디오 렌더링 함수
+    const renderVideo = () => {
+        if (!videoUrl) return null
+
+        return (
+            <div
                 style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    marginTop: `${fixedMarginTop}px`,
+                    width: "100%",
+                    maxWidth: "430px",
+                    margin: "0 auto",
+                    backgroundColor: "#fafafa",
+                    padding: "0",
                 }}
             >
-                {/* 신랑신부 이름 */}
                 <div
                     style={{
-                        fontSize: "17px",
-                        lineHeight: "1em",
-                        fontFamily: pretendardFontFamily,
-                        fontWeight: 400,
-                        textAlign: "center",
-                        marginBottom: "10px",
+                        marginTop: galleryType === "thumbnail" ? "0px" : "80px",
+                        width: "100%",
+                        position: "relative",
                     }}
                 >
-                    {pageSettings?.groom_name || "신랑"} ♥{" "}
-                    {pageSettings?.bride_name || "신부"}의 결혼식
+                    <div
+                        style={{
+                            position: "relative",
+                            width: "100%",
+                            height: 0,
+                            paddingBottom: "56.25%", // 16:9 비율
+                            overflow: "hidden",
+                        }}
+                    >
+                        <iframe
+                            src={convertToEmbedUrl(videoUrl)}
+                            title="YouTube video player"
+                            frameBorder="0"
+                            allow="autoplay; encrypted-media; gyroscope;"
+                            referrerPolicy="strict-origin-when-cross-origin"
+                            style={{
+                                position: "absolute",
+                                top: 0,
+                                left: 0,
+                                width: "100%",
+                                height: "100%",
+                                borderRadius: 0,
+                            }}
+                        />
+                    </div>
                 </div>
+            </div>
+        )
+    }
 
-                {/* D-day 카운터 */}
-                <div
-                    style={{
-                        fontSize: "17px",
-                        lineHeight: "1em",
-                        fontFamily: pretendardFontFamily,
-                        fontWeight: 600,
-                        textAlign: "center",
-                    }}
-                >
-                    {calculateDday()}
-                </div>
-            </motion.div>
+    // 메인 렌더링
+    return (
+        <div ref={rootRef} style={mergeStyles({ width: "100%" }, undefined)}>
+            <Card
+                style={mergeStyles(containerStyle, {
+                    border: "none",
+                    boxShadow: "none",
+                    padding: 0,
+                    borderRadius: 0,
+                    background: "#fafafa",
+                })}
+            >
+                {renderGallery()}
+            </Card>
+            {renderVideo()}
+            {/* 로컬 테스트 시나리오:
+               - page_settings.gallery_zoom = 'off' => 기존처럼 페이지 전체 핀치줌이 막혀야 함
+               - page_settings.gallery_zoom = 'on'  => 이 컴포넌트 영역에서만 핀치줌이 동작해야 함 */}
         </div>
     )
 }
 
-addPropertyControls(CalendarComponentProxy, {
+// Property Controls
+addPropertyControls(UnifiedGalleryComplete, {
     pageId: {
         type: ControlType.String,
-        title: "Page ID",
+        title: "페이지 ID",
         defaultValue: "default",
-        placeholder: "Enter page ID",
+        placeholder: "페이지 ID를 입력하세요",
     },
 })

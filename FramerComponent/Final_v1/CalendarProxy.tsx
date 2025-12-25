@@ -141,6 +141,13 @@ async function getInviteData(
     }
 }
 
+// 날짜 문자열을 UTC 자정으로 파싱하는 헬퍼 함수 (타임존 독립적 처리)
+function parseDateAsUTC(dateString: string): Date {
+    // YYYY-MM-DD 형식의 날짜를 UTC 자정으로 파싱
+    const date = new Date(dateString + 'T00:00:00.000Z');
+    return date;
+}
+
 // 프록시를 통한 캘린더 데이터 가져오기
 async function getCalendarData(pageId: string): Promise<CalendarEvent[]> {
     try {
@@ -234,7 +241,10 @@ export default function CalendarComponentProxy({
     // Pretendard 폰트 스택을 안전하게 가져오기
     const pretendardFontFamily = useMemo(() => {
         try {
-            return typography?.helpers?.stacks?.pretendardVariable || '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
+            return (
+                typography?.helpers?.stacks?.pretendardVariable ||
+                '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
+            )
         } catch {
             return '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
         }
@@ -243,7 +253,10 @@ export default function CalendarComponentProxy({
     // P22 폰트 스택을 안전하게 가져오기
     const p22FontFamily = useMemo(() => {
         try {
-            return typography?.helpers?.stacks?.p22 || '"P22 Late November", "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
+            return (
+                typography?.helpers?.stacks?.p22 ||
+                '"P22 Late November", "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
+            )
         } catch {
             return '"P22 Late November", "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
         }
@@ -252,7 +265,10 @@ export default function CalendarComponentProxy({
     // Goldenbook 폰트 스택을 안전하게 가져오기
     const goldenbookFontFamily = useMemo(() => {
         try {
-            return typography?.helpers?.stacks?.goldenbook || '"Goldenbook", "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
+            return (
+                typography?.helpers?.stacks?.goldenbook ||
+                '"Goldenbook", "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
+            )
         } catch {
             return '"Goldenbook", "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "Apple Color Emoji", "Segoe UI Emoji"'
         }
@@ -279,9 +295,9 @@ export default function CalendarComponentProxy({
                 setCurrentYear(firstDate.getFullYear())
             } else if (settings && settings.wedding_date) {
                 // 캘린더 데이터가 없으면 웨딩 날짜를 기준으로 월 설정
-                const weddingDate = new Date(settings.wedding_date)
-                setCurrentMonth((weddingDate.getMonth() + 1).toString())
-                setCurrentYear(weddingDate.getFullYear())
+                const weddingDate = parseDateAsUTC(settings.wedding_date)
+                setCurrentMonth((weddingDate.getUTCMonth() + 1).toString())
+                setCurrentYear(weddingDate.getUTCFullYear())
             }
         } catch (error) {
             setError(
@@ -307,13 +323,13 @@ export default function CalendarComponentProxy({
             }
 
             const today = new Date()
-            const targetDate = new Date(weddingDate)
+            // 타임존 독립적으로 웨딩 날짜를 UTC 자정으로 파싱
+            const targetDate = parseDateAsUTC(weddingDate)
 
-            // 시간 정보 제거 (자정으로 설정)
-            today.setHours(0, 0, 0, 0)
-            targetDate.setHours(0, 0, 0, 0)
+            // 현재 날짜도 UTC 자정으로 정규화
+            const todayUTC = new Date(today.getFullYear(), today.getMonth(), today.getDate())
 
-            const timeDiff = targetDate.getTime() - today.getTime()
+            const timeDiff = targetDate.getTime() - todayUTC.getTime()
             const dayDiff = Math.ceil(timeDiff / (1000 * 3600 * 24))
 
             if (dayDiff > 0) {
@@ -338,13 +354,14 @@ export default function CalendarComponentProxy({
                 return "날짜 정보 없음"
             }
 
-            const date = new Date(weddingDate)
+            // 타임존 독립적으로 날짜 파싱
+            const date = parseDateAsUTC(weddingDate)
             const [hour, minute] = weddingTime.split(":")
-            date.setHours(parseInt(hour), parseInt(minute))
+            date.setUTCHours(parseInt(hour), parseInt(minute))
 
-            const year = date.getFullYear()
-            const month = date.getMonth() + 1
-            const day = date.getDate()
+            const year = date.getUTCFullYear()
+            const month = date.getUTCMonth() + 1
+            const day = date.getUTCDate()
 
             const dayNames = [
                 "일요일",
@@ -355,7 +372,7 @@ export default function CalendarComponentProxy({
                 "금요일",
                 "토요일",
             ]
-            const dayName = dayNames[date.getDay()]
+            const dayName = dayNames[date.getUTCDay()]
 
             const hour24 = parseInt(hour)
             const hour12 =
@@ -436,11 +453,11 @@ export default function CalendarComponentProxy({
 
         // 1. 웨딩 날짜인지 확인
         if (pageSettings?.wedding_date) {
-            const weddingDate = new Date(pageSettings.wedding_date)
+            const weddingDate = parseDateAsUTC(pageSettings.wedding_date)
             const isWeddingDay =
-                weddingDate.getDate() === day &&
-                weddingDate.getMonth() === currentMonthIndex &&
-                weddingDate.getFullYear() === currentYear
+                weddingDate.getUTCDate() === day &&
+                weddingDate.getUTCMonth() === currentMonthIndex &&
+                weddingDate.getUTCFullYear() === currentYear
 
             // if (day === 18) {
             //     console.log('웨딩 날짜 체크:', { weddingDate: pageSettings.wedding_date, isWeddingDay })
@@ -453,11 +470,11 @@ export default function CalendarComponentProxy({
 
         // 2. 캘린더 이벤트 날짜인지 확인
         const isEventDay = calendarData.some((item) => {
-            const itemDate = new Date(item.date)
+            const itemDate = parseDateAsUTC(item.date)
             const matches =
-                itemDate.getDate() === day &&
-                itemDate.getMonth() === currentMonthIndex &&
-                itemDate.getFullYear() === currentYear
+                itemDate.getUTCDate() === day &&
+                itemDate.getUTCMonth() === currentMonthIndex &&
+                itemDate.getUTCFullYear() === currentYear
 
             // if (day === 18) {
             //     console.log('이벤트 날짜 체크:', { itemDate: item.date, matches })
@@ -568,7 +585,12 @@ export default function CalendarComponentProxy({
                 style={{
                     fontSize: "50px",
                     lineHeight: "1.8em",
-                    fontFamily: pageSettings?.type === "papillon" ? p22FontFamily : pageSettings?.type === "eternal" ? goldenbookFontFamily : p22FontFamily,
+                    fontFamily:
+                        pageSettings?.type === "papillon"
+                            ? p22FontFamily
+                            : pageSettings?.type === "eternal"
+                              ? goldenbookFontFamily
+                              : p22FontFamily,
                     fontWeight: 400,
                     textAlign: "center",
                     marginBottom: "20px",
@@ -695,8 +717,11 @@ export default function CalendarComponentProxy({
                                             style={{
                                                 fontSize: "15px",
                                                 lineHeight: "2.6em",
-                                                fontFamily: pretendardFontFamily,
-                                                fontWeight: isHighlighted(day) ? 600 : 400,
+                                                fontFamily:
+                                                    pretendardFontFamily,
+                                                fontWeight: isHighlighted(day)
+                                                    ? 600
+                                                    : 400,
                                                 color: isHighlighted(day)
                                                     ? pageSettings?.highlight_text_color ||
                                                       "black"
@@ -746,7 +771,8 @@ export default function CalendarComponentProxy({
                         marginBottom: "10px",
                     }}
                 >
-                    {pageSettings?.cal_txt || `${pageSettings?.groom_name || "신랑"} ♥ ${pageSettings?.bride_name || "신부"}의 결혼식`}
+                    {pageSettings?.cal_txt ||
+                        `${pageSettings?.groom_name || "신랑"} ♥ ${pageSettings?.bride_name || "신부"}의 결혼식`}
                 </div>
 
                 {/* D-day 카운터 */}

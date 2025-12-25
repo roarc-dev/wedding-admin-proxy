@@ -1,0 +1,1241 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <title>User Management</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        background: #f5f5f7;
+      }
+      #root {
+        min-height: 100vh;
+        display: flex;
+        align-items: stretch;
+        justify-content: center;
+      }
+      .page-wrapper {
+        flex: 1;
+        max-width: 1200px;
+        margin: 24px auto;
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.06);
+        padding: 24px;
+        box-sizing: border-box;
+      }
+      
+      /* CSS 애니메이션 */
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      @keyframes slideUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes scaleIn {
+        from { opacity: 0; transform: scale(0.8); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      
+      .animate-fade-in {
+        animation: fadeIn 0.3s ease-out forwards;
+      }
+      .animate-slide-up {
+        animation: slideUp 0.3s ease-out forwards;
+      }
+      .animate-scale-in {
+        animation: scaleIn 0.3s ease-out forwards;
+      }
+      
+      /* 버튼 호버 효과 */
+      .btn-hover {
+        transition: transform 0.15s ease, background-color 0.15s ease;
+      }
+      .btn-hover:hover {
+        transform: scale(1.05);
+      }
+      .btn-hover:active {
+        transform: scale(0.95);
+      }
+    </style>
+
+    <!-- React / ReactDOM CDN (18버전) -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+    <!-- Babel (JSX 변환용) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  </head>
+  <body>
+    <div id="root">로딩 중...</div>
+
+    <script type="text/babel">
+      const { useState, useEffect } = React;
+
+      // 프록시 서버 URL
+      const PROXY_BASE_URL = "https://wedding-admin-proxy.vercel.app";
+
+      // 토큰 관리
+      function getAuthToken() {
+        return localStorage.getItem("admin_session");
+      }
+
+      function setAuthToken(token) {
+        localStorage.setItem("admin_session", token);
+      }
+
+      function removeAuthToken() {
+        localStorage.removeItem("admin_session");
+      }
+
+      // 토큰 검증
+      function validateSessionToken(token) {
+        try {
+          const data = JSON.parse(atob(token));
+          return Date.now() < data.expires ? data : null;
+        } catch {
+          return null;
+        }
+      }
+
+      // 페이지 타입 목록
+      const PAGE_TYPES = ["papillon", "eternal", "fiore", "mobile"];
+      const DEFAULT_PAGE_TYPE = PAGE_TYPES[0];
+
+      function isPageType(value) {
+        return typeof value === "string" && PAGE_TYPES.includes(value);
+      }
+
+      async function fetchPageType(pageId) {
+        if (!pageId) return null;
+        try {
+          const response = await fetch(
+            `${PROXY_BASE_URL}/api/page-settings?pageId=${pageId}`,
+            {
+              method: "GET",
+              headers: {
+                Authorization: `Bearer ${getAuthToken()}`,
+              },
+            }
+          );
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const result = await response.json();
+          const typeValue = result?.data?.type;
+          if (isPageType(typeValue)) return typeValue;
+        } catch (e) {
+          console.warn("Fetch page type error:", e);
+        }
+        return null;
+      }
+
+      async function updatePageType(pageId, type) {
+        if (!pageId) return { success: false, error: "pageId is required" };
+        try {
+          const response = await fetch(`${PROXY_BASE_URL}/api/page-settings`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${getAuthToken()}`,
+            },
+            body: JSON.stringify({ pageId, settings: { type } }),
+          });
+          return await response.json();
+        } catch (e) {
+          console.error("Update page type error:", e);
+          return { success: false, error: "네트워크 오류" };
+        }
+      }
+
+      // 인증 함수
+      async function authenticateAdmin(username, password) {
+        try {
+          const response = await fetch(`${PROXY_BASE_URL}/api/user-management`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "login", username, password }),
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          const result = await response.json();
+          if (result.success) {
+            setAuthToken(result.token);
+            return { success: true, user: result.user };
+          } else {
+            return { success: false, error: result.error };
+          }
+        } catch (error) {
+          console.error("Login error:", error);
+          return { success: false, error: `네트워크 오류: ${error.message}` };
+        }
+      }
+
+      // 사용자 관리 API 함수들
+      async function getAllUsers() {
+        try {
+          const response = await fetch(`${PROXY_BASE_URL}/api/user-management`, {
+            method: "GET",
+            headers: { Authorization: `Bearer ${getAuthToken()}` },
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const result = await response.json();
+          return result.success ? result.data : [];
+        } catch (error) {
+          console.error("Get users error:", error);
+          return [];
+        }
+      }
+
+      async function createUser(userData) {
+        try {
+          const response = await fetch(`${PROXY_BASE_URL}/api/user-management`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${getAuthToken()}`,
+            },
+            body: JSON.stringify({
+              action: "createUser",
+              username: userData.username,
+              password: userData.password,
+              name: userData.name,
+              page_id: userData.page_id,
+              role: userData.role,
+            }),
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          return await response.json();
+        } catch (error) {
+          console.error("Create user error:", error);
+          return { success: false, error: "사용자 생성 중 오류가 발생했습니다" };
+        }
+      }
+
+      async function updateUser(userData) {
+        try {
+          const response = await fetch(`${PROXY_BASE_URL}/api/user-management`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${getAuthToken()}`,
+            },
+            body: JSON.stringify(userData),
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          return await response.json();
+        } catch (error) {
+          console.error("Update user error:", error);
+          return { success: false, error: "사용자 수정 중 오류가 발생했습니다" };
+        }
+      }
+
+      async function deleteUserApi(userId, deleteAllData = false) {
+        try {
+          const response = await fetch(`${PROXY_BASE_URL}/api/user-management`, {
+            method: "DELETE",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${getAuthToken()}`,
+            },
+            body: JSON.stringify({ id: userId, deleteAllData }),
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          return await response.json();
+        } catch (error) {
+          console.error("Delete user error:", error);
+          return { success: false, error: "사용자 삭제 중 오류가 발생했습니다" };
+        }
+      }
+
+      async function approveUser(userId, status, pageId) {
+        try {
+          const response = await fetch(`${PROXY_BASE_URL}/api/user-management`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${getAuthToken()}`,
+            },
+            body: JSON.stringify({ action: "approveUser", userId, status, pageId }),
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          return await response.json();
+        } catch (error) {
+          console.error("Approve user error:", error);
+          return { success: false, error: "사용자 승인 중 오류가 발생했습니다" };
+        }
+      }
+
+      async function generateRSVPPage(pageId) {
+        try {
+          const response = await fetch(`${PROXY_BASE_URL}/api/user-management`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${getAuthToken()}`,
+            },
+            body: JSON.stringify({ action: "generateRSVPHTML", pageId }),
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          return await response.json();
+        } catch (error) {
+          console.error("Generate RSVP page error:", error);
+          return { success: false, error: "RSVP 페이지 생성 중 오류가 발생했습니다" };
+        }
+      }
+
+      async function deleteRSVPPage(pageId) {
+        try {
+          const response = await fetch(`${PROXY_BASE_URL}/api/user-management`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${getAuthToken()}`,
+            },
+            body: JSON.stringify({ action: "deleteRSVPHTML", pageId }),
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          return await response.json();
+        } catch (error) {
+          console.error("Delete RSVP page error:", error);
+          return { success: false, error: "RSVP 페이지 삭제 중 오류가 발생했습니다" };
+        }
+      }
+
+      // 모바일 청첩장 URL 생성용 포매터
+      function formatWeddingDateCode(weddingDate) {
+        if (!weddingDate) return null;
+        const digitsOnly = weddingDate.replace(/\D/g, "");
+        if (digitsOnly.length < 8) return null;
+        const normalized = (digitsOnly + "00000000").slice(0, 8);
+        return normalized.slice(2, 8);
+      }
+
+      function buildMobileInviteUrl(user) {
+        if (!user.page_id) return null;
+        const dateCode = formatWeddingDateCode(user.wedding_date || "");
+        if (!dateCode) return null;
+        return `https://mcard.roarc.kr/${dateCode}/${user.page_id}`;
+      }
+
+      // 입력 필드 컴포넌트
+      function InputField({ label, type = "text", value, onChange, required = false }) {
+        return (
+          <div>
+            <label style={{ display: "block", fontSize: "14px", fontWeight: "500", color: "#374151", marginBottom: "5px" }}>
+              {label} {required && <span style={{ color: "#ef4444" }}>*</span>}
+            </label>
+            <input
+              type={type}
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              required={required}
+              style={{
+                width: "100%",
+                padding: "10px",
+                border: "1px solid #d1d5db",
+                borderRadius: "6px",
+                fontSize: "14px",
+                outline: "none",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+        );
+      }
+
+      // 메인 컴포넌트
+      function UserManagement({ style }) {
+        const [isAuthenticated, setIsAuthenticated] = useState(false);
+        const [currentUser, setCurrentUser] = useState(null);
+        const [loginForm, setLoginForm] = useState({ username: "", password: "" });
+        const [loginError, setLoginError] = useState("");
+        const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+        const [users, setUsers] = useState([]);
+        const [loading, setLoading] = useState(false);
+        const [error, setError] = useState(null);
+        const [success, setSuccess] = useState(null);
+        const [showAddModal, setShowAddModal] = useState(false);
+        const [editingUser, setEditingUser] = useState(null);
+        const [showApprovalModal, setShowApprovalModal] = useState(false);
+        const [approvingUser, setApprovingUser] = useState(null);
+        const [pageIdInput, setPageIdInput] = useState("");
+        const [approvalPageType, setApprovalPageType] = useState(DEFAULT_PAGE_TYPE);
+
+        const [userForm, setUserForm] = useState({
+          username: "",
+          password: "",
+          name: "",
+          is_active: true,
+          newPassword: "",
+          page_id: "",
+          type: DEFAULT_PAGE_TYPE,
+          expiry_date: "",
+          role: "user",
+        });
+
+        const [activeTab, setActiveTab] = useState("all");
+        const [currentPage, setCurrentPage] = useState(1);
+        const itemsPerPage = 10;
+        const [searchTerm, setSearchTerm] = useState("");
+
+        // 세션 확인
+        useEffect(() => {
+          const token = getAuthToken();
+          if (token) {
+            const tokenData = validateSessionToken(token);
+            if (tokenData) {
+              setIsAuthenticated(true);
+              setCurrentUser({ username: tokenData.username });
+              loadUsers();
+            } else {
+              removeAuthToken();
+            }
+          }
+        }, []);
+
+        // 탭 변경 시 페이지 초기화
+        useEffect(() => {
+          setCurrentPage(1);
+        }, [activeTab, searchTerm]);
+
+        // 알림 메시지 자동 제거
+        useEffect(() => {
+          if (error || success) {
+            const timer = setTimeout(() => {
+              setError(null);
+              setSuccess(null);
+            }, 5000);
+            return () => clearTimeout(timer);
+          }
+        }, [error, success]);
+
+        const loadUsers = async () => {
+          setLoading(true);
+          try {
+            const usersData = await getAllUsers();
+            setUsers(usersData);
+          } catch (err) {
+            setError("사용자 목록을 불러오는데 실패했습니다.");
+          } finally {
+            setLoading(false);
+          }
+        };
+
+        const handleLogin = async (e) => {
+          e.preventDefault();
+          setIsLoggingIn(true);
+          setLoginError("");
+
+          const result = await authenticateAdmin(loginForm.username, loginForm.password);
+          if (result.success) {
+            setIsAuthenticated(true);
+            setCurrentUser(result.user);
+            setLoginForm({ username: "", password: "" });
+            loadUsers();
+          } else {
+            setLoginError(result.error);
+          }
+          setIsLoggingIn(false);
+        };
+
+        const handleLogout = () => {
+          removeAuthToken();
+          setIsAuthenticated(false);
+          setCurrentUser(null);
+          setUsers([]);
+        };
+
+        const handleAddUser = () => {
+          setUserForm({
+            username: "",
+            password: "",
+            name: "",
+            is_active: true,
+            newPassword: "",
+            page_id: "",
+            type: DEFAULT_PAGE_TYPE,
+            expiry_date: "",
+            role: "user",
+          });
+          setEditingUser(null);
+          setShowAddModal(true);
+        };
+
+        const handleEditUser = (user) => {
+          setUserForm({
+            username: user.username,
+            password: "",
+            name: user.name,
+            is_active: user.is_active,
+            newPassword: "",
+            page_id: user.page_id || "",
+            type: DEFAULT_PAGE_TYPE,
+            expiry_date: user.expiry_date || "",
+            role: user.role || "user",
+          });
+          setEditingUser(user);
+          setShowAddModal(true);
+        };
+
+        const handleShowApprovalModal = (user) => {
+          setApprovingUser(user);
+          setPageIdInput(user.page_id || "");
+          setApprovalPageType(DEFAULT_PAGE_TYPE);
+          setShowApprovalModal(true);
+        };
+
+        const handleApproveUser = async (status) => {
+          if (!approvingUser) return;
+
+          setLoading(true);
+          try {
+            const result = await approveUser(
+              approvingUser.id,
+              status,
+              status === "approved" ? pageIdInput.trim() : null
+            );
+
+            if (result.success) {
+              if (status === "approved" && approvingUser) {
+                const finalPageId = (pageIdInput.trim() || approvingUser.page_id || "").trim();
+
+                if (finalPageId) {
+                  try {
+                    const initialPageSettingsResponse = await fetch(
+                      `${PROXY_BASE_URL}/api/page-settings`,
+                      {
+                        method: "POST",
+                        headers: {
+                          "Content-Type": "application/json",
+                          Authorization: `Bearer ${getAuthToken()}`,
+                        },
+                        body: JSON.stringify({
+                          pageId: finalPageId,
+                          settings: {
+                            type: approvalPageType,
+                            wedding_date: approvingUser.wedding_date || null,
+                            groom_name_en: approvingUser.groom_name_en || null,
+                            bride_name_en: approvingUser.bride_name_en || null,
+                            venue_name_kr: "",
+                            bgm: "off",
+                            bgm_type: "",
+                            bgm_autoplay: false,
+                            bgm_vol: 3,
+                            highlight_shape: "circle",
+                            highlight_color: "#e0e0e0",
+                            highlight_text_color: "black",
+                            gallery_type: "thumbnail",
+                            photo_section_overlay_position: "bottom",
+                            photo_section_overlay_color: "#ffffff",
+                            photo_section_locale: "en",
+                            rsvp: "off",
+                            comments: "off",
+                            wedding_hour: "12",
+                            wedding_minute: "30",
+                          },
+                        }),
+                      }
+                    );
+                    if (initialPageSettingsResponse.ok) {
+                      console.log("Initial page settings created successfully");
+                    }
+                  } catch (err) {
+                    console.warn("Initial page settings creation error:", err);
+                  }
+
+                  await updatePageType(finalPageId, approvalPageType);
+                  await generateRSVPPage(finalPageId);
+                }
+              }
+
+              setSuccess(result.message);
+              setShowApprovalModal(false);
+              setApprovingUser(null);
+              setPageIdInput("");
+              setApprovalPageType(DEFAULT_PAGE_TYPE);
+              loadUsers();
+            } else {
+              setError(result.error);
+            }
+          } catch (err) {
+            setError("승인 처리 중 오류가 발생했습니다.");
+          } finally {
+            setLoading(false);
+          }
+        };
+
+        const handleSaveUser = async () => {
+          setLoading(true);
+          try {
+            const trimmedPageId = userForm.page_id.trim();
+
+            let result;
+            if (editingUser) {
+              const updateData = {
+                id: editingUser.id,
+                username: userForm.username,
+                name: userForm.name,
+                is_active: userForm.is_active,
+                page_id: trimmedPageId,
+                expiry_date: userForm.expiry_date || null,
+                role: userForm.role,
+              };
+              if (userForm.newPassword) {
+                updateData.newPassword = userForm.newPassword;
+              }
+              result = await updateUser(updateData);
+            } else {
+              if (!userForm.username || !userForm.password || !userForm.name) {
+                setError("모든 필드를 입력하세요.");
+                setLoading(false);
+                return;
+              }
+              result = await createUser({
+                username: userForm.username,
+                password: userForm.password,
+                name: userForm.name,
+                page_id: trimmedPageId,
+                role: userForm.role,
+              });
+            }
+
+            if (trimmedPageId) {
+              await updatePageType(trimmedPageId, userForm.type);
+            }
+
+            if (result.success) {
+              setSuccess(result.message || "작업이 완료되었습니다.");
+              setShowAddModal(false);
+              loadUsers();
+            } else {
+              setError(result.error);
+            }
+          } catch (err) {
+            setError("작업 중 오류가 발생했습니다.");
+          } finally {
+            setLoading(false);
+          }
+        };
+
+        const handleDeleteUser = async (user) => {
+          const deleteAllData = confirm(
+            `'${user.name}' 사용자를 삭제하시겠습니까?\n\n⚠️ 확인을 누르면 모든 데이터가 삭제됩니다.\n취소를 누르면 계정만 삭제됩니다.`
+          );
+
+          if (!confirm(deleteAllData ? "⚠️ 경고: 모든 데이터를 영구적으로 삭제합니다. 계속하시겠습니까?" : `'${user.name}' 사용자 계정만 삭제하시겠습니까?`)) {
+            return;
+          }
+
+          setLoading(true);
+          try {
+            if (deleteAllData && user.page_id) {
+              await deleteRSVPPage(user.page_id);
+            }
+
+            const result = await deleteUserApi(user.id, deleteAllData);
+
+            if (result.success) {
+              setSuccess(result.message || "사용자가 성공적으로 삭제되었습니다.");
+              loadUsers();
+            } else {
+              setError(result.error);
+            }
+          } catch (err) {
+            setError("삭제 중 오류가 발생했습니다.");
+          } finally {
+            setLoading(false);
+          }
+        };
+
+        // 사용자 분류
+        const pendingUsers = users.filter((user) => user.approval_status === "pending");
+        const approvedUsers = users.filter((user) => user.approval_status === "approved");
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const expiredUsers = users.filter((user) => {
+          if (!user.expiry_date) return false;
+          const expiryDate = new Date(user.expiry_date);
+          return expiryDate < today && user.approval_status === "approved";
+        });
+
+        const activeUsers = users.filter((user) => {
+          if (!user.expiry_date) {
+            return user.approval_status === "approved" && user.is_active;
+          }
+          const expiryDate = new Date(user.expiry_date);
+          return expiryDate >= today && user.approval_status === "approved" && user.is_active;
+        });
+
+        const getFilteredUsers = () => {
+          switch (activeTab) {
+            case "pending": return pendingUsers;
+            case "active": return activeUsers;
+            case "expired": return expiredUsers;
+            default: return users;
+          }
+        };
+
+        const normalizedSearchTerm = searchTerm.trim().toLowerCase();
+        const filteredUsers = getFilteredUsers().filter((user) => {
+          if (!normalizedSearchTerm) return true;
+          return (
+            user.username.toLowerCase().includes(normalizedSearchTerm) ||
+            user.name.toLowerCase().includes(normalizedSearchTerm)
+          );
+        });
+        const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const paginatedUsers = filteredUsers.slice(startIndex, startIndex + itemsPerPage);
+
+        const handlePageChange = (page) => {
+          setCurrentPage(page);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        };
+
+        const handleBulkDeleteExpired = async () => {
+          if (expiredUsers.length === 0) {
+            alert("만료된 사용자가 없습니다.");
+            return;
+          }
+
+          if (!confirm(`만료된 사용자 ${expiredUsers.length}명을 모두 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`)) {
+            return;
+          }
+
+          setLoading(true);
+          try {
+            const rsvpDeletePromises = expiredUsers.filter((user) => user.page_id).map((user) => deleteRSVPPage(user.page_id));
+            if (rsvpDeletePromises.length > 0) {
+              await Promise.all(rsvpDeletePromises);
+            }
+
+            const deletePromises = expiredUsers.map((user) => deleteUserApi(user.id, true));
+            const results = await Promise.all(deletePromises);
+            const successCount = results.filter((r) => r.success).length;
+            const failCount = results.length - successCount;
+
+            if (failCount > 0) {
+              setError(`${successCount}명 삭제 성공, ${failCount}명 삭제 실패`);
+            } else {
+              setSuccess(`${successCount}명의 사용자가 성공적으로 삭제되었습니다.`);
+            }
+
+            loadUsers();
+          } catch (err) {
+            setError("일괄 삭제 중 오류가 발생했습니다.");
+          } finally {
+            setLoading(false);
+          }
+        };
+
+        const getExpiryStatus = (expiryDate) => {
+          if (!expiryDate) return null;
+          const expiry = new Date(expiryDate);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const diffDays = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+          if (diffDays < 0) return { text: `${Math.abs(diffDays)}일 전 만료`, color: "#dc2626" };
+          if (diffDays === 0) return { text: "오늘 만료", color: "#dc2626" };
+          if (diffDays <= 7) return { text: `${diffDays}일 후 만료`, color: "#f59e0b" };
+          return { text: `${diffDays}일 남음`, color: "#10b981" };
+        };
+
+        // 로그인 화면
+        if (!isAuthenticated) {
+          return (
+            <div style={{ ...style, padding: "40px", backgroundColor: "#f8f9fa", borderRadius: "12px", display: "flex", justifyContent: "center" }}>
+              <div style={{ backgroundColor: "white", padding: "40px", borderRadius: "12px", boxShadow: "0 4px 20px rgba(0,0,0,0.1)", maxWidth: "400px", width: "100%" }}>
+                <div style={{ textAlign: "center", marginBottom: "30px" }}>
+                  <div style={{ fontSize: "48px", marginBottom: "16px" }}>👥</div>
+                  <h2 style={{ margin: 0, fontSize: "24px", color: "#1a237e" }}>사용자 관리</h2>
+                  <p style={{ margin: "8px 0 0", fontSize: "14px", color: "#666" }}>관리자 계정으로 로그인하세요</p>
+                </div>
+
+                <form onSubmit={handleLogin}>
+                  <div style={{ marginBottom: "20px" }}>
+                    <label style={{ display: "block", marginBottom: "6px", fontSize: "14px", fontWeight: "bold" }}>아이디</label>
+                    <input
+                      type="text"
+                      value={loginForm.username}
+                      onChange={(e) => setLoginForm((prev) => ({ ...prev, username: e.target.value }))}
+                      style={{ width: "100%", padding: "12px", border: "2px solid #e0e0e0", borderRadius: "8px", boxSizing: "border-box", fontSize: "16px" }}
+                      required
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: "24px" }}>
+                    <label style={{ display: "block", marginBottom: "6px", fontSize: "14px", fontWeight: "bold" }}>비밀번호</label>
+                    <input
+                      type="password"
+                      value={loginForm.password}
+                      onChange={(e) => setLoginForm((prev) => ({ ...prev, password: e.target.value }))}
+                      style={{ width: "100%", padding: "12px", border: "2px solid #e0e0e0", borderRadius: "8px", boxSizing: "border-box", fontSize: "16px" }}
+                      required
+                    />
+                  </div>
+
+                  {loginError && (
+                    <div style={{ padding: "12px", backgroundColor: "#ffebee", color: "#c62828", borderRadius: "6px", marginBottom: "20px", textAlign: "center" }}>
+                      {loginError}
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={isLoggingIn}
+                    className="btn-hover"
+                    style={{ width: "100%", padding: "14px", backgroundColor: "#1a237e", color: "white", border: "none", borderRadius: "8px", fontSize: "16px", fontWeight: "bold", cursor: "pointer" }}
+                  >
+                    {isLoggingIn ? "로그인 중..." : "로그인"}
+                  </button>
+                </form>
+              </div>
+            </div>
+          );
+        }
+
+        // 관리자 화면
+        return (
+          <div style={{ ...style, display: "flex", flexDirection: "column", gap: "20px", padding: "20px" }}>
+            {/* 헤더 */}
+            <div style={{ padding: "16px", backgroundColor: "#1a237e", color: "white", borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: "18px" }}>👥 사용자 관리</h2>
+                <div style={{ fontSize: "12px", opacity: 0.8, marginTop: "4px" }}>
+                  {currentUser?.name || currentUser?.username}님 | 승인 대기: {pendingUsers.length}명 | 승인됨: {approvedUsers.length}명
+                </div>
+              </div>
+              <button onClick={handleLogout} className="btn-hover" style={{ padding: "8px 16px", backgroundColor: "#f44336", color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "14px" }}>
+                로그아웃
+              </button>
+            </div>
+
+            {/* 알림 메시지 */}
+            {(error || success) && (
+              <div className="animate-fade-in" style={{ padding: "12px 20px", borderRadius: "6px", backgroundColor: error ? "#fef2f2" : "#f0fdf4", border: `1px solid ${error ? "#fecaca" : "#bbf7d0"}`, color: error ? "#dc2626" : "#16a34a" }}>
+                {error || success}
+              </div>
+            )}
+
+            {/* 탭 메뉴 */}
+            <div style={{ display: "flex", gap: "10px", backgroundColor: "white", padding: "10px", borderRadius: "8px", boxShadow: "0 2px 4px rgba(0, 0, 0, 0.05)" }}>
+              {[
+                { key: "all", label: "전체", count: users.length },
+                { key: "pending", label: "승인 대기", count: pendingUsers.length },
+                { key: "active", label: "활성", count: activeUsers.length },
+                { key: "expired", label: "만료", count: expiredUsers.length },
+              ].map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className="btn-hover"
+                  style={{
+                    flex: 1,
+                    padding: "10px 16px",
+                    backgroundColor: activeTab === tab.key ? "#1a237e" : "#f3f4f6",
+                    color: activeTab === tab.key ? "white" : "#1f2937",
+                    border: "none",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                    fontWeight: activeTab === tab.key ? "600" : "500",
+                    transition: "all 0.2s",
+                  }}
+                >
+                  {tab.label} ({tab.count})
+                </button>
+              ))}
+            </div>
+
+            {/* 검색 영역 */}
+            <div
+              style={{
+                marginTop: "12px",
+                backgroundColor: "white",
+                padding: "14px",
+                borderRadius: "8px",
+                boxShadow: "0 2px 4px rgba(0, 0, 0, 0.05)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "8px",
+              }}
+            >
+              <label
+                style={{
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  color: "#1f2937",
+                }}
+                htmlFor="user-search-input"
+              >
+                🔎 사용자명/이름 검색
+              </label>
+              <div
+                style={{
+                  display: "flex",
+                  gap: "10px",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                }}
+              >
+                <input
+                  id="user-search-input"
+                  type="search"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="예: roarc 또는 홍길동"
+                  style={{
+                    flex: 1,
+                    minWidth: "220px",
+                    padding: "10px 14px",
+                    border: "1px solid #d1d5db",
+                    borderRadius: "8px",
+                    fontSize: "14px",
+                    outline: "none",
+                    height: "44px",
+                  }}
+                  aria-label="사용자명 또는 이름 검색"
+                />
+                <button
+                  onClick={() => setSearchTerm("")}
+                  disabled={!searchTerm.trim()}
+                  className="btn-hover"
+                  style={{
+                    padding: "10px 16px",
+                    backgroundColor: searchTerm.trim()
+                      ? "#111827"
+                      : "#e5e7eb",
+                    color: searchTerm.trim() ? "white" : "#9ca3af",
+                    border: "none",
+                    borderRadius: "8px",
+                    fontSize: "14px",
+                    cursor: searchTerm.trim() ? "pointer" : "not-allowed",
+                    height: "44px",
+                  }}
+                >
+                  초기화
+                </button>
+              </div>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "12px",
+                  color: "#6b7280",
+                }}
+              >
+                검색은 현재 선택한 탭 필터와 함께 적용됩니다.
+              </p>
+            </div>
+
+            {/* 승인 대기자 섹션 */}
+            {pendingUsers.length > 0 && (
+              <div style={{ backgroundColor: "#fffbeb", border: "1px solid #fbbf24", borderRadius: "10px", padding: "20px" }}>
+                <h3 style={{ fontSize: "18px", fontWeight: "600", color: "#92400e", margin: "0 0 15px 0" }}>
+                  ⏳ 승인 대기 중인 사용자 ({pendingUsers.length})
+                </h3>
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {pendingUsers.map((user) => (
+                    <div key={user.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "15px", backgroundColor: "white", borderRadius: "8px", border: "1px solid #fbbf24" }}>
+                      <div>
+                        <h4 style={{ fontSize: "16px", fontWeight: "600", color: "#1f2937", margin: "0 0 5px 0" }}>{user.name} ({user.username})</h4>
+                        <p style={{ fontSize: "14px", color: "#6b7280", margin: 0 }}>가입일: {new Date(user.created_at).toLocaleDateString()}</p>
+                      </div>
+                      <div style={{ display: "flex", gap: "10px" }}>
+                        <button onClick={() => handleShowApprovalModal(user)} className="btn-hover" style={{ padding: "8px 16px", backgroundColor: "#10b981", color: "white", border: "none", borderRadius: "4px", fontSize: "12px", cursor: "pointer" }}>
+                          승인 처리
+                        </button>
+                        <button onClick={() => handleApproveUser("rejected")} className="btn-hover" style={{ padding: "8px 16px", backgroundColor: "#ef4444", color: "white", border: "none", borderRadius: "4px", fontSize: "12px", cursor: "pointer" }}>
+                          거부
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 사용자 목록 헤더 */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px", backgroundColor: "white", borderRadius: "10px", boxShadow: "0 2px 4px rgba(0, 0, 0, 0.05)" }}>
+              <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1f2937", margin: 0 }}>
+                {activeTab === "all" && `전체 사용자 (${filteredUsers.length})`}
+                {activeTab === "pending" && `승인 대기 (${filteredUsers.length})`}
+                {activeTab === "active" && `활성 사용자 (${filteredUsers.length})`}
+                {activeTab === "expired" && `만료된 사용자 (${filteredUsers.length})`}
+              </h2>
+              <div style={{ display: "flex", gap: "10px" }}>
+                {activeTab === "expired" && expiredUsers.length > 0 && (
+                  <button onClick={handleBulkDeleteExpired} disabled={loading} className="btn-hover" style={{ padding: "10px 20px", backgroundColor: loading ? "#9ca3af" : "#ef4444", color: "white", border: "none", borderRadius: "6px", fontSize: "14px", fontWeight: "500", cursor: loading ? "not-allowed" : "pointer" }}>
+                    🗑️ 만료된 사용자 일괄 삭제
+                  </button>
+                )}
+                <button onClick={handleAddUser} className="btn-hover" style={{ padding: "10px 20px", backgroundColor: "#10b981", color: "white", border: "none", borderRadius: "6px", fontSize: "14px", fontWeight: "500", cursor: "pointer" }}>
+                  직접 사용자 추가
+                </button>
+                <button onClick={loadUsers} className="btn-hover" style={{ padding: "10px 20px", backgroundColor: "#2196f3", color: "white", border: "none", borderRadius: "6px", fontSize: "14px", fontWeight: "500", cursor: "pointer" }}>
+                  새로고침
+                </button>
+              </div>
+            </div>
+
+            {/* 사용자 목록 */}
+            <div style={{ backgroundColor: "white", borderRadius: "10px", boxShadow: "0 2px 4px rgba(0, 0, 0, 0.05)", overflow: "hidden" }}>
+              {loading ? (
+                <div style={{ textAlign: "center", padding: "40px", color: "#6b7280" }}>로딩 중...</div>
+              ) : paginatedUsers.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "40px", color: "#6b7280" }}>
+                  {activeTab === "expired" ? "만료된 사용자가 없습니다." : activeTab === "active" ? "활성 사용자가 없습니다." : activeTab === "pending" ? "승인 대기 중인 사용자가 없습니다." : "등록된 사용자가 없습니다."}
+                </div>
+              ) : (
+                <div style={{ padding: "20px" }}>
+                  {paginatedUsers.map((user, index) => {
+                    const expiryStatus = getExpiryStatus(user.expiry_date);
+                    const mobileInviteUrl = buildMobileInviteUrl(user);
+                    return (
+                      <div
+                        key={user.id}
+                        className="animate-slide-up"
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          padding: "15px",
+                          border: "1px solid #e5e7eb",
+                          borderRadius: "8px",
+                          marginBottom: "10px",
+                          backgroundColor: user.approval_status === "pending" ? "#fffbeb" : user.approval_status === "rejected" ? "#fef2f2" : user.is_active ? "#fafafa" : "#f3f4f6",
+                          animationDelay: `${index * 0.05}s`,
+                        }}
+                      >
+                        <div>
+                          <h3 style={{ fontSize: "16px", fontWeight: "600", color: user.is_active ? "#1f2937" : "#6b7280", margin: "0 0 5px 0" }}>
+                            {user.name} ({user.username})
+                            {user.approval_status === "pending" && " - 승인 대기"}
+                            {user.approval_status === "rejected" && " - 승인 거부"}
+                            {!user.is_active && user.approval_status === "approved" && " - 비활성"}
+                          </h3>
+                          <p style={{ fontSize: "14px", color: "#6b7280", margin: 0 }}>
+                            가입: {new Date(user.created_at).toLocaleDateString()}
+                            {user.last_login && ` | 마지막 로그인: ${new Date(user.last_login).toLocaleDateString()}`}
+                            {user.page_id && ` | Page ID: ${user.page_id}`}
+                            {user.role && ` | 권한: ${user.role === "admin" ? "관리자" : "사용자"}`}
+                          </p>
+                          {(user.wedding_date || user.groom_name_en || user.bride_name_en) && (
+                            <div style={{ marginTop: "8px", padding: "8px", backgroundColor: "#f0f9ff", borderRadius: "4px", border: "1px solid #bae6fd" }}>
+                              <p style={{ fontSize: "12px", fontWeight: "600", color: "#0369a1", margin: "0 0 4px 0" }}>💒 웨딩 정보:</p>
+                              {user.wedding_date && <p style={{ fontSize: "11px", color: "#0369a1", margin: "2px 0" }}>예식일: {new Date(user.wedding_date).toLocaleDateString()}</p>}
+                              {(user.groom_name_en || user.bride_name_en) && (
+                                <p style={{ fontSize: "11px", color: "#0369a1", margin: "2px 0" }}>
+                                  {user.groom_name_en && user.bride_name_en ? `${user.groom_name_en} & ${user.bride_name_en}` : user.groom_name_en || user.bride_name_en}
+                                </p>
+                              )}
+                            </div>
+                          )}
+                          {expiryStatus && <p style={{ fontSize: "13px", color: expiryStatus.color, margin: "5px 0 0 0", fontWeight: "600" }}>📅 {expiryStatus.text}</p>}
+                        </div>
+                        <div style={{ display: "flex", gap: "10px" }}>
+                          {user.approval_status === "pending" && (
+                            <button onClick={() => handleShowApprovalModal(user)} className="btn-hover" style={{ padding: "8px 16px", backgroundColor: "#10b981", color: "white", border: "none", borderRadius: "4px", fontSize: "12px", cursor: "pointer" }}>
+                              승인
+                            </button>
+                          )}
+                          {mobileInviteUrl && (
+                            <button
+                              onClick={() =>
+                                window.open(
+                                  mobileInviteUrl,
+                                  "_blank",
+                                  "noopener,noreferrer"
+                                )
+                              }
+                              className="btn-hover"
+                              style={{
+                                padding: "8px 16px",
+                                backgroundColor: "#8b5cf6",
+                                color: "white",
+                                border: "none",
+                                borderRadius: "4px",
+                                fontSize: "12px",
+                                cursor: "pointer",
+                              }}
+                              title="예식일+Page ID를 사용한 모바일 청첩장 바로가기"
+                              aria-label="모바일 청첩장 열기"
+                            >
+                              모바일 청첩장
+                            </button>
+                          )}
+                          <button onClick={() => handleEditUser(user)} className="btn-hover" style={{ padding: "8px 16px", backgroundColor: "#3b82f6", color: "white", border: "none", borderRadius: "4px", fontSize: "12px", cursor: "pointer" }}>
+                            편집
+                          </button>
+                          <button onClick={() => handleDeleteUser(user)} className="btn-hover" style={{ padding: "8px 16px", backgroundColor: "#ef4444", color: "white", border: "none", borderRadius: "4px", fontSize: "12px", cursor: "pointer" }}>
+                            삭제
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* 페이지네이션 */}
+              {totalPages > 1 && (
+                <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "8px", padding: "20px", borderTop: "1px solid #e5e7eb" }}>
+                  <button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} className="btn-hover" style={{ padding: "8px 12px", backgroundColor: currentPage === 1 ? "#f3f4f6" : "#ffffff", color: currentPage === 1 ? "#9ca3af" : "#374151", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "14px", cursor: currentPage === 1 ? "not-allowed" : "pointer" }}>
+                    ← 이전
+                  </button>
+
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                    const showPage = page === 1 || page === totalPages || Math.abs(page - currentPage) <= 2;
+                    if (!showPage) {
+                      if (page === currentPage - 3 || page === currentPage + 3) {
+                        return <span key={page} style={{ padding: "8px 4px", color: "#9ca3af", fontSize: "14px" }}>...</span>;
+                      }
+                      return null;
+                    }
+                    return (
+                      <button key={page} onClick={() => handlePageChange(page)} className="btn-hover" style={{ padding: "8px 12px", backgroundColor: currentPage === page ? "#1a237e" : "#ffffff", color: currentPage === page ? "#ffffff" : "#374151", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "14px", cursor: "pointer", minWidth: "40px" }}>
+                        {page}
+                      </button>
+                    );
+                  })}
+
+                  <button onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} className="btn-hover" style={{ padding: "8px 12px", backgroundColor: currentPage === totalPages ? "#f3f4f6" : "#ffffff", color: currentPage === totalPages ? "#9ca3af" : "#374151", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "14px", cursor: currentPage === totalPages ? "not-allowed" : "pointer" }}>
+                    다음 →
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* 사용자 추가/편집 모달 */}
+            {showAddModal && (
+              <div className="animate-fade-in" style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0, 0, 0, 0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
+                <div className="animate-scale-in" style={{ backgroundColor: "white", borderRadius: "10px", padding: "30px", width: "100%", maxWidth: "500px", maxHeight: "80vh", overflow: "auto" }}>
+                  <h2 style={{ fontSize: "24px", fontWeight: "600", marginBottom: "20px", color: "#1f2937" }}>
+                    {editingUser ? "사용자 편집" : "새 사용자 추가"}
+                  </h2>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "20px", marginBottom: "30px" }}>
+                    <InputField label="사용자명" type="text" value={userForm.username} onChange={(value) => setUserForm((prev) => ({ ...prev, username: value }))} required />
+                    <InputField label="이름" type="text" value={userForm.name} onChange={(value) => setUserForm((prev) => ({ ...prev, name: value }))} required />
+                    <InputField label="Page ID" type="text" value={userForm.page_id} onChange={(value) => setUserForm((prev) => ({ ...prev, page_id: value }))} />
+
+                    <div>
+                      <label style={{ display: "block", fontSize: "14px", fontWeight: "500", color: "#374151", marginBottom: "5px" }}>권한</label>
+                      <select value={userForm.role} onChange={(e) => setUserForm((prev) => ({ ...prev, role: e.target.value }))} style={{ width: "100%", padding: "10px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "14px", outline: "none", boxSizing: "border-box", background: "white" }}>
+                        <option value="user">사용자</option>
+                        <option value="admin">관리자</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ display: "block", fontSize: "14px", fontWeight: "500", color: "#374151", marginBottom: "5px" }}>타입</label>
+                      <select value={userForm.type} onChange={(e) => setUserForm((prev) => ({ ...prev, type: e.target.value }))} style={{ width: "100%", padding: "10px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "14px", outline: "none", boxSizing: "border-box", background: "white" }}>
+                        {PAGE_TYPES.map((type) => (
+                          <option key={type} value={type}>{type}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {!editingUser && <InputField label="비밀번호" type="password" value={userForm.password} onChange={(value) => setUserForm((prev) => ({ ...prev, password: value }))} required />}
+                    {editingUser && <InputField label="새 비밀번호 (변경하지 않으려면 비워두세요)" type="password" value={userForm.newPassword} onChange={(value) => setUserForm((prev) => ({ ...prev, newPassword: value }))} />}
+
+                    <div>
+                      <label style={{ display: "block", fontSize: "14px", fontWeight: "500", color: "#374151", marginBottom: "5px" }}>서비스 만료 기간</label>
+                      <input type="date" value={userForm.expiry_date} onChange={(e) => setUserForm((prev) => ({ ...prev, expiry_date: e.target.value }))} style={{ width: "100%", padding: "10px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "14px", outline: "none", boxSizing: "border-box" }} />
+                      <p style={{ fontSize: "12px", color: "#6b7280", margin: "5px 0 0 0" }}>만료 기간을 설정하지 않으면 무제한입니다.</p>
+                    </div>
+
+                    <div>
+                      <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", fontWeight: "500", color: "#374151", cursor: "pointer" }}>
+                        <input type="checkbox" checked={userForm.is_active} onChange={(e) => setUserForm((prev) => ({ ...prev, is_active: e.target.checked }))} style={{ width: "16px", height: "16px" }} />
+                        활성 사용자
+                      </label>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+                    <button onClick={() => setShowAddModal(false)} className="btn-hover" style={{ padding: "10px 20px", backgroundColor: "#6b7280", color: "white", border: "none", borderRadius: "6px", fontSize: "14px", cursor: "pointer" }}>
+                      취소
+                    </button>
+                    <button onClick={handleSaveUser} disabled={loading} className="btn-hover" style={{ padding: "10px 20px", backgroundColor: loading ? "#9ca3af" : "#10b981", color: "white", border: "none", borderRadius: "6px", fontSize: "14px", cursor: loading ? "not-allowed" : "pointer" }}>
+                      {loading ? "저장 중..." : "저장"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 승인 모달 */}
+            {showApprovalModal && approvingUser && (
+              <div className="animate-fade-in" style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0, 0, 0, 0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
+                <div className="animate-scale-in" style={{ backgroundColor: "white", borderRadius: "10px", padding: "30px", width: "100%", maxWidth: "450px" }}>
+                  <h2 style={{ fontSize: "24px", fontWeight: "600", marginBottom: "20px", color: "#1f2937" }}>사용자 승인</h2>
+
+                  <div style={{ marginBottom: "25px" }}>
+                    <p style={{ fontSize: "16px", color: "#374151", margin: "0 0 10px 0" }}>
+                      <strong>{approvingUser.name}</strong> ({approvingUser.username})님을 승인하시겠습니까?
+                    </p>
+                    <p style={{ fontSize: "14px", color: "#6b7280", margin: 0 }}>승인 시 개인 웨딩 페이지 ID를 발급해주세요.</p>
+
+                    {(approvingUser.wedding_date || approvingUser.groom_name_en || approvingUser.bride_name_en) && (
+                      <div style={{ marginTop: "15px", padding: "12px", backgroundColor: "#f8f9fa", borderRadius: "6px", border: "1px solid #e5e7eb" }}>
+                        <p style={{ fontSize: "13px", fontWeight: "600", color: "#374151", margin: "0 0 8px 0" }}>📋 입력된 웨딩 정보:</p>
+                        {approvingUser.wedding_date && <p style={{ fontSize: "12px", color: "#6b7280", margin: "2px 0" }}>예식일자: {new Date(approvingUser.wedding_date).toLocaleDateString()}</p>}
+                        {approvingUser.groom_name_en && <p style={{ fontSize: "12px", color: "#6b7280", margin: "2px 0" }}>신랑 영문명: {approvingUser.groom_name_en}</p>}
+                        {approvingUser.bride_name_en && <p style={{ fontSize: "12px", color: "#6b7280", margin: "2px 0" }}>신부 영문명: {approvingUser.bride_name_en}</p>}
+                        <p style={{ fontSize: "11px", color: "#9ca3af", margin: "8px 0 0 0", fontStyle: "italic" }}>승인 시 위 정보가 페이지 설정에 자동 반영됩니다.</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ marginBottom: "25px" }}>
+                    <InputField label="Page ID" type="text" value={pageIdInput} onChange={(value) => setPageIdInput(value)} />
+                    <p style={{ fontSize: "12px", color: "#6b7280", margin: "5px 0 0 0" }}>회원가입 시 생성된 Page ID가 자동 입력됩니다. 필요시 수정 가능합니다.</p>
+                  </div>
+
+                  <div style={{ marginBottom: "25px" }}>
+                    <label style={{ display: "block", fontSize: "14px", fontWeight: "500", color: "#374151", marginBottom: "5px" }}>타입</label>
+                    <select value={approvalPageType} onChange={(e) => { if (isPageType(e.target.value)) setApprovalPageType(e.target.value); }} style={{ width: "100%", padding: "10px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "14px", outline: "none", boxSizing: "border-box", background: "white" }}>
+                      {PAGE_TYPES.map((type) => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                    </select>
+                    <p style={{ fontSize: "12px", color: "#6b7280", margin: "5px 0 0 0" }}>선택한 타입은 승인 시 페이지 설정에 저장되며 이후 편집에서도 변경할 수 있습니다.</p>
+                  </div>
+
+                  <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+                    <button onClick={() => setShowApprovalModal(false)} className="btn-hover" style={{ padding: "10px 20px", backgroundColor: "#6b7280", color: "white", border: "none", borderRadius: "6px", fontSize: "14px", cursor: "pointer" }}>
+                      취소
+                    </button>
+                    <button onClick={() => handleApproveUser("rejected")} className="btn-hover" style={{ padding: "10px 20px", backgroundColor: "#ef4444", color: "white", border: "none", borderRadius: "6px", fontSize: "14px", cursor: "pointer" }}>
+                      거부
+                    </button>
+                    <button onClick={() => handleApproveUser("approved")} disabled={loading} className="btn-hover" style={{ padding: "10px 20px", backgroundColor: loading ? "#9ca3af" : "#10b981", color: "white", border: "none", borderRadius: "6px", fontSize: "14px", cursor: loading ? "not-allowed" : "pointer" }}>
+                      {loading ? "승인 중..." : "승인"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      // 렌더링
+      const rootElement = document.getElementById("root");
+      const root = ReactDOM.createRoot(rootElement);
+      root.render(
+        <div className="page-wrapper">
+          <UserManagement />
+        </div>
+      );
+    </script>
+  </body>
+</html>
