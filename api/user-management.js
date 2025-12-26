@@ -6,26 +6,11 @@ const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/cl
 const supabaseUrl = process.env.SUPABASE_URL
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY
 
-// 환경변수 검증을 함수 실행 시점으로 옮김
-let supabase = null
-
-function getSupabaseClient() {
-  if (!supabase) {
-    const supabaseUrl = process.env.SUPABASE_URL
-    const supabaseKey = process.env.SUPABASE_SERVICE_KEY
-
-    if (!supabaseUrl || !supabaseKey) {
-      console.error('Missing environment variables:', {
-        hasSupabaseUrl: !!supabaseUrl,
-        hasSupabaseKey: !!supabaseKey
-      })
-      throw new Error('SUPABASE_URL and SUPABASE_SERVICE_KEY environment variables are required')
-    }
-
-    supabase = createClient(supabaseUrl, supabaseKey)
-  }
-  return supabase
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error('SUPABASE_URL and SUPABASE_SERVICE_KEY environment variables are required')
 }
+
+const supabase = createClient(supabaseUrl, supabaseKey)
 
 // RSVP 전용 R2 클라이언트 (HTML 정적 페이지 업로드/삭제)
 const rsvpR2Client = new S3Client({
@@ -132,8 +117,6 @@ module.exports = async function handler(req, res) {
 
 // POST 요청 처리 (action 기반 라우팅)
 async function handlePostRequest(req, res) {
-  console.log('handlePostRequest called - Method:', req.method, 'URL:', req.url)
-
   let body = req.body
 
   // req.body가 없는 경우 요청을 파싱 (auth.js 호환성)
@@ -155,8 +138,6 @@ async function handlePostRequest(req, res) {
   }
 
   const { action } = body || {}
-
-  console.log('handlePostRequest - Action:', action, 'Body keys:', Object.keys(body || {}))
 
   switch (action) {
     case 'test':
@@ -207,19 +188,13 @@ function dateSegmentToIso(raw) {
 }
 
 async function handleCheckUserUrl(req, res, body) {
-  console.log('handleCheckUserUrl called with body:', body)
-  console.log('Headers:', req.headers.authorization ? 'Auth header present' : 'No auth header')
-
   const authResult = checkAuth(req, res)
   if (authResult.error) {
-    console.log('Check user_url auth failed:', authResult.error.message)
     return res.status(authResult.error.status).json({
       success: false,
       error: authResult.error.message,
     })
   }
-
-  console.log('Auth successful, tokenData:', authResult.tokenData)
 
   const tokenData = authResult.tokenData
   const userUrl = normalizeUserUrlInput(body?.user_url ?? body?.userUrl ?? '')
@@ -236,57 +211,37 @@ async function handleCheckUserUrl(req, res, body) {
     const currentUserId = tokenData?.userId || null
     const currentPageId = tokenData?.page_id || null
 
-    console.log('Querying with:', { dateIso, userUrl, currentUserId, currentPageId })
-
     // admin_users: 같은 날짜 + 같은 user_url, 단 본인 제외
-    console.log('Querying admin_users...')
-    const { data: adminHit, error: adminErr } = await getSupabaseClient()
+    const { data: adminHit, error: adminErr } = await supabase
       .from('admin_users')
       .select('id, page_id, user_url, wedding_date')
       .eq('wedding_date', dateIso)
       .eq('user_url', userUrl)
       .limit(1)
 
-    console.log('admin_users result:', { data: adminHit, error: adminErr })
-
-    if (adminErr) {
-      console.error('admin_users query error:', adminErr)
-      throw adminErr
-    }
+    if (adminErr) throw adminErr
 
     const adminConflict =
       Array.isArray(adminHit) &&
       adminHit.length > 0 &&
       (!currentUserId || adminHit[0].id !== currentUserId)
 
-    console.log('adminConflict:', adminConflict)
-
     // naver_admin_accounts: 같은 날짜 + 같은 user_url, 단 현재 page_id와 같으면 본인으로 간주
-    console.log('Querying naver_admin_accounts...')
-    const { data: naverHit, error: naverErr } = await getSupabaseClient()
+    const { data: naverHit, error: naverErr } = await supabase
       .from('naver_admin_accounts')
       .select('id, page_id, user_url, wedding_date')
       .eq('wedding_date', dateIso)
       .eq('user_url', userUrl)
       .limit(1)
 
-    console.log('naver_admin_accounts result:', { data: naverHit, error: naverErr })
-
-    if (naverErr) {
-      console.error('naver_admin_accounts query error:', naverErr)
-      throw naverErr
-    }
+    if (naverErr) throw naverErr
 
     const naverConflict =
       Array.isArray(naverHit) &&
       naverHit.length > 0 &&
       (!currentPageId || (naverHit[0].page_id && naverHit[0].page_id !== currentPageId))
 
-    console.log('naverConflict:', naverConflict)
-
     const conflict = adminConflict || naverConflict
-
-    console.log('Final result:', { conflict, available: !conflict })
 
     return res.status(200).json({
       success: true,
@@ -296,8 +251,7 @@ async function handleCheckUserUrl(req, res, body) {
     })
   } catch (error) {
     console.error('Check user_url error:', error)
-    console.error('Error stack:', error.stack)
-    return res.status(500).json({ success: false, error: 'user_url 중복 검사 중 오류가 발생했습니다', details: error.message })
+    return res.status(500).json({ success: false, error: 'user_url 중복 검사 중 오류가 발생했습니다' })
   }
 }
 
@@ -333,7 +287,7 @@ async function handleUpdateUserUrl(req, res, body) {
 
   try {
     // 중복 체크 (본인 제외)
-    const { data: hits, error: hitErr } = await getSupabaseClient()
+    const { data: hits, error: hitErr } = await supabase
       .from('admin_users')
       .select('id')
       .eq('wedding_date', dateIso)
@@ -348,7 +302,7 @@ async function handleUpdateUserUrl(req, res, body) {
 
     // admin_users 업데이트
     const nowIso = new Date().toISOString()
-    const { data: updated, error: updErr } = await getSupabaseClient()
+    const { data: updated, error: updErr } = await supabase
       .from('admin_users')
       .update({ user_url: userUrl, updated_at: nowIso })
       .eq('id', userId)
@@ -580,7 +534,7 @@ async function handleDeleteRequest(req, res) {
                 if (urlParts.length > 1) {
                   const [bucket, ...pathParts] = urlParts[1].split('/')
                   const filePath = pathParts.join('/')
-                  await getSupabaseClient().storage.from(bucket).remove([filePath])
+                  await supabase.storage.from(bucket).remove([filePath])
                   console.log(`[DELETE] Supabase Storage 이미지 삭제: ${filePath}`)
                 }
               }
@@ -2366,99 +2320,5 @@ function buildDefaultPageSettings(pageId, weddingInfo = {}, timestamp = new Date
     vid_url_saved: '',
     created_at: timestamp,
     updated_at: timestamp
-  }
-}
-
-// Version: 2025-10-13 - Unified User Management API
-
-// URL 중복 검사
-async function handleCheckUserUrl(req, res, body) {
-  const { user_url, date } = body
-  if (!user_url || !date) {
-    return res.status(400).json({ success: false, error: 'user_url and date are required' })
-  }
-
-  try {``
-    // 날짜 형식 검증 (YYMMDD)
-    if (!/^\d{6}$/.test(date)) {
-      return res.status(400).json({ success: false, error: 'Invalid date format' })
-    }
-
-    // YYYY-MM-DD로 변환
-    const yyyy = '20' + date.slice(0, 2)
-    const mm = date.slice(2, 4)
-    const dd = date.slice(4, 6)
-    const isoDate = `${yyyy}-${mm}-${dd}`
-
-    // admin_users와 naver_admin_accounts에서 중복 검사
-    const adminUsers = await supaGet(`admin_users?wedding_date=eq.${encodeURIComponent(isoDate)}&user_url=eq.${encodeURIComponent(user_url)}&select=id`)
-    const naverAccounts = await supaGet(`naver_admin_accounts?wedding_date=eq.${encodeURIComponent(isoDate)}&user_url=eq.${encodeURIComponent(user_url)}&select=id`)
-
-    const isAvailable = adminUsers.length === 0 && naverAccounts.length === 0
-
-    res.json({
-      success: true,
-      available: isAvailable
-    })
-  } catch (error) {
-    console.error('Check user URL error:', error)
-    res.status(500).json({ success: false, error: 'Server error' })
-  }
-}
-
-// URL 업데이트
-async function handleUpdateUserUrl(req, res, body) {
-  const tokenData = checkAuth(req, res)
-  if (tokenData.error) return
-
-  const { user_url, date } = body
-  if (!user_url || !date) {
-    return res.status(400).json({ success: false, error: 'user_url and date are required' })
-  }
-
-  try {
-    // 날짜 형식 검증 (YYMMDD)
-    if (!/^\d{6}$/.test(date)) {
-      return res.status(400).json({ success: false, error: 'Invalid date format' })
-    }
-
-    // YYYY-MM-DD로 변환
-    const yyyy = '20' + date.slice(0, 2)
-    const mm = date.slice(2, 4)
-    const dd = date.slice(4, 6)
-    const isoDate = `${yyyy}-${mm}-${dd}`
-
-    // 토큰에서 사용자 정보 추출
-    const userId = tokenData.tokenData.userId
-    const pageId = tokenData.tokenData.page_id
-
-    if (!userId || !pageId) {
-      return res.status(400).json({ success: false, error: 'Invalid token' })
-    }
-
-    // 먼저 중복 검사
-    const adminUsers = await supaGet(`admin_users?wedding_date=eq.${encodeURIComponent(isoDate)}&user_url=eq.${encodeURIComponent(user_url)}&id=neq.${userId}&select=id`)
-    const naverAccounts = await supaGet(`naver_admin_accounts?wedding_date=eq.${encodeURIComponent(isoDate)}&user_url=eq.${encodeURIComponent(user_url)}&page_id=neq.${encodeURIComponent(pageId)}&select=id`)
-
-    if (adminUsers.length > 0 || naverAccounts.length > 0) {
-      return res.status(400).json({ success: false, error: 'URL already exists' })
-    }
-
-    // admin_users 업데이트
-    await supaPatch(`admin_users?id=eq.${userId}`, {
-      user_url,
-      updated_at: new Date().toISOString()
-    })
-
-    // naver_admin_accounts도 업데이트 (page_id로 찾아서)
-    await supaPatch(`naver_admin_accounts?page_id=eq.${encodeURIComponent(pageId)}`, {
-      user_url,
-      updated_at: new Date().toISOString()
-    })
-
-    res.json({ success: true })
-  } catch (error) {
-    console.error('Update user URL error:', error)
-    res.status(500).json({ success: false, error: 'Server error' })
   }
 }
