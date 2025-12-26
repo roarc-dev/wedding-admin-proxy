@@ -6,15 +6,26 @@ const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/cl
 const supabaseUrl = process.env.SUPABASE_URL
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY
 
-if (!supabaseUrl || !supabaseKey) {
-  console.error('Missing environment variables:', {
-    hasSupabaseUrl: !!supabaseUrl,
-    hasSupabaseKey: !!supabaseKey
-  })
-  throw new Error('SUPABASE_URL and SUPABASE_SERVICE_KEY environment variables are required')
-}
+// 환경변수 검증을 함수 실행 시점으로 옮김
+let supabase = null
 
-const supabase = createClient(supabaseUrl, supabaseKey)
+function getSupabaseClient() {
+  if (!supabase) {
+    const supabaseUrl = process.env.SUPABASE_URL
+    const supabaseKey = process.env.SUPABASE_SERVICE_KEY
+
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('Missing environment variables:', {
+        hasSupabaseUrl: !!supabaseUrl,
+        hasSupabaseKey: !!supabaseKey
+      })
+      throw new Error('SUPABASE_URL and SUPABASE_SERVICE_KEY environment variables are required')
+    }
+
+    supabase = createClient(supabaseUrl, supabaseKey)
+  }
+  return supabase
+}
 
 // RSVP 전용 R2 클라이언트 (HTML 정적 페이지 업로드/삭제)
 const rsvpR2Client = new S3Client({
@@ -229,7 +240,7 @@ async function handleCheckUserUrl(req, res, body) {
 
     // admin_users: 같은 날짜 + 같은 user_url, 단 본인 제외
     console.log('Querying admin_users...')
-    const { data: adminHit, error: adminErr } = await supabase
+    const { data: adminHit, error: adminErr } = await getSupabaseClient()
       .from('admin_users')
       .select('id, page_id, user_url, wedding_date')
       .eq('wedding_date', dateIso)
@@ -252,7 +263,7 @@ async function handleCheckUserUrl(req, res, body) {
 
     // naver_admin_accounts: 같은 날짜 + 같은 user_url, 단 현재 page_id와 같으면 본인으로 간주
     console.log('Querying naver_admin_accounts...')
-    const { data: naverHit, error: naverErr } = await supabase
+    const { data: naverHit, error: naverErr } = await getSupabaseClient()
       .from('naver_admin_accounts')
       .select('id, page_id, user_url, wedding_date')
       .eq('wedding_date', dateIso)
@@ -322,7 +333,7 @@ async function handleUpdateUserUrl(req, res, body) {
 
   try {
     // 중복 체크 (본인 제외)
-    const { data: hits, error: hitErr } = await supabase
+    const { data: hits, error: hitErr } = await getSupabaseClient()
       .from('admin_users')
       .select('id')
       .eq('wedding_date', dateIso)
@@ -337,7 +348,7 @@ async function handleUpdateUserUrl(req, res, body) {
 
     // admin_users 업데이트
     const nowIso = new Date().toISOString()
-    const { data: updated, error: updErr } = await supabase
+    const { data: updated, error: updErr } = await getSupabaseClient()
       .from('admin_users')
       .update({ user_url: userUrl, updated_at: nowIso })
       .eq('id', userId)
@@ -569,7 +580,7 @@ async function handleDeleteRequest(req, res) {
                 if (urlParts.length > 1) {
                   const [bucket, ...pathParts] = urlParts[1].split('/')
                   const filePath = pathParts.join('/')
-                  await supabase.storage.from(bucket).remove([filePath])
+                  await getSupabaseClient().storage.from(bucket).remove([filePath])
                   console.log(`[DELETE] Supabase Storage 이미지 삭제: ${filePath}`)
                 }
               }
