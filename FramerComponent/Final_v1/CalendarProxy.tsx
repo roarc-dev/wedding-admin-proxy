@@ -141,11 +141,12 @@ async function getInviteData(
     }
 }
 
-// 날짜 문자열을 UTC 자정으로 파싱하는 헬퍼 함수 (타임존 독립적 처리)
-function parseDateAsUTC(dateString: string): Date {
-    // YYYY-MM-DD 형식의 날짜를 UTC 자정으로 파싱
-    const date = new Date(dateString + 'T00:00:00.000Z');
-    return date;
+// 날짜 문자열을 KST(한국 표준시, UTC+9) 자정으로 파싱하는 헬퍼 함수
+function parseDateAsKST(dateString: string): Date {
+    // YYYY-MM-DD 형식의 날짜를 KST 자정으로 파싱
+    // KST는 UTC+9이므로, UTC로는 전날 15:00에 해당
+    const date = new Date(dateString + "T00:00:00+09:00")
+    return date
 }
 
 // 프록시를 통한 캘린더 데이터 가져오기
@@ -295,9 +296,12 @@ export default function CalendarComponentProxy({
                 setCurrentYear(firstDate.getFullYear())
             } else if (settings && settings.wedding_date) {
                 // 캘린더 데이터가 없으면 웨딩 날짜를 기준으로 월 설정
-                const weddingDate = parseDateAsUTC(settings.wedding_date)
-                setCurrentMonth((weddingDate.getUTCMonth() + 1).toString())
-                setCurrentYear(weddingDate.getUTCFullYear())
+                const weddingDate = parseDateAsKST(settings.wedding_date)
+                // KST 기준으로 월과 연도 추출
+                const kstYear = weddingDate.getUTCFullYear()
+                const kstMonth = weddingDate.getUTCMonth()
+                setCurrentMonth((kstMonth + 1).toString())
+                setCurrentYear(kstYear)
             }
         } catch (error) {
             setError(
@@ -314,7 +318,7 @@ export default function CalendarComponentProxy({
         loadData()
     }, [pageId])
 
-    // D-day 계산 함수
+    // D-day 계산 함수 (KST 기준)
     const calculateDday = () => {
         try {
             const weddingDate = pageSettings?.wedding_date
@@ -322,14 +326,22 @@ export default function CalendarComponentProxy({
                 return "D-00일"
             }
 
-            const today = new Date()
-            // 타임존 독립적으로 웨딩 날짜를 UTC 자정으로 파싱
-            const targetDate = parseDateAsUTC(weddingDate)
+            // 현재 시간을 KST 기준으로 가져오기
+            const now = new Date()
+            // KST 오프셋(UTC+9) 적용: 현재 UTC 시간에 9시간을 더한 후 자정으로 정규화
+            const nowKST = new Date(now.getTime() + 9 * 60 * 60 * 1000)
+            const todayKST = new Date(
+                Date.UTC(
+                    nowKST.getUTCFullYear(),
+                    nowKST.getUTCMonth(),
+                    nowKST.getUTCDate()
+                )
+            )
 
-            // 현재 날짜도 UTC 자정으로 정규화
-            const todayUTC = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+            // 웨딩 날짜를 KST 자정으로 파싱
+            const targetDate = parseDateAsKST(weddingDate)
 
-            const timeDiff = targetDate.getTime() - todayUTC.getTime()
+            const timeDiff = targetDate.getTime() - todayKST.getTime()
             const dayDiff = Math.ceil(timeDiff / (1000 * 3600 * 24))
 
             if (dayDiff > 0) {
@@ -354,14 +366,23 @@ export default function CalendarComponentProxy({
                 return "날짜 정보 없음"
             }
 
-            // 타임존 독립적으로 날짜 파싱
-            const date = parseDateAsUTC(weddingDate)
+            // KST 기준으로 날짜 파싱
+            const date = parseDateAsKST(weddingDate)
             const [hour, minute] = weddingTime.split(":")
-            date.setUTCHours(parseInt(hour), parseInt(minute))
+            // KST 시간 설정: KST 자정에 시간을 더함
+            // parseDateAsKST는 이미 KST 자정이므로, 시간만 추가
+            const kstHour = parseInt(hour)
+            const kstMinute = parseInt(minute)
+            // KST 시간을 UTC로 변환하여 설정 (KST = UTC+9)
+            date.setUTCHours(kstHour - 9, kstMinute)
 
-            const year = date.getUTCFullYear()
-            const month = date.getUTCMonth() + 1
-            const day = date.getUTCDate()
+            // KST 기준으로 날짜 추출 (UTC가 아닌 KST 기준)
+            // KST는 UTC+9이므로, UTC 시간에 9시간을 더한 후 날짜 추출
+            const kstTime = date.getTime() + 9 * 60 * 60 * 1000
+            const kstDate = new Date(kstTime)
+            const year = kstDate.getUTCFullYear()
+            const month = kstDate.getUTCMonth() + 1
+            const day = kstDate.getUTCDate()
 
             const dayNames = [
                 "일요일",
@@ -372,7 +393,7 @@ export default function CalendarComponentProxy({
                 "금요일",
                 "토요일",
             ]
-            const dayName = dayNames[date.getUTCDay()]
+            const dayName = dayNames[kstDate.getUTCDay()]
 
             const hour24 = parseInt(hour)
             const hour12 =
@@ -453,7 +474,7 @@ export default function CalendarComponentProxy({
 
         // 1. 웨딩 날짜인지 확인
         if (pageSettings?.wedding_date) {
-            const weddingDate = parseDateAsUTC(pageSettings.wedding_date)
+            const weddingDate = parseDateAsKST(pageSettings.wedding_date)
             const isWeddingDay =
                 weddingDate.getUTCDate() === day &&
                 weddingDate.getUTCMonth() === currentMonthIndex &&
@@ -470,7 +491,7 @@ export default function CalendarComponentProxy({
 
         // 2. 캘린더 이벤트 날짜인지 확인
         const isEventDay = calendarData.some((item) => {
-            const itemDate = parseDateAsUTC(item.date)
+            const itemDate = parseDateAsKST(item.date)
             const matches =
                 itemDate.getUTCDate() === day &&
                 itemDate.getUTCMonth() === currentMonthIndex &&
@@ -796,7 +817,7 @@ addPropertyControls(CalendarComponentProxy, {
     pageId: {
         type: ControlType.String,
         title: "Page ID",
-        defaultValue: "default",
+        defaultValue: "",
         placeholder: "Enter page ID",
     },
 })
