@@ -312,14 +312,39 @@ async function handleUpdateUserUrl(req, res, body) {
 
     if (updErr) throw updErr
 
-    // 네이버 계정도 있으면 함께 반영(선택)
+    // naver_admin_accounts 업데이트
+    // admin_users의 page_id를 사용하여 naver_admin_accounts를 찾아 업데이트
+    if (updated?.page_id) {
+      try {
+        const { error: naverUpdErr } = await supabase
+          .from('naver_admin_accounts')
+          .update({ user_url: userUrl, updated_at: nowIso })
+          .eq('page_id', updated.page_id)
+
+        if (naverUpdErr) {
+          console.error('naver_admin_accounts update error:', naverUpdErr)
+          // 에러가 발생해도 admin_users 업데이트는 성공했으므로 계속 진행
+        }
+      } catch (err) {
+        console.error('naver_admin_accounts update exception:', err)
+        // 에러가 발생해도 admin_users 업데이트는 성공했으므로 계속 진행
+      }
+    }
+
+    // admin_users에 naver_id가 직접 있는 경우도 처리 (이중 안전장치)
     if (updated?.naver_id) {
       try {
-        await supabase
+        const { error: naverUpdErr2 } = await supabase
           .from('naver_admin_accounts')
           .update({ user_url: userUrl, updated_at: nowIso })
           .eq('naver_id', updated.naver_id)
-      } catch (_) {}
+
+        if (naverUpdErr2) {
+          console.error('naver_admin_accounts update by naver_id error:', naverUpdErr2)
+        }
+      } catch (err) {
+        console.error('naver_admin_accounts update by naver_id exception:', err)
+      }
     }
 
     return res.status(200).json({ success: true, data: updated })
