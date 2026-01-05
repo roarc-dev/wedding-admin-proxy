@@ -264,13 +264,13 @@ async function handleGetSettings(req, res) {
 
       const defaultSettings = {
         page_id: pageId,
-        type: 'papillon',
+        type: '',
         groom_name_kr: '',
         groom_name_en: weddingInfo.groom_name_en || '',
         bride_name_kr: '',
         bride_name_en: weddingInfo.bride_name_en || '',
         wedding_date: weddingInfo.wedding_date || null,
-        wedding_hour: '14',
+        wedding_hour: '12',
         wedding_minute: '00',
         venue_name: '',
         venue_address: '',
@@ -285,10 +285,10 @@ async function handleGetSettings(req, res) {
         highlight_text_color: 'black',
         gallery_type: 'thumbnail',
         gallery_zoom: 'off',
-        bgm: 'off',
+        bgm: '',
         bgm_url: '',
         bgm_type: '',
-        bgm_autoplay: false,
+        bgm_autoplay: true,
         bgm_vol: 3,
         rsvp: 'off',
         comments: 'off',
@@ -459,9 +459,26 @@ async function handleUpdateSettings(req, res, validatedUser) {
     // 승인 시에만 덮어쓰기 방지가 적용됨
     const finalSettings = { ...normalized }
 
-    // bgm 필드가 없는 경우 기본값 설정 (NOT NULL 제약조건 해결)
+    // bgm 필드가 요청에 명시적으로 포함되지 않았으면 기존 값 유지
+    // (NOT NULL 제약조건 해결 + 다른 필드 수정 시 bgm 상태 보존)
     if (!Object.prototype.hasOwnProperty.call(finalSettings, 'bgm')) {
-      finalSettings.bgm = 'off'
+      // 기존 데이터에서 bgm 값 조회
+      const { data: existingSettings, error: selectError } = await supabase
+        .from('page_settings')
+        .select('bgm')
+        .eq('page_id', effectivePageId)
+        .single()
+
+      if (selectError && selectError.code !== 'PGRST116') {
+        // 레코드가 없는 경우에만 기본값 설정
+        finalSettings.bgm = 'off'
+      } else if (existingSettings?.bgm) {
+        // 기존 값이 있으면 유지
+        finalSettings.bgm = existingSettings.bgm
+      } else {
+        // 기존 값이 없으면 기본값 설정
+        finalSettings.bgm = 'off'
+      }
     }
 
     const { data, error } = await supabase
@@ -499,7 +516,26 @@ async function handleUpdateSettings(req, res, validatedUser) {
 }
 
 async function handleGetTransport(req, res) {
-  const { pageId } = req.query
+  let { pageId } = req.query
+
+  // GET이라도 Authorization 헤더가 있으면 검증 후 admin_users.page_id를 우선 사용
+  try {
+    const authHeader = req.headers.authorization
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7)
+      const decoded = validateToken(token)
+      if (decoded?.userId) {
+        const { data: adminUser, error: adminErr } = await supabase
+          .from('admin_users')
+          .select('id, page_id')
+          .eq('id', decoded.userId)
+          .single()
+        if (!adminErr && adminUser?.page_id) {
+          pageId = adminUser.page_id
+        }
+      }
+    }
+  } catch (_) {}
 
   if (!pageId) {
     return res.status(400).json({
@@ -549,35 +585,72 @@ async function handleGetTransport(req, res) {
 async function handleUpdateTransport(req, res, validatedUser) {
   const { pageId, items, locationName, venue_address } = req.body
 
-  if (!pageId) {
-    return res.status(400).json({
-      success: false,
-      error: 'pageId is required'
-    })
-  }
+  console.log('[handleUpdateTransport] 요청 시작:', {
+    hasPageId: !!pageId,
+    hasItems: Array.isArray(items),
+    itemsCount: Array.isArray(items) ? items.length : 0,
+    locationName,
+    venue_address,
+    hasValidatedUser: !!validatedUser
+  })
 
   try {
     // 1) 사용자 인증 확인
     const userId = validatedUser?.userId
     if (!userId) {
+      console.error('[handleUpdateTransport] 인증 실패: validatedUser 없음')
       return res.status(401).json({ 
         success: false, 
         error: '인증 사용자 정보를 찾을 수 없습니다' 
       })
     }
 
-    // 2) transport_infos 테이블 업데이트
+    // 2) pageId 결정: body에서 제공되면 사용, 없으면 사용자의 page_id 조회
+    let effectivePageId = pageId
+
+    if (!effectivePageId) {
+      console.log('[handleUpdateTransport] pageId가 없어서 사용자 page_id 조회 중')
+      const { data: adminUser, error: adminErr } = await supabase
+        .from('admin_users')
+        .select('id, page_id')
+        .eq('id', userId)
+        .single()
+
+      if (adminErr) {
+        console.error('[handleUpdateTransport] admin_users 조회 실패:', adminErr)
+        throw adminErr
+      }
+
+      effectivePageId = adminUser?.page_id
+      if (!effectivePageId) {
+        console.error('[handleUpdateTransport] page_id가 없음:', { userId })
+        return res.status(400).json({ 
+          success: false, 
+          error: '이 사용자에게 page_id가 부여되지 않았습니다' 
+        })
+      }
+    }
+
+    console.log('[handleUpdateTransport] effectivePageId:', effectivePageId)
+
+    // 3) transport_infos 테이블 업데이트
     if (Array.isArray(items)) {
+      console.log('[handleUpdateTransport] transport_infos 업데이트 시작:', items.length)
       // 기존 데이터 삭제
-      await supabase
+      const { error: deleteError } = await supabase
         .from('transport_infos')
         .delete()
-        .eq('page_id', pageId)
+        .eq('page_id', effectivePageId)
+
+      if (deleteError) {
+        console.error('[handleUpdateTransport] transport_infos 삭제 실패:', deleteError)
+        // 삭제 실패는 경고만 하고 계속 진행
+      }
 
       // 새 데이터 삽입
       if (items.length > 0) {
         const transportItems = items.map((item, index) => ({
-          page_id: pageId,
+          page_id: effectivePageId,
           title: item.title || '',
           description: item.description || '',
           display_order: item.display_order || index + 1
@@ -588,62 +661,130 @@ async function handleUpdateTransport(req, res, validatedUser) {
           .insert(transportItems)
 
         if (insertError) {
-          console.error('Transport insert error:', insertError)
+          console.error('[handleUpdateTransport] transport_infos 삽입 실패:', insertError)
           throw insertError
         }
+        console.log('[handleUpdateTransport] transport_infos 삽입 성공')
       }
     }
 
-    // 3) page_settings에 장소명과 주소 저장
+    // 4) page_settings에 장소명과 주소 저장
+    // 실제 값이 있을 때만 저장 (빈 문자열은 저장하지 않음)
     const updateData = {
       updated_at: new Date().toISOString()
     }
 
-    if (locationName !== undefined) {
-      updateData.transport_location_name = locationName
+    // locationName이 실제 값이 있을 때만 저장 (빈 문자열이 아닐 때)
+    if (locationName && typeof locationName === 'string' && locationName.trim() !== '') {
+      updateData.transport_location_name = locationName.trim()
+      console.log('[handleUpdateTransport] transport_location_name 저장:', locationName.trim())
     }
 
-    if (venue_address !== undefined) {
-      updateData.venue_address = venue_address
+    // venue_address가 실제 값이 있을 때만 저장 (빈 문자열이 아닐 때)
+    if (venue_address && typeof venue_address === 'string' && venue_address.trim() !== '') {
+      updateData.venue_address = venue_address.trim()
+      console.log('[handleUpdateTransport] venue_address 저장:', venue_address.trim())
     }
 
-    if (req.body.venue_name_kr !== undefined) {
-      updateData.venue_name_kr = req.body.venue_name_kr
+    if (req.body.venue_name_kr && typeof req.body.venue_name_kr === 'string' && req.body.venue_name_kr.trim() !== '') {
+      updateData.venue_name_kr = req.body.venue_name_kr.trim()
     }
 
-    if (locationName !== undefined || venue_address !== undefined || req.body.venue_name_kr !== undefined) {
-      const { error: updateError } = await supabase
+    // bgm 필드 처리: body에 있으면 사용, 없으면 기존 값 유지
+    // 참고: bgm은 NOT NULL이지만, upsert 시 기존 레코드가 있으면 포함하지 않아도 기존 값이 유지됨
+    if (Object.prototype.hasOwnProperty.call(req.body, 'bgm')) {
+      updateData.bgm = req.body.bgm
+    } else {
+      // 기존 레코드가 있는지 확인하여 기존 값 유지
+      const { data: existingSettings, error: selectError } = await supabase
         .from('page_settings')
-        .upsert(
-          {
-            page_id: pageId,
-            ...updateData
-          },
-          { onConflict: 'page_id' }
-        )
+        .select('bgm')
+        .eq('page_id', effectivePageId)
+        .maybeSingle()
 
-      if (updateError) {
-        console.error('Location/Address update error:', updateError)
-        throw updateError
+      if (selectError && selectError.code !== 'PGRST116') {
+        // 조회 에러 발생 시: bgm을 포함하지 않음
+        // upsert 시 기존 레코드가 있으면 기존 값 유지, 없으면 에러 발생 가능
+        console.warn('[handleUpdateTransport] bgm 조회 실패:', selectError)
+      } else if (existingSettings) {
+        // 기존 레코드가 있으면 bgm을 포함하지 않아도 upsert 시 기존 값 유지됨
+        console.log('[handleUpdateTransport] 기존 레코드 존재, bgm 기존 값 유지')
+      } else {
+        // 기존 레코드가 없는 경우: 
+        // 교통편 정보 저장 시점에는 일반적으로 레코드가 이미 존재함 (handleGetSettings에서 생성)
+        // 만약 정말 없고 에러가 발생하면, 클라이언트에서 bgm을 포함하여 재시도하거나
+        // handleGetSettings를 먼저 호출하여 레코드를 생성한 후 재시도
+        console.log('[handleUpdateTransport] 기존 레코드 없음, bgm 미포함 (upsert 시 에러 가능하지만 일반적으로 레코드 존재)')
       }
+      // bgm을 updateData에 포함하지 않음 → upsert 시 기존 값 유지
     }
+
+    // 업데이트할 필드가 있으면 page_settings 업데이트
+    console.log('[handleUpdateTransport] page_settings 업데이트 시작:', updateData)
+    const { data: upsertData, error: updateError } = await supabase
+      .from('page_settings')
+      .upsert(
+        {
+          page_id: effectivePageId,
+          ...updateData
+        },
+        { onConflict: 'page_id' }
+      )
+      .select()
+      .single()
+
+    if (updateError) {
+      console.error('[handleUpdateTransport] page_settings 업데이트 실패:', updateError)
+      throw updateError
+    }
+
+    console.log('[handleUpdateTransport] page_settings 업데이트 성공:', {
+      transport_location_name: upsertData?.transport_location_name,
+      venue_address: upsertData?.venue_address
+    })
 
     return res.json({
       success: true,
-      message: '교통편 정보가 저장되었습니다'
+      message: '교통편 정보가 저장되었습니다',
+      data: {
+        transport_location_name: upsertData?.transport_location_name,
+        venue_address: upsertData?.venue_address
+      }
     })
   } catch (error) {
-    console.error('Update transport error:', error)
+    console.error('[handleUpdateTransport] 전체 에러:', error)
     return res.status(500).json({
       success: false,
       error: '교통편 저장 중 오류가 발생했습니다',
-      message: error?.message || String(error)
+      message: error?.message || String(error),
+      details: error?.details || undefined,
+      hint: error?.hint || undefined,
+      code: error?.code || undefined
     })
   }
 }
 
 async function handleGetInfo(req, res, validatedUser) {
-  const { pageId } = req.query
+  let { pageId } = req.query
+
+  // GET이라도 Authorization 헤더가 있으면 검증 후 admin_users.page_id를 우선 사용
+  try {
+    const authHeader = req.headers.authorization
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7)
+      const decoded = validateToken(token)
+      if (decoded?.userId) {
+        const { data: adminUser, error: adminErr } = await supabase
+          .from('admin_users')
+          .select('id, page_id')
+          .eq('id', decoded.userId)
+          .single()
+        if (!adminErr && adminUser?.page_id) {
+          pageId = adminUser.page_id
+        }
+      }
+    }
+  } catch (_) {}
 
   if (!pageId) {
     return res.status(400).json({
@@ -701,13 +842,6 @@ async function handleGetInfo(req, res, validatedUser) {
 async function handleUpdateInfo(req, res, validatedUser) {
   const { pageId, items } = req.body
 
-  if (!pageId) {
-    return res.status(400).json({
-      success: false,
-      error: 'pageId is required'
-    })
-  }
-
   try {
     // 1) 사용자 인증 확인
     const userId = validatedUser?.userId
@@ -718,18 +852,41 @@ async function handleUpdateInfo(req, res, validatedUser) {
       })
     }
 
-    // 2) info_item 테이블 업데이트
+    // 2) pageId 결정: body에서 제공되면 사용, 없으면 사용자의 page_id 조회
+    let effectivePageId = pageId
+
+    if (!effectivePageId) {
+      const { data: adminUser, error: adminErr } = await supabase
+        .from('admin_users')
+        .select('id, page_id')
+        .eq('id', userId)
+        .single()
+
+      if (adminErr) {
+        throw adminErr
+      }
+
+      effectivePageId = adminUser?.page_id
+      if (!effectivePageId) {
+        return res.status(400).json({
+          success: false,
+          error: '이 사용자에게 page_id가 부여되지 않았습니다'
+        })
+      }
+    }
+
+    // 3) info_item 테이블 업데이트
     if (Array.isArray(items)) {
       // 기존 데이터 삭제
       await supabase
         .from('info_item')
         .delete()
-        .eq('page_id', pageId)
+        .eq('page_id', effectivePageId)
 
       // 새 데이터 삽입
       if (items.length > 0) {
         const infoItems = items.map((item, index) => ({
-          page_id: pageId,
+          page_id: effectivePageId,
           title: item.title || '',
           description: item.description || '',
           display_order: item.display_order || index + 1
