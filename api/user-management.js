@@ -28,6 +28,7 @@ function generateSecureToken(user) {
     userId: user.id,
     username: user.username,
     name: user.name,
+    role: user.role || null, // role 필드 추가
     expires: Date.now() + 24 * 60 * 60 * 1000, // 24시간
     signature: Buffer.from(`${user.id}-${Date.now()}-${Math.random()}`).toString('base64')
   }
@@ -959,7 +960,8 @@ async function handleLogin(req, res, body) {
     const sessionToken = generateSecureToken({
       id: user.id,
       username: user.username,
-      name: user.name
+      name: user.name,
+      role: user.role // role 필드 포함
     })
 
     return res.status(200).json({
