@@ -81,7 +81,7 @@ async function generateUniqueCodePair(maxRetries = 10, codeLength, pageIdLength)
 export default async function handler(req, res) {
   // CORS 설정
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 
   if (req.method === 'OPTIONS') {
@@ -120,6 +120,10 @@ export default async function handler(req, res) {
       return await handleCreateCodes(req, res)
     } else if (req.method === 'GET') {
       return await handleGetCodes(req, res)
+    } else if (req.method === 'PUT') {
+      return await handleUpdateCode(req, res)
+    } else if (req.method === 'DELETE') {
+      return await handleDeleteCode(req, res)
     } else {
       return res.status(405).json({
         success: false,
@@ -250,6 +254,104 @@ async function handleGetCodes(req, res) {
     return res.status(500).json({
       success: false,
       error: error.message || '코드 조회 중 오류가 발생했습니다.',
+    })
+  }
+}
+
+// 코드 업데이트 (만료일 설정)
+async function handleUpdateCode(req, res) {
+  const { code, expiresAt } = req.body || {}
+
+  if (!code) {
+    return res.status(400).json({
+      success: false,
+      error: '코드가 필요합니다.',
+    })
+  }
+
+  try {
+    const updateData = {}
+    if (expiresAt !== undefined) {
+      updateData.expires_at = expiresAt || null
+    }
+
+    const { error: updateError } = await supabase
+      .from('naver_redeem_codes')
+      .update(updateData)
+      .eq('code', code)
+
+    if (updateError) {
+      throw updateError
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: '코드가 성공적으로 업데이트되었습니다.',
+    })
+  } catch (error) {
+    console.error('Update code error:', error)
+    return res.status(500).json({
+      success: false,
+      error: error.message || '코드 업데이트 중 오류가 발생했습니다.',
+    })
+  }
+}
+
+// 코드 삭제
+async function handleDeleteCode(req, res) {
+  const { code } = req.body || {}
+
+  if (!code) {
+    return res.status(400).json({
+      success: false,
+      error: '코드가 필요합니다.',
+    })
+  }
+
+  try {
+    // 사용된 코드는 삭제 불가
+    const { data: existingCode, error: fetchError } = await supabase
+      .from('naver_redeem_codes')
+      .select('used_at')
+      .eq('code', code)
+      .single()
+
+    if (fetchError) {
+      throw fetchError
+    }
+
+    if (!existingCode) {
+      return res.status(404).json({
+        success: false,
+        error: '코드를 찾을 수 없습니다.',
+      })
+    }
+
+    if (existingCode.used_at) {
+      return res.status(400).json({
+        success: false,
+        error: '이미 사용된 코드는 삭제할 수 없습니다.',
+      })
+    }
+
+    const { error: deleteError } = await supabase
+      .from('naver_redeem_codes')
+      .delete()
+      .eq('code', code)
+
+    if (deleteError) {
+      throw deleteError
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: '코드가 성공적으로 삭제되었습니다.',
+    })
+  } catch (error) {
+    console.error('Delete code error:', error)
+    return res.status(500).json({
+      success: false,
+      error: error.message || '코드 삭제 중 오류가 발생했습니다.',
     })
   }
 }
