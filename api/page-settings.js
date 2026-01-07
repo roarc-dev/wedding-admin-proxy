@@ -509,6 +509,49 @@ async function handleUpdateSettings(req, res, validatedUser) {
 
     if (error) throw error
 
+    // wedding_date가 업데이트된 경우 admin_users와 naver_admin_accounts도 동기화
+    // (Trigger가 있지만 API 레벨에서도 명시적으로 처리하여 안정성 확보)
+    if (Object.prototype.hasOwnProperty.call(finalSettings, 'wedding_date')) {
+      const weddingDateValue = finalSettings.wedding_date || null
+      const nowIso = new Date().toISOString()
+
+      // admin_users 업데이트
+      try {
+        const { error: adminErr } = await supabase
+          .from('admin_users')
+          .update({
+            wedding_date: weddingDateValue,
+            updated_at: nowIso
+          })
+          .eq('page_id', effectivePageId)
+
+        if (adminErr) {
+          console.warn('Failed to sync wedding_date to admin_users:', adminErr)
+          // 에러가 발생해도 page_settings 업데이트는 성공했으므로 계속 진행
+        }
+      } catch (err) {
+        console.warn('Exception syncing wedding_date to admin_users:', err)
+      }
+
+      // naver_admin_accounts 업데이트
+      try {
+        const { error: naverErr } = await supabase
+          .from('naver_admin_accounts')
+          .update({
+            wedding_date: weddingDateValue,
+            updated_at: nowIso
+          })
+          .eq('page_id', effectivePageId)
+
+        if (naverErr) {
+          console.warn('Failed to sync wedding_date to naver_admin_accounts:', naverErr)
+          // 에러가 발생해도 page_settings 업데이트는 성공했으므로 계속 진행
+        }
+      } catch (err) {
+        console.warn('Exception syncing wedding_date to naver_admin_accounts:', err)
+      }
+    }
+
     return res.json({
       success: true,
       data
