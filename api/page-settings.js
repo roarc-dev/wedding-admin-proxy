@@ -196,11 +196,20 @@ async function handleGetSettings(req, res) {
       if (adminUser?.page_id) {
         pageId = adminUser.page_id
       } else {
-        // 폴백: userUrl이 곧 pageId인 케이스(기존 링크)도 지원
-        pageId = normalizedUserUrl
+        // userUrl이 DB에 없으면 에러 반환 (이전 user_url로 접근하는 것을 방지)
+        // 폴백 제거: userUrl이 곧 pageId인 케이스는 더 이상 지원하지 않음
+        return res.status(404).json({
+          success: false,
+          error: `user_url '${normalizedUserUrl}' not found`
+        })
       }
-    } catch (_) {
-      pageId = normalizedUserUrl
+    } catch (err) {
+      // 에러 발생 시에도 폴백하지 않고 에러 반환
+      console.error('Error resolving userUrl to pageId:', err)
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to resolve user_url'
+      })
     }
   }
 
