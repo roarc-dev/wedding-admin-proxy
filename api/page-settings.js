@@ -129,8 +129,8 @@ async function handleGetSettings(req, res) {
   let { pageId, userUrl, date } = req.query
 
   // userUrl 기반 조회 지원: /YYMMDD/userUrl 라우팅을 위한 공개 조회
-  // - userUrl + date(YYMMDD) -> admin_users/ navers의 (wedding_date, user_url) 매핑 -> page_id로 page_settings 조회
-  // - 매핑이 없으면 userUrl을 pageId로 취급하여 하위호환 유지
+  // - userUrl + date(YYMMDD) -> admin_users/naver_admin_accounts의 (wedding_date, user_url) 매핑 -> page_id로 page_settings 조회
+  // - 보안: date가 필수 (같은 user_url을 가진 다른 사용자의 페이지 접근 방지)
   if (!pageId && userUrl) {
     const normalizedUserUrl = typeof userUrl === 'string' ? userUrl.trim() : ''
     if (!normalizedUserUrl) {
@@ -139,68 +139,70 @@ async function handleGetSettings(req, res) {
         error: 'userUrl is required'
       })
     }
+    
+    // date 파라미터 필수 검증
     const normalizedDate = typeof date === 'string' ? date.trim() : ''
-    const isoDate = normalizedDate && /^\d{6}$/.test(normalizedDate)
-      ? `20${normalizedDate.slice(0, 2)}-${normalizedDate.slice(2, 4)}-${normalizedDate.slice(4, 6)}`
-      : null
+    if (!normalizedDate) {
+      return res.status(400).json({
+        success: false,
+        error: 'date (YYMMDD format) is required for userUrl-based lookup'
+      })
+    }
+    
+    // date 형식 검증 (YYMMDD: 6자리 숫자)
+    if (!/^\d{6}$/.test(normalizedDate)) {
+      return res.status(400).json({
+        success: false,
+        error: 'date must be in YYMMDD format (6 digits)'
+      })
+    }
+    
+    // YYMMDD -> YYYY-MM-DD 변환
+    const isoDate = `20${normalizedDate.slice(0, 2)}-${normalizedDate.slice(2, 4)}-${normalizedDate.slice(4, 6)}`
 
     try {
-      // 1. admin_users에서 user_url 조회
-      let { data: adminUser, error: adminErr } = await supabase
-        .from('admin_users')
-        .select('page_id, user_url')
-        .eq('user_url', normalizedUserUrl)
-        .maybeSingle()
+      // wedding_date와 user_url이 모두 일치해야 함 (보안 강화)
+      let adminUser = null
+      let adminErr = null
 
-      // date가 있으면 wedding_date까지 포함하여 재조회 (정확 매칭)
-      if (isoDate) {
-        const { data: datedAdminUser, error: datedErr } = await supabase
-          .from('admin_users')
-          .select('page_id, user_url')
-          .eq('user_url', normalizedUserUrl)
-          .eq('wedding_date', isoDate)
-          .maybeSingle()
-        if (!datedErr && datedAdminUser?.page_id) {
-          adminUser = datedAdminUser
-          adminErr = null
-        }
+      // 1. admin_users에서 user_url + wedding_date 조회
+      const { data: datedAdminUser, error: datedErr } = await supabase
+        .from('admin_users')
+        .select('page_id, user_url, wedding_date')
+        .eq('user_url', normalizedUserUrl)
+        .eq('wedding_date', isoDate)
+        .maybeSingle()
+      
+      if (!datedErr && datedAdminUser?.page_id) {
+        adminUser = datedAdminUser
+      } else {
+        adminErr = datedErr
       }
 
       // 2. admin_users에 없으면 naver_admin_accounts에서 조회
-      if (adminErr || !adminUser?.page_id) {
-        const { data: naverUser, error: naverErr } = await supabase
+      if (!adminUser?.page_id) {
+        const { data: datedNaverUser, error: datedNaverErr } = await supabase
           .from('naver_admin_accounts')
-          .select('page_id, user_url')
+          .select('page_id, user_url, wedding_date')
           .eq('user_url', normalizedUserUrl)
+          .eq('wedding_date', isoDate)
           .maybeSingle()
-
-        let resolvedNaver = naverUser
-        // date가 있으면 wedding_date까지 포함하여 재조회
-        if (isoDate) {
-          const { data: datedNaverUser, error: datedNaverErr } = await supabase
-            .from('naver_admin_accounts')
-            .select('page_id, user_url')
-            .eq('user_url', normalizedUserUrl)
-            .eq('wedding_date', isoDate)
-            .maybeSingle()
-          if (!datedNaverErr && datedNaverUser?.page_id) {
-            resolvedNaver = datedNaverUser
-          }
-        }
-
-        if (!naverErr && resolvedNaver?.page_id) {
-          adminUser = resolvedNaver
+        
+        if (!datedNaverErr && datedNaverUser?.page_id) {
+          adminUser = datedNaverUser
+          adminErr = null
+        } else {
+          adminErr = datedNaverErr || adminErr
         }
       }
 
       if (adminUser?.page_id) {
         pageId = adminUser.page_id
       } else {
-        // userUrl이 DB에 없으면 에러 반환 (이전 user_url로 접근하는 것을 방지)
-        // 폴백 제거: userUrl이 곧 pageId인 케이스는 더 이상 지원하지 않음
+        // userUrl + date 조합이 DB에 없으면 에러 반환
         return res.status(404).json({
           success: false,
-          error: `user_url '${normalizedUserUrl}' not found`
+          error: `user_url '${normalizedUserUrl}' with wedding_date '${isoDate}' not found`
         })
       }
     } catch (err) {
