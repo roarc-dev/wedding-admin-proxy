@@ -428,6 +428,7 @@ async function handleUpdateSettings(req, res, validatedUser) {
       'kko_img',
       'kko_title',
       'kko_date',
+      'tag_image',
       'vid_url',
       'vid_url_saved',
     ]
