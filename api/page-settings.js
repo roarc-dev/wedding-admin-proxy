@@ -425,6 +425,7 @@ async function handleUpdateSettings(req, res, validatedUser) {
       'highlight_text_color',
       'gallery_type',
       'gallery_zoom',
+      'contact',
       'info',
       'account',
       'bgm',
