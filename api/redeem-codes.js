@@ -16,6 +16,7 @@ if (!supabaseUrl || !supabaseServiceKey) {
 }
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey)
+const ALLOWED_TYPES = ['papillon', 'eternal', 'fiore']
 
 // 토큰 검증
 function validateToken(token) {
@@ -141,12 +142,19 @@ export default async function handler(req, res) {
 
 // 코드 일괄 생성
 async function handleCreateCodes(req, res) {
-  const { count, codeLength, pageIdLength, expiresAt } = req.body || {}
+  const { count, codeLength, pageIdLength, expiresAt, type } = req.body || {}
 
   if (!count || count < 1 || count > 50000) {
     return res.status(400).json({
       success: false,
       error: '생성 개수는 1개 이상 50,000개 이하여야 합니다.',
+    })
+  }
+
+  if (!type || !ALLOWED_TYPES.includes(type)) {
+    return res.status(400).json({
+      success: false,
+      error: `type은 ${ALLOWED_TYPES.join(', ')} 중 하나여야 합니다.`,
     })
   }
 
@@ -164,6 +172,7 @@ async function handleCreateCodes(req, res) {
           code: pair.code,
           page_id: pair.page_id, // 활성화된 상태로 생성
           expires_at: expiresAt || null,
+          type,
           created_at: new Date().toISOString(),
         })
       }
@@ -196,7 +205,8 @@ async function handleCreateCodes(req, res) {
 
 // 코드 조회 및 검색
 async function handleGetCodes(req, res) {
-  const { search, used, page = 1, limit = 50 } = req.query || {}
+  const { search, used, page = 1, limit = 50, type } = req.query || {}
+  const typeFilter = type && ALLOWED_TYPES.includes(type) ? type : null
 
   try {
     let query = supabase.from('naver_redeem_codes').select('*', { count: 'exact' })
@@ -211,6 +221,11 @@ async function handleGetCodes(req, res) {
       query = query.not('used_at', 'is', null)
     } else if (used === 'false') {
       query = query.is('used_at', null)
+    }
+
+    // 타입 필터
+    if (typeFilter) {
+      query = query.eq('type', typeFilter)
     }
 
     // 정렬 및 페이지네이션
@@ -228,19 +243,18 @@ async function handleGetCodes(req, res) {
     }
 
     // 통계 계산
-    const { count: totalCount } = await supabase
-      .from('naver_redeem_codes')
-      .select('*', { count: 'exact', head: true })
+    const baseCountQuery = supabase.from('naver_redeem_codes').select('*', { count: 'exact', head: true })
+    const totalQuery = typeFilter ? baseCountQuery.eq('type', typeFilter) : baseCountQuery
+    const unusedQuery = typeFilter
+      ? supabase.from('naver_redeem_codes').select('*', { count: 'exact', head: true }).eq('type', typeFilter).is('used_at', null)
+      : supabase.from('naver_redeem_codes').select('*', { count: 'exact', head: true }).is('used_at', null)
+    const usedQuery = typeFilter
+      ? supabase.from('naver_redeem_codes').select('*', { count: 'exact', head: true }).eq('type', typeFilter).not('used_at', 'is', null)
+      : supabase.from('naver_redeem_codes').select('*', { count: 'exact', head: true }).not('used_at', 'is', null)
 
-    const { count: unusedCount } = await supabase
-      .from('naver_redeem_codes')
-      .select('*', { count: 'exact', head: true })
-      .is('used_at', null)
-
-    const { count: usedCount } = await supabase
-      .from('naver_redeem_codes')
-      .select('*', { count: 'exact', head: true })
-      .not('used_at', 'is', null)
+    const { count: totalCount } = await totalQuery
+    const { count: unusedCount } = await unusedQuery
+    const { count: usedCount } = await usedQuery
 
     return res.status(200).json({
       success: true,
