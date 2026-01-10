@@ -166,29 +166,29 @@ async function handleGetSettings(req, res) {
       let adminErr = null
 
       // 1. admin_users에서 user_url + wedding_date 조회
-      const { data: datedAdminUser, error: datedErr } = await supabase
-        .from('admin_users')
+        const { data: datedAdminUser, error: datedErr } = await supabase
+          .from('admin_users')
         .select('page_id, user_url, wedding_date')
-        .eq('user_url', normalizedUserUrl)
-        .eq('wedding_date', isoDate)
-        .maybeSingle()
+          .eq('user_url', normalizedUserUrl)
+          .eq('wedding_date', isoDate)
+          .maybeSingle()
       
-      if (!datedErr && datedAdminUser?.page_id) {
-        adminUser = datedAdminUser
+        if (!datedErr && datedAdminUser?.page_id) {
+          adminUser = datedAdminUser
       } else {
         adminErr = datedErr
       }
 
       // 2. admin_users에 없으면 naver_admin_accounts에서 조회
       if (!adminUser?.page_id) {
-        const { data: datedNaverUser, error: datedNaverErr } = await supabase
-          .from('naver_admin_accounts')
+          const { data: datedNaverUser, error: datedNaverErr } = await supabase
+            .from('naver_admin_accounts')
           .select('page_id, user_url, wedding_date')
-          .eq('user_url', normalizedUserUrl)
-          .eq('wedding_date', isoDate)
-          .maybeSingle()
+            .eq('user_url', normalizedUserUrl)
+            .eq('wedding_date', isoDate)
+            .maybeSingle()
         
-        if (!datedNaverErr && datedNaverUser?.page_id) {
+          if (!datedNaverErr && datedNaverUser?.page_id) {
           adminUser = datedNaverUser
           adminErr = null
         } else {
@@ -430,6 +430,7 @@ async function handleUpdateSettings(req, res, validatedUser) {
       'contact',
       'info',
       'account',
+      'account_text',
       'bgm',
       'bgm_url',
       'bgm_type',
