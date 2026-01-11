@@ -493,14 +493,9 @@ export default function UnifiedGalleryComplete({
     )
 
     // 슬라이드 갤러리 상수
-    const SLIDE_WIDTH = 344 // 이미지 너비 (슬라이드형)
-    const SLIDE_GAP = 10 // 이미지 간격 (슬라이드형)
+    const SLIDE_WIDTH = 344 // 이미지 너비
+    const SLIDE_GAP = 10 // 이미지 간격
     const SLIDE_TOTAL = SLIDE_WIDTH + SLIDE_GAP // 슬라이드 하나의 전체 너비
-    
-    // 썸네일 갤러리 상수 (큰 이미지 영역)
-    const THUMBNAIL_SLIDE_WIDTH = 430 // 썸네일형 이미지 너비
-    const THUMBNAIL_SLIDE_GAP = 0 // 썸네일형 이미지 간격
-    const THUMBNAIL_SLIDE_TOTAL = THUMBNAIL_SLIDE_WIDTH + THUMBNAIL_SLIDE_GAP
 
     // 썸네일 스크롤을 가운데로 위치시키는 함수
     const scrollThumbnailToCenter = useCallback((index: number) => {
@@ -580,12 +575,9 @@ export default function UnifiedGalleryComplete({
             const diff = currentX - slideStartX.current
             const newOffset = slideStartOffset.current + diff
 
-            // 갤러리 타입에 따라 적절한 슬라이드 너비 사용
-            const slideTotal = galleryType === "slide" ? SLIDE_TOTAL : THUMBNAIL_SLIDE_TOTAL
-
             // 범위 제한 (첫 번째 이미지 이전, 마지막 이미지 이후로 제한)
             const maxOffset = 0
-            const minOffset = -((images.length - 1) * slideTotal)
+            const minOffset = -((images.length - 1) * SLIDE_TOTAL)
 
             // 경계에서 저항감 추가 (elastic effect)
             if (newOffset > maxOffset) {
@@ -596,16 +588,13 @@ export default function UnifiedGalleryComplete({
                 setSlideOffset(newOffset)
             }
         },
-        [images.length, isDragging, slideOffset, SLIDE_TOTAL, THUMBNAIL_SLIDE_TOTAL, galleryType]
+        [images.length, isDragging, slideOffset, SLIDE_TOTAL]
     )
 
     const handleSlideTouchEnd = useCallback(() => {
         if (slideStartX.current === null) return
 
         setIsDragging(false)
-
-        // 갤러리 타입에 따라 적절한 슬라이드 너비 사용
-        const slideTotal = galleryType === "slide" ? SLIDE_TOTAL : THUMBNAIL_SLIDE_TOTAL
 
         // 드래그 거리 계산
         const dragDistance = slideOffset - slideStartOffset.current
@@ -618,13 +607,13 @@ export default function UnifiedGalleryComplete({
 
         // 드래그 거리가 임계값을 넘었는지 확인
         if (
-            dragDistance < -slideTotal * SNAP_THRESHOLD ||
+            dragDistance < -SLIDE_TOTAL * SNAP_THRESHOLD ||
             dragDistance < -MIN_SWIPE_DISTANCE * 2
         ) {
             // 왼쪽으로 드래그 → 다음 장
             targetIndex = Math.min(selectedIndex + 1, images.length - 1)
         } else if (
-            dragDistance > slideTotal * SNAP_THRESHOLD ||
+            dragDistance > SLIDE_TOTAL * SNAP_THRESHOLD ||
             dragDistance > MIN_SWIPE_DISTANCE * 2
         ) {
             // 오른쪽으로 드래그 → 이전 장
@@ -633,29 +622,37 @@ export default function UnifiedGalleryComplete({
 
         // 해당 인덱스로 스냅
         setSelectedIndex(targetIndex)
-        setSlideOffset(-targetIndex * slideTotal)
+        setSlideOffset(-targetIndex * SLIDE_TOTAL)
 
         slideStartX.current = null
-    }, [SLIDE_TOTAL, THUMBNAIL_SLIDE_TOTAL, images.length, selectedIndex, slideOffset, galleryType])
+    }, [SLIDE_TOTAL, images.length, selectedIndex, slideOffset])
 
     // 다음/이전 이미지로 이동
     const goToNext = useCallback(() => {
-        const slideTotal = galleryType === "slide" ? SLIDE_TOTAL : THUMBNAIL_SLIDE_TOTAL
-        const nextIndex =
-            selectedIndex < images.length - 1
-                ? selectedIndex + 1
-                : selectedIndex
-        setSelectedIndex(nextIndex)
-        setSlideOffset(-nextIndex * slideTotal)
-    }, [SLIDE_TOTAL, THUMBNAIL_SLIDE_TOTAL, galleryType, images.length, selectedIndex])
+        if (galleryType === "slide") {
+            const nextIndex =
+                selectedIndex < images.length - 1
+                    ? selectedIndex + 1
+                    : selectedIndex
+            setSelectedIndex(nextIndex)
+            setSlideOffset(-nextIndex * SLIDE_TOTAL)
+        } else {
+            setSelectedIndex((prev) =>
+                Math.min(prev + 1, Math.max(images.length - 1, 0))
+            )
+        }
+    }, [SLIDE_TOTAL, galleryType, images.length, selectedIndex])
 
     const goToPrevious = useCallback(() => {
-        const slideTotal = galleryType === "slide" ? SLIDE_TOTAL : THUMBNAIL_SLIDE_TOTAL
-        const prevIndex =
-            selectedIndex > 0 ? selectedIndex - 1 : selectedIndex
-        setSelectedIndex(prevIndex)
-        setSlideOffset(-prevIndex * slideTotal)
-    }, [SLIDE_TOTAL, THUMBNAIL_SLIDE_TOTAL, galleryType, selectedIndex])
+        if (galleryType === "slide") {
+            const prevIndex =
+                selectedIndex > 0 ? selectedIndex - 1 : selectedIndex
+            setSelectedIndex(prevIndex)
+            setSlideOffset(-prevIndex * SLIDE_TOTAL)
+        } else {
+            setSelectedIndex((prev) => Math.max(prev - 1, 0))
+        }
+    }, [SLIDE_TOTAL, galleryType, selectedIndex])
 
     const handlePrevFocus = useCallback(() => {
         setFocusedNav("prev")
@@ -672,17 +669,14 @@ export default function UnifiedGalleryComplete({
     // 썸네일 클릭 핸들러 (썸네일형용)
     const handleThumbnailClick = useCallback((index: number) => {
         setSelectedIndex(index)
-        // slideOffset도 동기화하여 부드러운 슬라이드 애니메이션 제공
-        setSlideOffset(-index * THUMBNAIL_SLIDE_TOTAL)
-    }, [THUMBNAIL_SLIDE_TOTAL])
+    }, [])
 
     // 슬라이드 갤러리 인덱스 변경 시 오프셋 동기화
     useEffect(() => {
-        if (!isDragging) {
-            const slideTotal = galleryType === "slide" ? SLIDE_TOTAL : THUMBNAIL_SLIDE_TOTAL
-            setSlideOffset(-selectedIndex * slideTotal)
+        if (galleryType === "slide" && !isDragging) {
+            setSlideOffset(-selectedIndex * SLIDE_TOTAL)
         }
-    }, [selectedIndex, galleryType, isDragging, SLIDE_TOTAL, THUMBNAIL_SLIDE_TOTAL])
+    }, [selectedIndex, galleryType, isDragging, SLIDE_TOTAL])
 
     // 썸네일형 갤러리에서 selectedIndex 변경 시 썸네일 가운데 스크롤
     useEffect(() => {
@@ -958,168 +952,54 @@ export default function UnifiedGalleryComplete({
                         width: "100%",
                         height: "460px", // 고정 높이
                         position: "relative",
+                        borderRadius: 0,
                         overflow: "hidden",
-                        touchAction: galleryZoomEnabled
-                            ? "pan-y pinch-zoom"
-                            : "pan-y",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
                     }}
                     initial={{ opacity: 0, y: 50 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, ease: "easeOut", delay: 0.1 }}
                     viewport={{ once: true }}
-                    onTouchStart={handleSlideTouchStart}
-                    onTouchMove={handleSlideTouchMove}
-                    onTouchEnd={handleSlideTouchEnd}
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
                 >
-                    <div
-                        style={{
-                            display: "flex",
-                            height: "100%",
-                            gap: `${THUMBNAIL_SLIDE_GAP}px`,
-                            transform: `translateX(${slideOffset}px)`,
-                            transition: isDragging
-                                ? "none"
-                                : "transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
-                            willChange: "transform",
-                        }}
-                    >
-                        {images.map((image, index) => (
-                            <div
-                                key={image.id || String(index)}
-                                style={{
-                                    flexShrink: 0,
-                                    width: `${THUMBNAIL_SLIDE_WIDTH}px`,
-                                    height: "460px",
-                                    borderRadius: "0px",
-                                    overflow: "hidden",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    position: "relative",
-                                }}
-                            >
-                                <img
-                                    src={image.src}
-                                    alt={image.alt}
-                                    draggable={false}
-                                    style={{
-                                        maxWidth: "100%",
-                                        maxHeight: "100%",
-                                        objectFit: "contain",
-                                        objectPosition: "center",
-                                        userSelect: "none",
-                                        pointerEvents: "none",
-                                        display: "block",
-                                    }}
-                                    onLoad={handleImageLoad}
-                                    onError={(e) => {
-                                        try {
-                                            ;(
-                                                e.target as HTMLImageElement
-                                            ).style.display = "none"
-                                        } catch (_) {}
-                                    }}
-                                />
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* 네비게이션 버튼 */}
-                    <div
-                        style={{
-                            position: "absolute",
-                            bottom: "12px",
-                            left: "12px",
-                            display: "flex",
-                            gap: "5px",
-                        }}
-                    >
-                        {/* 이전 버튼 */}
-                        <Button
-                            onClick={goToPrevious}
-                            aria-label="이전 이미지"
-                            variant="ghost"
-                            size="sm"
-                            onFocus={handlePrevFocus}
-                            onBlur={handleNavBlur}
+                    <AnimatePresence mode="wait">
+                        <motion.img
+                            key={selectedIndex}
+                            src={
+                                images[selectedIndex] &&
+                                images[selectedIndex].src
+                            }
+                            alt={
+                                images[selectedIndex] &&
+                                images[selectedIndex].alt
+                            }
                             style={{
-                                width: "28px",
-                                height: "28px",
-                                borderRadius: "14px",
-                                border: "none",
-                                backgroundColor: "rgba(0, 0, 0, 0.08)",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                cursor: "pointer",
-                                transition: "opacity 0.2s ease",
-                                padding: "0",
-                                outline:
-                                    focusedNav === "prev"
-                                        ? `2px solid ${theme.color.primary}`
-                                        : "2px solid transparent",
-                                outlineOffset: 2,
+                                maxWidth: "100%",
+                                maxHeight: "100%",
+                                objectFit: "contain", // 이미지 비율 유지하면서 컨테이너에 맞춤
+                                userSelect: "none",
+                                pointerEvents: "none",
+                                display: "block",
                             }}
-                        >
-                            <div
-                                style={{
-                                    width: "7px",
-                                    height: "12px",
-                                    color: "white",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    transform: "translateX(-1px)",
-                                }}
-                                dangerouslySetInnerHTML={{
-                                    __html: '<svg width="7" height="12" viewBox="0 0 7 12" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6.0625 11.229L0.999769 6.11461L6.0625 1.00022" stroke="white" stroke-width="1.54982" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-                                }}
-                            />
-                        </Button>
-                        {/* 다음 버튼 */}
-                        <Button
-                            onClick={goToNext}
-                            aria-label="다음 이미지"
-                            variant="ghost"
-                            size="sm"
-                            onFocus={handleNextFocus}
-                            onBlur={handleNavBlur}
-                            style={{
-                                width: "28px",
-                                height: "28px",
-                                borderRadius: "14px",
-                                border: "none",
-                                backgroundColor: "rgba(0, 0, 0, 0.08)",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                cursor: "pointer",
-                                transition: "opacity 0.2s ease",
-                                padding: "0",
-                                outline:
-                                    focusedNav === "next"
-                                        ? `2px solid ${theme.color.primary}`
-                                        : "2px solid transparent",
-                                outlineOffset: 2,
+                            variants={animationVariants}
+                            initial="initial"
+                            animate="animate"
+                            exit="exit"
+                            transition={{ duration: 0.3 }}
+                            onLoad={handleImageLoad}
+                            onError={(e) => {
+                                try {
+                                    ;(
+                                        e.target as HTMLImageElement
+                                    ).style.display = "none"
+                                } catch (_) {}
                             }}
-                        >
-                            <div
-                                style={{
-                                    width: "7px",
-                                    height: "12px",
-                                    color: "white",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    transform:
-                                        "scaleX(-1) translateX(-1px)",
-                                }}
-                                dangerouslySetInnerHTML={{
-                                    __html: '<svg width="7" height="12" viewBox="0 0 7 12" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6.0625 11.229L0.999769 6.11461L6.0625 1.00022" stroke="white" stroke-width="1.54982" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-                                }}
-                            />
-                        </Button>
-                    </div>
+                        />
+                    </AnimatePresence>
                 </motion.div>
 
                 {/* 썸네일 영역(가로 스크롤) */}

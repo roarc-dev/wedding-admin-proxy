@@ -28,6 +28,7 @@ export default function MusicPlayer(props: MusicPlayerProps) {
     const [supabaseAutoplay, setSupabaseAutoplay] = useState<boolean>(false)
     const [supabaseVolume, setSupabaseVolume] = useState<number>(10)
     const [bgmType, setBgmType] = useState<string>("")
+    const [bgmEnabled, setBgmEnabled] = useState<boolean>(false)
     const [showNotification, setShowNotification] = useState<boolean>(false)
     const [notificationPhase, setNotificationPhase] = useState<
         "entering" | "waiting" | "exiting"
@@ -74,7 +75,18 @@ export default function MusicPlayer(props: MusicPlayerProps) {
                     const data = result.success ? result.data : result
                     console.log(`[BGM-Supabase] 페이지 설정 데이터:`, data)
 
-                    if (data && data.bgm_url && data.bgm_url.trim() !== "") {
+                    // BGM 활성화 설정 확인
+                    const bgmEnabledFromApi = data.bgm !== "off"
+                    setBgmEnabled(bgmEnabledFromApi)
+                    console.log(
+                        `[BGM-Supabase] BGM 활성화 설정: ${bgmEnabledFromApi}`
+                    )
+
+                    if (
+                        bgmEnabledFromApi &&
+                        data.bgm_url &&
+                        data.bgm_url.trim() !== ""
+                    ) {
                         setAudioUrl(data.bgm_url.trim())
                         console.log(
                             `[BGM-Supabase] R2 음원 URL 설정: ${data.bgm_url}`
@@ -86,8 +98,10 @@ export default function MusicPlayer(props: MusicPlayerProps) {
                             setBgmType(data.type)
                         }
 
-                        // 배경음악 준비 알림 표시
-                        setShowNotification(true)
+                        // 배경음악 준비 알림 표시 (BGM이 활성화된 경우만)
+                        if (bgmEnabledFromApi) {
+                            setShowNotification(true)
+                        }
 
                         // Supabase bgm_autoplay 설정 적용
                         if (data.bgm_autoplay !== undefined) {
@@ -114,24 +128,29 @@ export default function MusicPlayer(props: MusicPlayerProps) {
                             setSupabaseVolume(10)
                         }
                     } else {
-                        console.log(`[BGM-Supabase] bgm_url이 없거나 비어있음`)
                         console.log(
-                            `[BGM-Supabase] data.bgm_url 원본 값:`,
-                            JSON.stringify(data?.bgm_url)
+                            `[BGM-Supabase] bgm_url이 없거나 비어있거나 BGM이 비활성화됨`
                         )
-                        console.log(
-                            `[BGM-Supabase] data.bgm_type 값:`,
-                            JSON.stringify(data?.bgm_type)
-                        )
+
+                        // BGM 타입은 URL 유무와 관계없이 설정 (papillon 높이 유지용)
+                        if (data.type) {
+                            setBgmType(data.type)
+                            console.log(
+                                `[BGM-Supabase] BGM 타입 설정: ${data.type}`
+                            )
+                        }
+
                         console.log(`[BGM-Supabase] 전체 BGM 관련 필드:`, {
+                            bgm: data?.bgm,
                             bgm_url: data?.bgm_url,
                             bgm_type: data?.bgm_type,
                             bgm_autoplay: data?.bgm_autoplay,
                             bgm_vol: data?.bgm_vol,
+                            type: data?.type,
                         })
 
-                        // 테스트용: pageId가 'test'인 경우 테스트 음원 사용
-                        if (pageId === "test") {
+                        // 테스트용: pageId가 'test'인 경우 테스트 음원 사용 (bgm이 off가 아니면)
+                        if (pageId === "test" && bgmEnabledFromApi) {
                             // 실제 동작하는 테스트 음원 (공개 도메인)
                             const testUrl =
                                 "https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3"
@@ -173,9 +192,9 @@ export default function MusicPlayer(props: MusicPlayerProps) {
         }
     }, [supabaseVolume])
 
-    // Supabase bgm_autoplay 설정에 따른 자동 재생 처리
+    // Supabase bgm_autoplay 설정에 따른 자동 재생 처리 (BGM이 활성화된 경우만)
     useEffect(() => {
-        if (supabaseAutoplay && audioRef.current && audioUrl) {
+        if (bgmEnabled && supabaseAutoplay && audioRef.current && audioUrl) {
             console.log(`[BGM-Supabase] Supabase 자동 재생 시도: ${audioUrl}`)
             // 브라우저 정책으로 인해 사용자 인터랙션 없이는 자동재생이 제한될 수 있음
             audioRef.current
@@ -192,7 +211,7 @@ export default function MusicPlayer(props: MusicPlayerProps) {
                     setIsPlaying(false)
                 })
         }
-    }, [supabaseAutoplay, audioUrl])
+    }, [bgmEnabled, supabaseAutoplay, audioUrl])
 
     // 배경음악 준비 알림 타이머 처리
     useEffect(() => {
@@ -243,24 +262,8 @@ export default function MusicPlayer(props: MusicPlayerProps) {
     }
 
     if (loading) {
-        return (
-            <div
-                style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    ...style,
-                }}
-            >
-                <div style={{ fontSize: "12px", color: "#999" }}>...</div>
-            </div>
-        )
-    }
-
-    if (!audioUrl) {
-        // BGM이 없는 경우 처리
+        // papillon 타입이면 항상 높이 43px 유지
         if (bgmType === "papillon") {
-            // papillon 타입일 때는 43px 높이의 투명한 영역 표시
             return (
                 <div
                     style={{
@@ -273,7 +276,46 @@ export default function MusicPlayer(props: MusicPlayerProps) {
                         width: "100%",
                         height: "43px",
                         minHeight: "43px",
-                        backgroundColor: "transparent",
+                        backgroundColor: "#FAFAFA",
+                        ...style,
+                    }}
+                >
+                    <div style={{ fontSize: "12px", color: "#999" }}>...</div>
+                </div>
+            )
+        }
+        return (
+            <div
+                style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    backgroundColor: "#fff",
+                    ...style,
+                }}
+            >
+                <div style={{ fontSize: "12px", color: "#999" }}>...</div>
+            </div>
+        )
+    }
+
+    if (!audioUrl || !bgmEnabled) {
+        // BGM이 없거나 비활성화된 경우 처리
+        if (bgmType === "papillon") {
+            // papillon 타입일 때는 항상 43px 높이의 영역 표시 (BGM 유무와 무관)
+            return (
+                <div
+                    style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: "6px",
+                        gap: "10px",
+                        width: "100%",
+                        height: "43px",
+                        minHeight: "43px",
+                        backgroundColor: "#FAFAFA",
                         ...style,
                     }}
                 />
@@ -328,7 +370,7 @@ export default function MusicPlayer(props: MusicPlayerProps) {
                     <motion.div
                         key={index}
                         style={{
-                            backgroundColor: "transparent",
+                            backgroundColor: "#D9D9D9",
                             width: "2px",
                             height: "12px", // 고정 높이
                             position: "absolute",
@@ -359,14 +401,24 @@ export default function MusicPlayer(props: MusicPlayerProps) {
         padding: "6px",
         gap: "10px",
         width: "100%",
-        height: audioUrl ? (bgmType === "papillon" ? "43px" : "auto") : (bgmType === "papillon" ? "43px" : "0px"),
-        minHeight: audioUrl ? (bgmType === "papillon" ? "43px" : "0px") : (bgmType === "papillon" ? "43px" : "0px"),
-        backgroundColor: audioUrl ? (bgmType === "papillon" ? "#FAFAFA" : "transparent") : "transparent",
+        height:
+            bgmType === "papillon"
+                ? "43px"
+                : bgmEnabled && audioUrl
+                  ? "auto"
+                  : "0px",
+        minHeight:
+            bgmType === "papillon"
+                ? "43px"
+                : bgmEnabled && audioUrl
+                  ? "0px"
+                  : "0px",
+        backgroundColor: bgmType === "papillon" ? "#FAFAFA" : "#fff",
         ...style,
     }
 
-    // BGM이 없고 papillon이 아닐 때 전체 숨김 처리
-    if (!audioUrl && bgmType !== "papillon") {
+    // BGM이 비활성화되고 papillon이 아닐 때 전체 숨김 처리
+    if (!bgmEnabled && bgmType !== "papillon") {
         return (
             <div style={{ display: "none" }}>
                 <audio
@@ -448,8 +500,8 @@ export default function MusicPlayer(props: MusicPlayerProps) {
 
             {/* 이퀄라이저와 플레이어 컨테이너 */}
             <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                {/* 이퀄라이저 애니메이션 (재생 중일 때만 표시) */}
-                {isPlaying && audioUrl && (
+                {/* 이퀄라이저 애니메이션 (재생 중이고 BGM이 활성화된 경우만 표시) */}
+                {isPlaying && audioUrl && bgmEnabled && (
                     <div
                         style={{
                             display: "flex",
@@ -461,8 +513,8 @@ export default function MusicPlayer(props: MusicPlayerProps) {
                     </div>
                 )}
 
-                {/* 플레이어 버튼 */}
-                {audioUrl && (
+                {/* 플레이어 버튼 (BGM이 활성화된 경우만 표시) */}
+                {audioUrl && bgmEnabled && (
                     <motion.button
                         onTap={togglePlayback}
                         style={{

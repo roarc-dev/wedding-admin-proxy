@@ -28,3 +28,4 @@ END $$;
 -- 4) 코멘트 업데이트
 COMMENT ON COLUMN page_settings.bgm IS 'BGM 토글: on/off (NULL 허용, 기본값 off)';
 
+

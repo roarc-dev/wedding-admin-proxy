@@ -142,7 +142,7 @@ export default function EternalMainPhoto(props: EternalMainPhotoProps) {
                     style={{
                         position: "absolute",
                         inset: 0,
-                        background: "#f5f5f5",
+                        background: "#e0e0e0",
                     }}
                 />
             )}

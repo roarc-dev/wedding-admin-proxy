@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react"
 import { addPropertyControls, ControlType } from "framer"
+// @ts-expect-error - CDN URL import
 import typography from "https://cdn.roarc.kr/fonts/typography.js"
 // @ts-ignore
 import { motion } from "framer-motion"
@@ -145,10 +146,7 @@ export default function FioreNameSection(props: FioreNameSectionProps) {
                 typeof typography.ensure === "function" &&
                 typography.ensure()
         } catch (error) {
-            console.warn(
-                "[FioreNameSection] Typography loading failed:",
-                error
-            )
+            console.warn("[FioreNameSection] Typography loading failed:", error)
         }
     }, [])
 
@@ -263,11 +261,12 @@ export default function FioreNameSection(props: FioreNameSectionProps) {
                     fontSize: `${nameFontSize}px`,
                     fontFamily: p22FontFamily,
                     fontWeight: 400,
-                    lineHeight: "32px",
+                    lineHeight: 1.4,
                     wordWrap: "break-word",
                     letterSpacing: "0 em",
                     whiteSpace: "pre",
-                    overflow: "hidden",
+                    paddingTop: `${nameFontSize * 0.1}px`,
+                    paddingBottom: `${nameFontSize * 0.15}px`,
                 }}
             >
                 {resolvedGroomName.toUpperCase().replace(/\s+/g, " ")}
@@ -309,11 +308,12 @@ export default function FioreNameSection(props: FioreNameSectionProps) {
                     fontSize: `${nameFontSize}px`,
                     fontFamily: p22FontFamily,
                     fontWeight: 400,
-                    lineHeight: "32px",
+                    lineHeight: 1.4,
                     wordWrap: "break-word",
                     letterSpacing: "0 em",
                     whiteSpace: "pre",
-                    overflow: "hidden",
+                    paddingTop: `${nameFontSize * 0.1}px`,
+                    paddingBottom: `${nameFontSize * 0.15}px`,
                 }}
             >
                 {resolvedBrideName.toUpperCase().replace(/\s+/g, " ")}

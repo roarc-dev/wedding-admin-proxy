@@ -4,6 +4,8 @@ export default {
     const ALLOWED_ORIGINS = [
       "https://mcard.roarc.kr",
       "https://wedding-admin-proxy.vercel.app",
+      "https://admin.roarc.kr",
+      "https://my.roarc.kr",
     ];
     // Framer 프리뷰 도메인 패턴: *.framer.app, *.framercanvas.com
     const FRAMER_PATTERNS = [
@@ -166,7 +168,7 @@ async function handleUpload(req, env, json) {
 
       const image = await env.IMAGES.input(fileBuffer)
         .transform({ width: targetWidth }) // 비율 유지, 가로만 축소
-        .output({ format: "image/avif", quality: 82 });
+        .output({ format: "image/webp", quality: 82 });
 
       imageResponse = await image.response();
       console.log("[Upload] Cloudflare Images 변환 완료");
@@ -200,13 +202,13 @@ async function handleUpload(req, env, json) {
       );
     }
 
-    const key = `images/${encodeURIComponent(pageId)}/${crypto.randomUUID()}.avif`;
+    const key = `images/${encodeURIComponent(pageId)}/${crypto.randomUUID()}.webp`;
 
     try {
       console.log(`[Upload] R2 업로드 시작: ${key}`);
       await env.R2_GALLERY.put(key, imageResponse.body, {
         httpMetadata: {
-          contentType: "image/avif",
+          contentType: "image/webp",
           cacheControl: "public, max-age=31536000, immutable",
         },
       });
