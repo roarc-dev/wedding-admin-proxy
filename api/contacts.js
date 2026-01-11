@@ -50,9 +50,11 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
   
-  // 캐시 헤더 추가
+  // 캐시 방지 헤더 추가 (계좌 정보는 항상 최신 데이터 필요)
   if (req.method === 'GET') {
-    res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=120')
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+    res.setHeader('Pragma', 'no-cache')
+    res.setHeader('Expires', '0')
   }
 
   if (req.method === 'OPTIONS') {
