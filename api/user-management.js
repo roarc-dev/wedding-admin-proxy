@@ -748,9 +748,9 @@ async function handleRegister(req, res, body) {
         username,
         password: passwordHash,
         name,
-        is_active: false, // 승인 대기 상태
+        is_active: true, // redeem 코드 확인 전이라도 로그인 가능하도록 TRUE 설정
         role: role || 'user', // 요청에서 받은 role 사용, 없으면 기본값 'user'
-        approval_status: 'pending',
+        approval_status: 'pending', // redeem 코드 입력 후 'approved'로 변경됨
         page_id: page_id || null,
         wedding_date: wedding_date || null,
         groom_name_en: groom_name_en,
