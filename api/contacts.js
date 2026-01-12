@@ -48,7 +48,7 @@ export default async function handler(req, res) {
   // CORS 설정 - 최적화된 헤더
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control')
   
   // 캐시 방지 헤더 추가 (계좌 정보는 항상 최신 데이터 필요)
   if (req.method === 'GET') {
