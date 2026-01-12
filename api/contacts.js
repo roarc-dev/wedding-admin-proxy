@@ -210,31 +210,65 @@ async function handleCreateContact(req, res) {
   }
 
   try {
-    // 생성 시간 추가
-    const dataToInsert = {
-      ...contactData,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+    // page_id가 unique이므로 UPSERT 사용 (이미 존재하면 업데이트, 없으면 생성)
+    // 먼저 기존 레코드 확인
+    const { data: existingContact, error: checkError } = await supabase
+      .from('wedding_contacts')
+      .select('id, created_at')
+      .eq('page_id', contactData.page_id)
+      .maybeSingle()
+
+    if (checkError && checkError.code !== 'PGRST116') {
+      console.error('Check existing contact error:', checkError)
+      throw checkError
     }
 
+    const now = new Date().toISOString()
+    const dataToUpsert = {
+      ...contactData,
+      updated_at: now
+    }
+
+    // 기존 레코드가 있으면 created_at 유지, 없으면 새로 생성
+    if (existingContact) {
+      dataToUpsert.created_at = existingContact.created_at
+    } else {
+      dataToUpsert.created_at = now
+    }
+
+    // UPSERT 실행 (onConflict: 'page_id'로 설정하여 page_id가 중복되면 업데이트)
     const { data, error } = await supabase
       .from('wedding_contacts')
-      .insert([dataToInsert])
+      .upsert([dataToUpsert], {
+        onConflict: 'page_id',
+        ignoreDuplicates: false
+      })
       .select()
 
     if (error) throw error
 
-    return res.status(201).json({ 
+    const isUpdate = !!existingContact
+    return res.status(isUpdate ? 200 : 201).json({ 
       success: true, 
       data: data[0],
-      message: '연락처가 생성되었습니다' 
+      message: isUpdate ? '연락처가 업데이트되었습니다' : '연락처가 생성되었습니다' 
     })
 
   } catch (error) {
     console.error('Create contact error:', error)
+    
+    // 중복 키 에러 처리
+    if (error.code === '23505') {
+      // 이미 UPSERT를 사용하므로 이 에러는 발생하지 않아야 하지만, 안전장치로 처리
+      return res.status(409).json({ 
+        success: false, 
+        error: '이미 존재하는 연락처입니다. 업데이트를 시도해주세요.' 
+      })
+    }
+    
     return res.status(500).json({ 
       success: false, 
-      error: '연락처 생성 중 오류가 발생했습니다' 
+      error: '연락처 저장 중 오류가 발생했습니다' 
     })
   }
 }
