@@ -162,6 +162,8 @@ async function handlePostRequest(req, res) {
       return handleCheckUserUrl(req, res, body)
     case 'updateUserUrl':
       return handleUpdateUserUrl(req, res, body)
+    case 'redeemGeneral':
+      return handleRedeemGeneral(req, res, body)
     default:
       // action이 없는 경우 기본 사용자 생성 (users.js 호환성)
       if (!action) {
@@ -793,7 +795,7 @@ async function handleGeneralLogin(req, res, body) {
   try {
     const { data: user, error } = await supabase
       .from('admin_users')
-      .select('id, username, name, password, is_active, approval_status, role, page_id, wedding_date')
+      .select('id, username, name, password, is_active, approval_status, role, page_id, wedding_date, groom_name_en, bride_name_en')
       .eq('username', username)
       .single()
 
@@ -812,13 +814,8 @@ async function handleGeneralLogin(req, res, body) {
       })
     }
 
-    if (user.approval_status !== 'approved') {
-      return res.status(401).json({
-        success: false,
-        error: '승인되지 않은 계정입니다.'
-      })
-    }
-
+    // approval_status 체크 제거 - pending이어도 로그인 가능
+    // is_active 체크는 유지
     if (!user.is_active) {
       return res.status(401).json({
         success: false,
@@ -867,6 +864,9 @@ async function handleGeneralLogin(req, res, body) {
 
     const token = Buffer.from(JSON.stringify(tokenPayload)).toString('base64')
 
+    // has_redeem_code 판단: wedding_date, groom_name_en, bride_name_en이 모두 있으면 TRUE
+    const has_redeem_code = !!(user.wedding_date && user.groom_name_en && user.bride_name_en)
+
     return res.status(200).json({
       success: true,
       token,
@@ -876,7 +876,9 @@ async function handleGeneralLogin(req, res, body) {
         name: user.name,
         role: user.role,
         page_id: user.page_id,
-        wedding_date: user.wedding_date
+        wedding_date: user.wedding_date,
+        approval_status: user.approval_status,
+        has_redeem_code: has_redeem_code
       }
     })
 
@@ -1142,6 +1144,131 @@ async function handleApproveUser(req, res, body) {
     return res.status(500).json({
       success: false,
       error: '사용자 승인 처리 중 오류가 발생했습니다'
+    })
+  }
+}
+
+// 일반 유저용 Redeem 코드 처리
+async function handleRedeemGeneral(req, res, body) {
+  const authResult = checkAuth(req, res)
+  if (authResult.error) {
+    return res.status(authResult.error.status).json({
+      success: false,
+      error: authResult.error.message
+    })
+  }
+
+  const { tokenData } = authResult
+  const username = tokenData.username
+
+  const {
+    code,
+    wedding_date,
+    last_groom_name_kr,
+    groom_name_kr,
+    last_groom_name_en,
+    groom_name_en,
+    last_bride_name_kr,
+    bride_name_kr,
+    last_bride_name_en,
+    bride_name_en
+  } = body
+
+  if (!code || !wedding_date || !groom_name_en || !bride_name_en) {
+    return res.status(400).json({
+      success: false,
+      error: '필수 정보를 모두 입력해주세요'
+    })
+  }
+
+  try {
+    // 1. 코드 검증
+    const { data: redeemCode, error: codeError } = await supabase
+      .from('naver_redeem_codes')
+      .select('*')
+      .eq('code', code.trim())
+      .is('used_at', null)
+      .single()
+
+    if (codeError || !redeemCode) {
+      return res.status(400).json({
+        success: false,
+        error: '유효하지 않은 코드입니다'
+      })
+    }
+
+    if (!redeemCode.page_id) {
+      return res.status(400).json({
+        success: false,
+        error: '아직 활성화되지 않은 코드입니다'
+      })
+    }
+
+    // 만료일 체크
+    if (redeemCode.expires_at) {
+      const expiryDate = new Date(redeemCode.expires_at)
+      if (expiryDate < new Date()) {
+        return res.status(400).json({
+          success: false,
+          error: '만료된 코드입니다'
+        })
+      }
+    }
+
+    // 2. user_url 생성 (groom_name_en + bride_name_en 조합, 소문자, 공백/특수문자 제거)
+    const cleanGroomEn = groom_name_en.replace(/[\s\p{P}]/gu, '').toLowerCase()
+    const cleanBrideEn = bride_name_en.replace(/[\s\p{P}]/gu, '').toLowerCase()
+    const user_url = `${cleanGroomEn}${cleanBrideEn}`
+
+    // 3. admin_users 업데이트
+    const { data: updatedUser, error: updateError } = await supabase
+      .from('admin_users')
+      .update({
+        approval_status: 'approved',
+        wedding_date: wedding_date,
+        last_groom_name_kr: last_groom_name_kr || null,
+        groom_name_kr: groom_name_kr || null,
+        last_groom_name_en: last_groom_name_en || null,
+        groom_name_en: groom_name_en,
+        last_bride_name_kr: last_bride_name_kr || null,
+        bride_name_kr: bride_name_kr || null,
+        last_bride_name_en: last_bride_name_en || null,
+        bride_name_en: bride_name_en,
+        page_id: redeemCode.page_id,
+        user_url: user_url
+      })
+      .eq('username', username)
+      .select()
+      .single()
+
+    if (updateError) {
+      console.error('Admin user update error:', updateError)
+      return res.status(500).json({
+        success: false,
+        error: '사용자 정보 업데이트 중 오류가 발생했습니다'
+      })
+    }
+
+    // 4. redeem code 사용 처리
+    await supabase
+      .from('naver_redeem_codes')
+      .update({
+        used_at: new Date().toISOString(),
+        used_by_naver_id: username
+      })
+      .eq('code', code.trim())
+
+    return res.status(200).json({
+      success: true,
+      message: '코드 등록이 완료되었습니다',
+      user: updatedUser
+    })
+
+  } catch (error) {
+    console.error('Redeem general exception:', error)
+    return res.status(500).json({
+      success: false,
+      error: '코드 처리 중 오류가 발생했습니다'
     })
   }
 }
