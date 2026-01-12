@@ -708,10 +708,11 @@ async function handleRegister(req, res, body) {
 
   console.log('Processing register/signup request')
 
-  if (!username || !password || !name || !groom_name_en || !bride_name_en) {
+  // wedding_date, groom_name_en, bride_name_en은 redeem 페이지에서 입력하므로 필수 아님
+  if (!username || !password || !name) {
     return res.status(400).json({
       success: false,
-      error: '사용자명, 비밀번호, 이름, 신랑 영문 이름, 신부 영문 이름을 모두 입력하세요'
+      error: '사용자명, 비밀번호, 이름을 모두 입력하세요'
     })
   }
 
