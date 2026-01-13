@@ -1250,6 +1250,71 @@ async function handleRedeemGeneral(req, res, body) {
       })
     }
 
+    // 3-1. page_settings 업데이트 (기본 정보 섹션에 표시하기 위해)
+    const pageSettingsPayload = {
+      wedding_date: wedding_date,
+      groom_name_kr: groom_name_kr || null,
+      last_groom_name_kr: last_groom_name_kr || null,
+      groom_name_en: groom_name_en,
+      last_groom_name_en: last_groom_name_en || null,
+      bride_name_kr: bride_name_kr || null,
+      last_bride_name_kr: last_bride_name_kr || null,
+      bride_name_en: bride_name_en,
+      last_bride_name_en: last_bride_name_en || null,
+      // 레거시 컬럼 (있으면 UI에 쓰임)
+      groom_name: `${last_groom_name_kr || ''}${groom_name_kr || ''}`.trim(),
+      bride_name: `${last_bride_name_kr || ''}${bride_name_kr || ''}`.trim(),
+      updated_at: new Date().toISOString()
+    }
+
+    // page_settings가 이미 존재하는지 확인
+    const { data: existingPageSettings } = await supabase
+      .from('page_settings')
+      .select('page_id')
+      .eq('page_id', redeemCode.page_id)
+      .single()
+
+    if (existingPageSettings) {
+      // 기존 레코드가 있으면 업데이트
+      const { error: pageUpdateError } = await supabase
+        .from('page_settings')
+        .update(pageSettingsPayload)
+        .eq('page_id', redeemCode.page_id)
+
+      if (pageUpdateError) {
+        console.error('page_settings update error:', pageUpdateError)
+        // page_settings 업데이트 실패는 치명적이지 않으므로 로그만 남김
+      }
+    } else {
+      // 새 레코드 생성
+      const { error: pageInsertError } = await supabase
+        .from('page_settings')
+        .insert({
+          page_id: redeemCode.page_id,
+          ...pageSettingsPayload,
+          // 필수 필드 기본값 설정 (type은 redeem code에서 가져올 수 있음)
+          type: redeemCode.type || 'papillon',
+          bgm: 'off',
+          bgm_vol: 3,
+          rsvp: 'off',
+          comments: 'off',
+          wedding_hour: '12',
+          wedding_minute: '00',
+          highlight_shape: 'circle',
+          highlight_color: '#e0e0e0',
+          highlight_text_color: 'black',
+          gallery_type: 'thumbnail',
+          photo_section_overlay_position: 'bottom',
+          photo_section_overlay_color: '#ffffff',
+          photo_section_locale: 'en'
+        })
+
+      if (pageInsertError) {
+        console.error('page_settings insert error:', pageInsertError)
+        // page_settings 생성 실패는 치명적이지 않으므로 로그만 남김
+      }
+    }
+
     // 4. redeem code 사용 처리
     await supabase
       .from('naver_redeem_codes')
