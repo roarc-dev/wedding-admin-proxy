@@ -408,7 +408,10 @@ export default function UnifiedGalleryComplete({
             alignItems: "center",
             justifyContent: "center",
             overflow: "visible",
-            fontFamily: pageType === "eternal" || pageType === "fiore" ? goldenbookFontFamily : p22FontFamily,
+            fontFamily:
+                pageType === "eternal" || pageType === "fiore"
+                    ? goldenbookFontFamily
+                    : p22FontFamily,
             fontSize: "25px",
             letterSpacing: "0.05em",
             lineHeight: "0.7em",
@@ -498,30 +501,38 @@ export default function UnifiedGalleryComplete({
     const SLIDE_TOTAL = SLIDE_WIDTH + SLIDE_GAP // 슬라이드 하나의 전체 너비
 
     // 썸네일 스크롤을 가운데로 위치시키는 함수
-    const scrollThumbnailToCenter = useCallback((index: number) => {
-        if (thumbnailScrollRef.current && galleryType === "thumbnail") {
-            const container = thumbnailScrollRef.current
-            const thumbnailWidth = 60 // 썸네일 너비
-            const gap = 6 // 썸네일 간격
-            const paddingLeft = 16 // 왼쪽 패딩
+    const scrollThumbnailToCenter = useCallback(
+        (index: number) => {
+            if (thumbnailScrollRef.current && galleryType === "thumbnail") {
+                const container = thumbnailScrollRef.current
+                const thumbnailWidth = 60 // 썸네일 너비
+                const gap = 6 // 썸네일 간격
+                const paddingLeft = 16 // 왼쪽 패딩
 
-            // 선택된 썸네일의 왼쪽 위치 계산
-            const thumbnailLeft = index * (thumbnailWidth + gap) + paddingLeft
+                // 선택된 썸네일의 왼쪽 위치 계산
+                const thumbnailLeft =
+                    index * (thumbnailWidth + gap) + paddingLeft
 
-            // 컨테이너 중앙에 썸네일을 위치시키기 위한 스크롤 위치 계산
-            const containerWidth = container.clientWidth
-            const scrollLeft = thumbnailLeft - (containerWidth / 2) + (thumbnailWidth / 2)
+                // 컨테이너 중앙에 썸네일을 위치시키기 위한 스크롤 위치 계산
+                const containerWidth = container.clientWidth
+                const scrollLeft =
+                    thumbnailLeft - containerWidth / 2 + thumbnailWidth / 2
 
-            // 스크롤 위치가 음수가 되지 않도록 하고, 최대 스크롤 범위를 넘지 않도록 제한
-            const maxScrollLeft = container.scrollWidth - containerWidth
-            const clampedScrollLeft = Math.max(0, Math.min(scrollLeft, maxScrollLeft))
+                // 스크롤 위치가 음수가 되지 않도록 하고, 최대 스크롤 범위를 넘지 않도록 제한
+                const maxScrollLeft = container.scrollWidth - containerWidth
+                const clampedScrollLeft = Math.max(
+                    0,
+                    Math.min(scrollLeft, maxScrollLeft)
+                )
 
-            container.scrollTo({
-                left: clampedScrollLeft,
-                behavior: 'smooth'
-            })
-        }
-    }, [galleryType])
+                container.scrollTo({
+                    left: clampedScrollLeft,
+                    behavior: "smooth",
+                })
+            }
+        },
+        [galleryType]
+    )
 
     // 썸네일형 갤러리 터치 이벤트 핸들러
     const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -541,7 +552,10 @@ export default function UnifiedGalleryComplete({
         if (distance > minSwipeDistance) {
             // 왼쪽으로 스와이프 (다음 이미지) - 썸네일형에서만 사용됨
             setSelectedIndex((prev) => {
-                const newIndex = Math.min(prev + 1, Math.max(images.length - 1, 0))
+                const newIndex = Math.min(
+                    prev + 1,
+                    Math.max(images.length - 1, 0)
+                )
                 // 썸네일 가운데 스크롤
                 setTimeout(() => scrollThumbnailToCenter(newIndex), 0)
                 return newIndex
